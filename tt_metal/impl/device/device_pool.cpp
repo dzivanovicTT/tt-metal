@@ -274,8 +274,7 @@ void DevicePool::initialize(
     _inst->skip_remote_devices = skip;
     _inst->use_max_eth_core_count_on_all_devices_ = use_max_eth_core_count_on_all_devices;
     _inst->add_devices_to_pool(device_ids);
-    // _inst->init_firmware_on_active_devices();
-    // _inst->wait_for_fabric_router_sync();
+        
     tt::tt_metal::MetalContext::instance().get_cluster().set_internal_routing_info_for_ethernet_cores(
         true, target_mmio_ids);
     _inst->init_firmware_on_active_devices();
