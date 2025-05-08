@@ -7,7 +7,7 @@
 #include "compute_kernel_api/reduce.h"
 #include "compute_kernel_api/tilize.h"
 
-#define DEBUG_PRINT 0
+#define DEBUG_PRINT 1
 
 #if DEBUG_PRINT == 1
 #include "debug/dprint.h"
@@ -118,7 +118,7 @@ void MAIN {
     constexpr uint32_t out_cb_id = get_compile_time_arg_val(14);
     constexpr uint32_t interm_cb_id = get_compile_time_arg_val(15);
     constexpr uint32_t in_one_cb_id = get_compile_time_arg_val(16);
-    constexpr bool one_scalar_per_core = get_compile_time_arg_val(17);
+    constexpr bool one_scalar_per_core = get_compile_time_arg_val(17)
 
     constexpr bool is_partial_tile = in_c < 32;
     static_assert((!is_partial_tile || (in_c == 16)), "Partial tile must have c_dim 16");
@@ -168,7 +168,7 @@ void MAIN {
             for (uint32_t h = 0; h < interm_reduction_chunks; h++) {
                 reduce_h_fused_interm<
                     max_tiles_per_iter,
-                    is_partial_tile,
+                    false,
                     max_rows_for_reduction,
                     split_reader,
                     max_rows_for_reduction,
@@ -197,7 +197,7 @@ void MAIN {
         for (uint32_t h = 0; h < interm_reduction_chunks; h++) {
             reduce_h_fused_interm<
                 max_tiles_per_iter,
-                is_partial_tile,
+                false,
                 max_rows_for_reduction,
                 split_reader,
                 max_rows_for_reduction,
