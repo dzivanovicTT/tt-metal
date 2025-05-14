@@ -1152,6 +1152,7 @@ void run_fabric_edm_main_loop(
     // improve performance. The value of 32 was chosen somewhat empirically and then raised up slightly.
 
     while (!got_immediate_termination_signal(termination_signal_ptr)) {
+        invalidate_l1_cache();
         bool got_graceful_termination = got_graceful_termination_signal(termination_signal_ptr);
         if (got_graceful_termination) {
             DPRINT << "EDM Graceful termination\n";
@@ -1984,7 +1985,10 @@ void kernel_main() {
                     tt::tt_fabric::EDMStatus::READY_FOR_TRAFFIC);
             }
         }
+        WAYPOINT("BUL4");
     }
+
+    WAYPOINT("SHAK");
 
     if constexpr (is_2d_fabric) {
         uint32_t has_downstream_edm = has_downstream_edm_vc0_buffer_connection & 0xF;

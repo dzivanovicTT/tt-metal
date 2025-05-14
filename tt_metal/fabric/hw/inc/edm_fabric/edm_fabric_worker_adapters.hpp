@@ -234,7 +234,9 @@ struct WorkerToFabricEdmSenderImpl {
 
     FORCE_INLINE void wait_for_empty_write_slot() const {
         WAYPOINT("FWSW");
-        while (!this->edm_has_space_for_packet());
+        while (!this->edm_has_space_for_packet()) {
+            invalidate_l1_cache();
+        }
         WAYPOINT("FWSD");
     }
 
@@ -391,6 +393,7 @@ struct WorkerToFabricEdmSenderImpl {
     void open() {
         open_start<posted, WORKER_HANDSHAKE_NOC>();
         open_finish<posted, WORKER_HANDSHAKE_NOC>();
+        WAYPOINT("BUBU");
     }
 
     // Advanced usage API:
@@ -481,12 +484,14 @@ private:
     FORCE_INLINE void update_edm_buffer_free_slots(uint8_t noc = noc_index) {
         if constexpr (stateful_api) {
             if constexpr (enable_ring_support) {
+                WAYPOINT("SHXX");
                 noc_inline_dw_write_with_state<true, false, true>(
                     0,  // val unused
                     this->edm_buffer_remote_free_slots_update_addr,
                     this->sync_noc_cmd_buf,
                     noc);
             } else {
+                WAYPOINT("IMZA");
                 noc_inline_dw_write_with_state<false, false, true>(
                     0,  // val unused
                     0,  // addr unused

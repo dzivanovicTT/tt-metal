@@ -1398,7 +1398,7 @@ FORCE_INLINE
 void noc_async_writes_flushed(uint8_t noc = noc_index) {
     RECORD_NOC_EVENT(NocEventType::WRITE_FLUSH);
 
-    WAYPOINT("NWFW");
+    // WAYPOINT("NWFW");
     if constexpr (noc_mode == DM_DYNAMIC_NOC) {
         while (!ncrisc_dynamic_noc_nonposted_writes_sent(noc)) {
             invalidate_l1_cache();
@@ -1407,7 +1407,7 @@ void noc_async_writes_flushed(uint8_t noc = noc_index) {
         while (!ncrisc_noc_nonposted_writes_sent(noc));
     }
     invalidate_l1_cache();
-    WAYPOINT("NWFD");
+    // WAYPOINT("NWFD");
 }
 
 /**
@@ -1592,7 +1592,7 @@ void noc_semaphore_set(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val) {
 template <bool write_to_stream_reg = false, bool posted = false>
 FORCE_INLINE void noc_inline_dw_write(
     uint64_t addr, uint32_t val, uint8_t be = 0xF, uint8_t noc = noc_index, uint8_t vc = NOC_UNICAST_WRITE_VC) {
-    WAYPOINT("NWIW");
+    // WAYPOINT("NWIW");
     DEBUG_SANITIZE_NOC_ADDR(noc, addr, 4);
     // This API does not support DRAM addresses
     DEBUG_SANITIZE_NO_DRAM_ADDR(noc, addr, 4);
@@ -1611,9 +1611,8 @@ FORCE_INLINE void noc_inline_dw_write(
             be,  // byte-enable
             vc,
             false,  // mcast
-            false   // posted
-        );
-        WAYPOINT("NWID");
+            posted);
+        WAYPOINT("NWIX");
         return;
     }
 
@@ -1634,8 +1633,7 @@ FORCE_INLINE void noc_inline_dw_write(
         false,  // linked
         1,      // num_dests
         true,   // multicast_path_reserve
-        false   // posted
-    );
+        posted);
     noc_async_writes_flushed(noc);
 #else
     noc_fast_write_dw_inline<noc_mode>(
@@ -1649,7 +1647,7 @@ FORCE_INLINE void noc_inline_dw_write(
         posted  // posted
     );
 #endif
-    WAYPOINT("NWID");
+    // WAYPOINT("NWID");
 }
 
 // on BH this api can only write to stream register, writing to L1 will cause hangs!

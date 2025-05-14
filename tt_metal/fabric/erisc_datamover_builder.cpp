@@ -537,12 +537,12 @@ std::vector<uint32_t> FabricEriscDatamoverBuilder::get_compile_time_args(uint32_
     TT_ASSERT(this->my_chip_id != this->peer_chip_id);
 
     for (uint32_t i = 0; i < FabricEriscDatamoverConfig::num_sender_channels; i++) {
-        log_trace(tt::LogTest, "Sender {} num buffers: {}", i, this->sender_channels_num_buffers[i]);
-        log_trace(tt::LogTest, "Sender {} channel address: {}", i, this->local_sender_channels_buffer_address[i]);
+        log_info(tt::LogTest, "Sender {} num buffers: {}", i, this->sender_channels_num_buffers[i]);
+        log_info(tt::LogTest, "Sender {} channel address: {}", i, this->local_sender_channels_buffer_address[i]);
     }
     for (uint32_t i = 0; i < FabricEriscDatamoverConfig::num_receiver_channels; i++) {
-        log_trace(tt::LogTest, "Receiver {} num buffers: {}", i, this->receiver_channels_num_buffers[i]);
-        log_trace(tt::LogTest, "Receiver {} channel address: {}", i, this->local_receiver_channels_buffer_address[i]);
+        log_info(tt::LogTest, "Receiver {} num buffers: {}", i, this->receiver_channels_num_buffers[i]);
+        log_info(tt::LogTest, "Receiver {} channel address: {}", i, this->local_receiver_channels_buffer_address[i]);
     }
 
     // TODO: promote to user-configurable parameter (user could be just control plane based on arch in this case)
@@ -552,6 +552,7 @@ std::vector<uint32_t> FabricEriscDatamoverBuilder::get_compile_time_args(uint32_
 
     // TODO: allow specification per eth txq
     const size_t default_num_eth_txq_data_packet_accept_ahead = 32;
+    std::cout << "Handshake addr " << this->handshake_address << std::endl;
 
     size_t num_sender_channels = config.num_used_sender_channels;
     size_t num_receiver_channels = config.num_used_receiver_channels;
