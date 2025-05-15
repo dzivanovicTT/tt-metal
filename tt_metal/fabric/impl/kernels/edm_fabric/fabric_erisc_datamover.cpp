@@ -588,6 +588,7 @@ FORCE_INLINE void receiver_forward_packet(
         }
     } else if constexpr (std::is_same_v<ROUTING_FIELDS_TYPE, tt::tt_fabric::LowLatencyRoutingFields>) {
         uint32_t routing = cached_routing_fields.value & tt::tt_fabric::LowLatencyRoutingFields::FIELD_MASK;
+        WATCHER_RING_BUFFER_PUSH(routing);
         uint16_t payload_size_bytes = packet_start->payload_size_bytes;
         switch (routing) {
             case tt::tt_fabric::LowLatencyRoutingFields::WRITE_ONLY:
@@ -603,6 +604,7 @@ FORCE_INLINE void receiver_forward_packet(
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
                 break;
             default: {
+                WAYPOINT("FAKE");
                 ASSERT(false);
             }
         }
@@ -894,6 +896,7 @@ void run_sender_channel_step(
                 channel_connection_established,
                 sender_channel_free_slots_stream_id);
         }
+        WAYPOINT("BHAS");
     }
 };
 
@@ -933,11 +936,14 @@ void run_receiver_channel_step(
         // and only increment the counter
         ack_counter.counter += pkts_received_since_last_check;
     }
+    WAYPOINT("SQRT");
 
     auto& wr_sent_counter = receiver_channel_pointers.wr_sent_counter;
     bool unwritten_packets = !wr_sent_counter.is_caught_up_to(ack_counter);
     if (unwritten_packets) {
         auto receiver_buffer_index = wr_sent_counter.get_buffer_index();
+        WATCHER_RING_BUFFER_PUSH(0xdeadbeef);
+        WATCHER_RING_BUFFER_PUSH((uint32_t)receiver_buffer_index);
         tt_l1_ptr PACKET_HEADER_TYPE* packet_header = const_cast<PACKET_HEADER_TYPE*>(
             local_receiver_channel.template get_packet_header<PACKET_HEADER_TYPE>(receiver_buffer_index));
 
@@ -974,12 +980,14 @@ void run_receiver_channel_step(
             can_send_to_all_local_chip_receivers = can_forward_packet_completely(hop_cmd, downstream_edm_interface);
 #endif
         } else {
+            WAYPOINT("CQRT");
             can_send_to_all_local_chip_receivers =
                 can_forward_packet_completely(cached_routing_fields, downstream_edm_interface[receiver_channel]);
         }
         bool trid_flushed = receiver_channel_trid_tracker.transaction_flushed(receiver_buffer_index);
         if (can_send_to_all_local_chip_receivers && trid_flushed) {
             did_something = true;
+            WAYPOINT("DQRT");
             uint8_t trid = receiver_channel_trid_tracker.update_buffer_slot_to_next_trid_and_advance_trid_counter(
                 receiver_buffer_index);
             if constexpr (is_2d_fabric) {
@@ -996,6 +1004,7 @@ void run_receiver_channel_step(
                     packet_header, cached_routing_fields, downstream_edm_interface, trid, rx_channel_id, hop_cmd);
 #endif
             } else {
+                WAYPOINT("FQRT");
                 receiver_forward_packet(
                     packet_header,
                     cached_routing_fields,
@@ -1006,6 +1015,8 @@ void run_receiver_channel_step(
             wr_sent_counter.increment();
         }
     }
+
+    WAYPOINT("TQRT");
 
     if constexpr (!fuse_receiver_flush_and_completion_ptr) {
         auto& wr_flush_counter = receiver_channel_pointers.wr_flush_counter;
@@ -1466,6 +1477,33 @@ void kernel_main() {
         eth_txq_reg_write(
             receiver_txq_id, ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD, DEFAULT_NUM_ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD);
     }
+    eth_chan_to_noc_xy[0][0] = (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][1] = (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][2] = (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][3] = (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][4] = (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][5] = (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][6] = (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][7] = (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][8] = (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][9] = (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][10] = (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[0][11] = (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET);
+
+    eth_chan_to_noc_xy[1][0] = (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][1] = (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][2] = (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][3] = (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][4] = (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][5] = (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][6] = (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][7] = (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][8] = (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][9] = (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][10] = (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET);
+    eth_chan_to_noc_xy[1][11] = (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET);
+
+    eth_txq_reg_write(DEFAULT_ETH_TXQ, ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD, DEFAULT_NUM_ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD);
     //
     // COMMON CT ARGS (not specific to sender or receiver)
     //

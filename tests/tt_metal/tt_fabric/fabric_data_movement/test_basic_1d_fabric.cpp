@@ -322,6 +322,7 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
 
     if (!is_2d_fabric) {
         // Find a device with enough neighbours in the specified directions
+        std::cout << "HERE!" << std::endl;
         if (!find_device_with_neighbor_in_multi_direction(
                 fixture,
                 src_fabric_node_id,
@@ -341,6 +342,7 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
             GTEST_SKIP() << "No active eth chans to connect to";
         }
     } else {
+        std::cout << "HERE 2d!" << std::endl;
         auto devices = fixture->get_devices();
         auto num_devices = devices.size();
         // create a list of available deive ids in a random order

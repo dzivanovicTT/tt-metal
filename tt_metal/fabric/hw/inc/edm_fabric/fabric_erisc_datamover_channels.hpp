@@ -75,6 +75,7 @@ public:
 
     template <typename T>
     [[nodiscard]] FORCE_INLINE volatile T* get_packet_header(const BufferIndex& buffer_index) const {
+        WATCHER_RING_BUFFER_PUSH(this->buffer_addresses[buffer_index]);
         return reinterpret_cast<volatile T*>(this->buffer_addresses[buffer_index]);
     }
 

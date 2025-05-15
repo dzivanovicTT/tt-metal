@@ -143,6 +143,7 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(Topology topology) {
     // Channel Allocations
     this->max_l1_loading_size =
         tt::tt_metal::hal::get_erisc_l1_unreserved_size() + tt::tt_metal::hal::get_erisc_l1_unreserved_base();
+    std::cout << "Max l1 loading size: " << this->max_l1_loading_size << std::endl;
     this->buffer_region_start = (buffer_address + buffer_alignment) & ~(buffer_alignment - 1);  // Align
     this->available_channel_buffering_space = max_l1_loading_size - buffer_region_start;
 }
@@ -336,6 +337,7 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(
         this->sender_channels_size_bytes[i] =
             skip_current_channel ? 0 : channel_buffer_size_bytes * num_sender_buffer_slots;
     }
+    log_info(tt::LogOp, "num used receiver channels {}", this->num_used_receiver_channels);
     for (uint32_t i = 0; i < this->num_used_receiver_channels; i++) {
         // skip receiver channel 0 for dateline edm and set the buffer size to 0
         bool skip_current_channel = (i == non_dateline_receiver_channel_idx && is_dateline);
@@ -344,19 +346,19 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(
             skip_current_channel ? 0 : channel_buffer_size_bytes * num_receiver_buffer_slots;
     }
 
-    uint32_t buffer_addr = buffer_region_start;
+    uint32_t buffer_addr = this->buffer_region_start;
     for (uint32_t i = 0; i < this->num_used_sender_channels; i++) {
         this->sender_channels_base_address[i] = buffer_addr;
         buffer_addr += this->sender_channels_size_bytes[i];
-        log_trace(tt::LogOp, "Sender {} channel_start: {}", i, this->sender_channels_base_address[i]);
+        log_info(tt::LogOp, "Sender {} channel_start: {}", i, this->sender_channels_base_address[i]);
     }
     for (uint32_t i = 0; i < this->num_used_receiver_channels; i++) {
         this->receiver_channels_base_address[i] = buffer_addr;
         buffer_addr += this->receiver_channels_size_bytes[i];
-        log_trace(tt::LogOp, "Receiver {} channel_start: {}", i, this->receiver_channels_base_address[i]);
+        log_info(tt::LogOp, "Receiver {} channel_start: {}", i, this->receiver_channels_base_address[i]);
     }
 
-    log_trace(tt::LogOp, "Available channel buffering space: {}", this->available_channel_buffering_space);
+    log_info(tt::LogOp, "Available channel buffering space: {}", this->available_channel_buffering_space);
 
     for (uint32_t i = 0; i < this->num_used_sender_channels; i++) {
         bool skip_current_channel = (i == non_dateline_sender_channel_idx && is_dateline);
