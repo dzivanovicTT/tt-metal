@@ -505,7 +505,7 @@ void EthernetKernel::read_binaries(IDevice* device) {
         build_state.get_target_out_path(this->kernel_full_name_),
         load_type);
     if (tt::tt_metal::MetalContext::instance().rtoptions().get_erisc_iram_enabled() &&
-        this->config_.eth_mode != Eth::IDLE) {
+        this->config_.eth_mode != Eth::IDLE /*&& arch != tt::ARCH::BLACKHOLE*/) {
         // text_addr and some of span's addr point to IRAM base address.
         // However it need to be placed L1 kernel base address for FW to copy it to IRAM then kick off
         // The kernel can run with IRAM base address once it started.

@@ -1212,6 +1212,7 @@ std::unique_ptr<Program> create_and_compile_tt_fabric_program(IDevice* device) {
     auto& fabric_context = control_plane->get_fabric_context();
 
     build_tt_fabric_program(device, fabric_program_ptr.get(), edm_builders);
+    std::cout << " edm builders size: " << edm_builders.size() << std::endl;
     fabric_context.set_num_fabric_initialized_routers(device->id(), edm_builders.size());
     if (edm_builders.empty()) {
         return nullptr;
@@ -1275,6 +1276,7 @@ std::unique_ptr<Program> create_and_compile_tt_fabric_program(IDevice* device) {
 std::unique_ptr<Program> create_and_compile_fabric_program(IDevice* device) {
     auto fabric_config = tt::tt_metal::MetalContext::instance().get_cluster().get_fabric_config();
     if (tt_fabric::is_tt_fabric_config(fabric_config)) {
+        std::cout << "Creating and compiling TT fabric program" << std::endl;
         return create_and_compile_tt_fabric_program(device);
     }
     return nullptr;

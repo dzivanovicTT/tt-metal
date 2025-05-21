@@ -17,7 +17,8 @@
 #include "tt_metal/hw/inc/utils/utils.h"
 #include "tt_metal/hw/inc/wormhole/core_config.h"
 #include "debug/assert.h"
-
+#include "debug/dprint.h"
+#include "debug/pause.h"
 #include <cstdint>
 #include <array>
 
@@ -88,6 +89,7 @@ struct WorkerToFabricEdmSenderImpl {
         auto worker_teardown_sem_addr =
             reinterpret_cast<volatile uint32_t* const>(get_semaphore<my_core_type>(get_arg_val<uint32_t>(arg_idx++)));
         const auto worker_buffer_index_semaphore_addr = get_semaphore<my_core_type>(get_arg_val<uint32_t>(arg_idx++));
+        DPRINT << "edm_l1_sem_id " << (uint32_t)edm_l1_sem_id << ENDL();
         return WorkerToFabricEdmSenderImpl(
             is_persistent_fabric,
             direction,
@@ -402,6 +404,7 @@ struct WorkerToFabricEdmSenderImpl {
     // !!! IMPORTANT !!!
     // Must be called alongside (before) close_finish().
     void close_start() {
+        DPRINT << "In close_start edm x-y " << (uint32_t)this->edm_noc_x << "-" << (uint32_t)this->edm_noc_y << ENDL();
         const auto dest_noc_addr_coord_only =
             get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0) & ~(uint64_t)NOC_COORDINATE_MASK;
 
@@ -484,14 +487,12 @@ private:
     FORCE_INLINE void update_edm_buffer_free_slots(uint8_t noc = noc_index) {
         if constexpr (stateful_api) {
             if constexpr (enable_ring_support) {
-                WAYPOINT("SHXX");
                 noc_inline_dw_write_with_state<true, false, true>(
                     0,  // val unused
                     this->edm_buffer_remote_free_slots_update_addr,
                     this->sync_noc_cmd_buf,
                     noc);
             } else {
-                WAYPOINT("IMZA");
                 noc_inline_dw_write_with_state<false, false, true>(
                     0,  // val unused
                     0,  // addr unused
@@ -560,6 +561,7 @@ private:
     template <EDM_IO_BLOCKING_MODE blocking_mode>
     FORCE_INLINE void send_payload_without_header_from_address_impl(uint32_t source_address, size_t size_bytes) {
         uint64_t buffer_address = this->compute_dest_buffer_slot_noc_addr();
+        DPRINT << "SPWHFAI ba: " << HEX() << buffer_address << DEC() << ENDL();
 
         // skip past the first part of the buffer which will be occupied by the packet header
         send_chunk_from_address<blocking_mode>(
@@ -568,6 +570,8 @@ private:
     template <EDM_IO_BLOCKING_MODE blocking_mode>
     FORCE_INLINE void send_payload_from_address_impl(uint32_t source_address, size_t size_bytes) {
         uint64_t buffer_address = this->compute_dest_buffer_slot_noc_addr();
+        DPRINT << "SPFAI ba: " << HEX() << buffer_address << DEC() << ENDL();
+
         ASSERT(size_bytes <= this->buffer_size_bytes);
         ASSERT(tt::tt_fabric::is_valid(
             *const_cast<PACKET_HEADER_TYPE*>(reinterpret_cast<volatile PACKET_HEADER_TYPE*>(source_address))));

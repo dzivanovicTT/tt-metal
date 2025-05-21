@@ -312,6 +312,7 @@ void DevicePool::initialize_host(IDevice* dev) const {
 
 void DevicePool::initialize_active_devices() const {
     const auto& active_devices = this->get_all_active_devices();
+    std::cout << "Num of active devices: " << active_devices.size() << std::endl;
 
     // Activate fabric (must be before FD)
     FabricConfig fabric_config = tt::tt_metal::MetalContext::instance().get_cluster().get_fabric_config();
@@ -328,6 +329,7 @@ void DevicePool::initialize_active_devices() const {
 
         // Initialize fabric on mmio device
         for (const auto& dev : active_devices) {
+            std::cout << "Initializing fabric on device " << dev->id() << std::endl;
             dev->init_fabric();
         }
         log_info(tt::LogMetal, "Fabric Initialized with config {}", fabric_config);
