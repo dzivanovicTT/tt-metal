@@ -8,20 +8,8 @@
 #include "debug/dprint.h"
 #include "debug/dprint_pages.h"
 
-uint32_t cb_srca = 256;  // outside of any cbs
-uint32_t cb_srcb = 256;  // outside of any cbs
-
-constexpr std::uint32_t onetile = 1;
-
-template <bool to_from_int8 = false>
-ALWI void test_func(const uint32_t srca_new_operand, const uint32_t srcb_new_operand) {
-    DPRINT << "AAAAA 1\n";
-}
-
-inline bool dummy_compare(std::uint32_t old_operand, std::uint32_t new_operand) {
-    return (unpack_src_format[old_operand] != unpack_src_format[new_operand]) ||
-           (unpack_dst_format[old_operand] != unpack_dst_format[new_operand]);
-}
+static uint32_t cb_srca = 256;  // outside of any cbs
+static uint32_t cb_srcb = 256;  // outside of any cbs
 
 namespace NAMESPACE {
 void MAIN {
@@ -30,41 +18,44 @@ void MAIN {
     constexpr auto cb_other = tt::CBIndex::c_1;
     constexpr auto cb_out = tt::CBIndex::c_2;
 
-    // Variables
-    constexpr uint32_t input_dst_reg = 0;
-
     binary_op_init_common(cb_in, cb_other, cb_out);
 
     tile_regs_acquire();
-    cb_wait_front(cb_in, onetile);
-    cb_wait_front(cb_other, onetile);
+    cb_wait_front(cb_in, 1);
+    cb_wait_front(cb_other, 1);
 
-    {
-        DPRINT << "DST_ACCUM_MODE " << static_cast<uint32_t>(DST_ACCUM_MODE) << "\n";
-        if (cb_srca == 256 || cb_srcb == 256) {
-            test_func<DST_ACCUM_MODE>(cb_in, cb_other);
-        } else {
-            UNPACK(if (dummy_compare(cb_srca, cb_in)) { TTI_STALLWAIT(p_stall::STALL_CFG, p_stall::UNPACK0); })
-        }
-
-        cb_srca = cb_in;
-        cb_srcb = cb_other;
+    // These DPRINTS are necessary
+    UNPACK(DPRINT << "DST_ACCUM_MODE " << static_cast<uint32_t>(DST_ACCUM_MODE) << "\n");
+    if (cb_srca == 256 || cb_srcb == 256) {
+        UNPACK(DPRINT << "UNPACK 1\n");
+        MATH(DPRINT << "  MATH 1\n");
+        PACK(DPRINT << "  PACK 1\n");
+    } else {
+        UNPACK(
+            if (unpack_src_format[cb_srca] != unpack_src_format[cb_in] ||
+                unpack_dst_format[cb_srca] != unpack_dst_format[cb_in]) {
+                TTI_STALLWAIT(p_stall::STALL_CFG, p_stall::UNPACK0);
+            });
     }
+
+    cb_srca = cb_in;
+    cb_srcb = cb_other;
 
     mul_tiles_init(cb_in, cb_other);
     mul_tiles(cb_in, cb_other, 0, 0, 0);
+    //    PACK(tt::compute::common::print_full_tile(cb_other, 0, false));
 
-    cb_pop_front(cb_in, onetile);
-    cb_pop_front(cb_other, onetile);
+    cb_pop_front(cb_in, 1);
+    cb_pop_front(cb_other, 1);
     tile_regs_commit();
 
     tile_regs_wait();
-    cb_reserve_back(cb_out, onetile);
+    cb_reserve_back(cb_out, 1);
     pack_tile(0, cb_out);
-    cb_push_back(cb_out, onetile);
+    cb_push_back(cb_out, 1);
     tile_regs_release();
 
     cb_wait_front(cb_out, 1);
-    UNPACK(tt::compute::common::print_full_tile(cb_out, 0, false);)
+    // UNPACK(tt::compute::common::print_full_tile(cb_out, 0, false));
 }
 }  // namespace NAMESPACE

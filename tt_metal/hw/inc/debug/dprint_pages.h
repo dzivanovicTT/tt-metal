@@ -72,7 +72,7 @@ inline void print_tile_rows(uint32_t cb_id, uint32_t rows = 32, uint32_t tile_id
 }
 
 inline void print_full_tile(uint32_t cb_id, uint32_t tile_id = 0, bool untilize = false) {
-    DPRINT << "======" << ENDL();
+    DPRINT << "===TILE===" << COMPILE_FOR_TRISC << ENDL();
     for (uint16_t r = 0; r < 32; ++r) {
         DPRINT << (uint)r << " : "
                << TileSlice(

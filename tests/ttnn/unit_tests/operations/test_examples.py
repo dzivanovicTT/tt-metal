@@ -14,8 +14,8 @@ def test_example(device):
 
     shape = [5 * 32, 32]
 
-    torch_input = torch.ones(shape, dtype=torch.bfloat16) * -1.7014118e38
-    torch_other = torch.zeros(shape, dtype=torch.bfloat16) * 0
+    torch_input = torch.ones(shape, dtype=torch.bfloat16) * 128.0
+    torch_other = torch.ones(shape, dtype=torch.bfloat16) * 0.0
 
     expected_output = torch_input * torch_other
 
@@ -34,6 +34,5 @@ def test_example(device):
 
         ret = torch.allclose(actual_output, expected_output, atol=0, rtol=0)
         if not ret:
-            None
-            # print("actual_output", actual_output.to(torch.float32).flatten().tolist())
+            print("actual_output", actual_output.to(torch.float32).flatten().tolist())
         assert torch.allclose(actual_output, expected_output, atol=0, rtol=0)
