@@ -8,6 +8,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "debug/dprint.h"
+#include "debug/pause.h"
 #include "dataflow_api.h"
 #if defined(COMPILE_FOR_ERISC)
 #include "tt_metal/hw/inc/ethernet/tunneling.h"

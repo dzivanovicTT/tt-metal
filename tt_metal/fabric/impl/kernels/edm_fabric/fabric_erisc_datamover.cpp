@@ -395,6 +395,7 @@ FORCE_INLINE void send_next_data(
     while (internal_::eth_txq_is_busy(sender_txq_id)) {
     };
     remote_update_ptr_val<to_receiver_pkts_sent_id, sender_txq_id>(packets_to_forward);
+    WATCHER_RING_BUFFER_PUSH(0xfacefeed);
 }
 
 /////////////////////////////////////////////
@@ -806,7 +807,12 @@ void run_sender_channel_step(
     // TODO: convert to loop to send multiple packets back to back (or support sending multiple packets in one shot)
     //       when moving to stream regs to manage rd/wr ptrs
     // TODO: update to be stream reg based. Initialize to space available and simply check for non-zero
-    WATCHER_RING_BUFFER_PUSH(0xabcd1234);
+    // invalidate_l1_cache();
+    // asm("fence");
+    // WATCHER_RING_BUFFER_PUSH(0xabcd1234);
+    // for (int i = 0; i < 2048; i++) {
+    //     asm("fence");
+    // }
     bool receiver_has_space_for_packet = outbound_to_receiver_channel_pointers.has_space_for_packet();
     uint32_t free_slots = get_ptr_val(sender_channel_free_slots_stream_id);
     bool has_unsent_packet = free_slots != SENDER_NUM_BUFFERS;
@@ -819,6 +825,7 @@ void run_sender_channel_step(
         can_send = can_send && !sender_backpressured_from_sender_side;
     }
     if (can_send) {
+        WATCHER_RING_BUFFER_PUSH(0xfacefeed);
         did_something = true;
         if constexpr (enable_packet_header_recording) {
             auto packet_header = reinterpret_cast<PACKET_HEADER_TYPE*>(local_sender_channel.get_buffer_address(
@@ -923,8 +930,8 @@ void run_receiver_channel_step(
     std::array<uint8_t, num_eth_ports>& port_direction_table) {
     auto& ack_counter = receiver_channel_pointers.ack_counter;
     auto pkts_received_since_last_check = get_ptr_val<to_receiver_pkts_sent_id>();
-    // WATCHER_RING_BUFFER_PUSH(0xfacefeed);
-    // WATCHER_RING_BUFFER_PUSH(pkts_received_since_last_check);
+    // WATCHER_RING_BUFFER_PUSH(0xcabebabe);
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)pkts_received_since_last_check);
     if constexpr (enable_first_level_ack) {
         bool pkts_received = pkts_received_since_last_check > 0;
         ASSERT(receiver_channel_pointers.completion_counter - ack_counter < RECEIVER_NUM_BUFFERS);
@@ -1325,6 +1332,7 @@ void run_fabric_edm_main_loop(
 
         if constexpr (enable_context_switch) {
             if (did_something) {
+                WATCHER_RING_BUFFER_PUSH(0xfebafeba);
                 did_nothing_count = 0;
             } else {
                 if (did_nothing_count++ > SWITCH_INTERVAL) {
@@ -1345,7 +1353,9 @@ void __attribute__((noinline)) wait_for_static_connection_to_ready(
     std::array<uint32_t, NUM_SENDER_CHANNELS>& local_sender_channel_free_slots_stream_ids_ordered) {
     for (size_t i = 0; i < NUM_SENDER_CHANNELS; i++) {
         if (sender_ch_live_check_skip[i]) {
-            while (!connect_is_requested(*local_sender_channel_worker_interfaces[i].connection_live_semaphore));
+            while (!connect_is_requested(*local_sender_channel_worker_interfaces[i].connection_live_semaphore)) {
+                invalidate_l1_cache();
+            }
             establish_edm_connection(
                 local_sender_channel_worker_interfaces[i], local_sender_channel_free_slots_stream_ids_ordered[i]);
         }
@@ -1674,6 +1684,8 @@ void kernel_main() {
     ////////////////////////
     // Sender runtime args
     ////////////////////////
+    // WATCHER_RING_BUFFER_PUSH(0x70098778);
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)arg_idx);
     auto sender0_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(
         persistent_mode ? get_arg_val<uint32_t>(arg_idx++)
                         : get_semaphore<ProgrammableCoreType::ACTIVE_ETH>(get_arg_val<uint32_t>(arg_idx++)));
@@ -1685,6 +1697,10 @@ void kernel_main() {
                      : get_semaphore<ProgrammableCoreType::ACTIVE_ETH>(get_arg_val<uint32_t>(arg_idx++)));
     auto sender3_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(get_arg_val<uint32_t>(arg_idx++));
     auto sender4_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(get_arg_val<uint32_t>(arg_idx++));
+    // WATCHER_RING_BUFFER_PUSH(0x70098778);
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)sender0_worker_semaphore_ptr);
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)sender1_worker_semaphore_ptr);
+    // WATCHER_RING_BUFFER_PUSH(0x50098778);
 
     const size_t local_sender_channel_0_connection_buffer_index_addr =
         persistent_mode ? local_sender_channel_0_connection_buffer_index_id
