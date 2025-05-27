@@ -79,7 +79,7 @@ class TtLinearParameters:
         if shard_dim in [0, -2]:
             bias_mm = _ShardBias(device)
         elif shard_dim in [1, -1]:
-            bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=[None, 1])
+            bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=[None, shard_dim])
         else:
             bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=[None, None])
 
