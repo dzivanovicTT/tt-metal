@@ -270,6 +270,7 @@ class CMakeBuild(build_ext):
 
 
 packages = find_packages(where="ttnn", exclude=["ttnn.examples", "ttnn.examples.*"])
+packages += find_packages("tools")
 
 print(("packaging: ", packages))
 
@@ -291,6 +292,7 @@ setup(
     packages=packages,
     package_dir={
         "": "ttnn",
+        "tracy": "tools/tracy",
     },
     long_description_content_type="text/markdown",
     ext_modules=ext_modules,
