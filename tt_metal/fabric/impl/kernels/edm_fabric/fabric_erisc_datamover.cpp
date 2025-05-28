@@ -825,7 +825,7 @@ void run_sender_channel_step(
         can_send = can_send && !sender_backpressured_from_sender_side;
     }
     if (can_send) {
-        WATCHER_RING_BUFFER_PUSH(0xfacefeed);
+        WATCHER_RING_BUFFER_PUSH(0x34078765);
         did_something = true;
         if constexpr (enable_packet_header_recording) {
             auto packet_header = reinterpret_cast<PACKET_HEADER_TYPE*>(local_sender_channel.get_buffer_address(
@@ -929,9 +929,16 @@ void run_receiver_channel_step(
     uint8_t rx_channel_id,
     std::array<uint8_t, num_eth_ports>& port_direction_table) {
     auto& ack_counter = receiver_channel_pointers.ack_counter;
+
+    // WATCHER_RING_BUFFER_PUSH(0x31182413);
+
     auto pkts_received_since_last_check = get_ptr_val<to_receiver_pkts_sent_id>();
+
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)to_receiver_pkts_sent_id);
+    // WATCHER_RING_BUFFER_PUSH(pkts_received_since_last_check);
+
     // WATCHER_RING_BUFFER_PUSH(0xcabebabe);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)pkts_received_since_last_check);
+    // WATCHER_RING_BUFFER_PUSH((uint32_t)enable_first_level_ack);
     if constexpr (enable_first_level_ack) {
         bool pkts_received = pkts_received_since_last_check > 0;
         ASSERT(receiver_channel_pointers.completion_counter - ack_counter < RECEIVER_NUM_BUFFERS);
@@ -947,11 +954,12 @@ void run_receiver_channel_step(
         // and only increment the counter
         ack_counter.counter += pkts_received_since_last_check;
     }
-    WAYPOINT("SQRT");
+    // WAYPOINT("SQRT");
 
     auto& wr_sent_counter = receiver_channel_pointers.wr_sent_counter;
     bool unwritten_packets = !wr_sent_counter.is_caught_up_to(ack_counter);
     if (unwritten_packets) {
+        WATCHER_RING_BUFFER_PUSH(0x8BADF00D);
         auto receiver_buffer_index = wr_sent_counter.get_buffer_index();
         tt_l1_ptr PACKET_HEADER_TYPE* packet_header = const_cast<PACKET_HEADER_TYPE*>(
             local_receiver_channel.template get_packet_header<PACKET_HEADER_TYPE>(receiver_buffer_index));
@@ -1484,33 +1492,6 @@ void kernel_main() {
         eth_txq_reg_write(
             receiver_txq_id, ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD, DEFAULT_NUM_ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD);
     }
-    eth_chan_to_noc_xy[0][0] = (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][1] = (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][2] = (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][3] = (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][4] = (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][5] = (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][6] = (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][7] = (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][8] = (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][9] = (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][10] = (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[0][11] = (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET);
-
-    eth_chan_to_noc_xy[1][0] = (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][1] = (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][2] = (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][3] = (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][4] = (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][5] = (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][6] = (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][7] = (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][8] = (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][9] = (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][10] = (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET);
-    eth_chan_to_noc_xy[1][11] = (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET);
-
-    eth_txq_reg_write(DEFAULT_ETH_TXQ, ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD, DEFAULT_NUM_ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD);
     //
     // COMMON CT ARGS (not specific to sender or receiver)
     //

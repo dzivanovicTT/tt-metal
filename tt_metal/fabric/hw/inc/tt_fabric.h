@@ -297,39 +297,6 @@ struct fvc_inbound_push_state_t {
             tt::tt_fabric::chan_id_t my_chan = routing_table->intra_mesh_table.dest_entry[device_id];
             uint32_t my_direction;
 
-            uint16_t eth_chan_to_noc_xy_1[2][12] = {
-                {
-                    // noc=0
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-                },
-                {
-                    // noc=1
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                    (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-                },
-            };
-
             if (routing_table->port_direction.directions[eth_chan_directions::EAST] == my_chan) {
                 my_direction = eth_chan_directions::EAST;
                 mcast_router_noc_xy[eth_chan_directions::WEST] =
@@ -558,39 +525,6 @@ struct fvc_inbound_push_state_t {
 
 #ifndef LOW_LATENCY_ROUTING
     uint32_t get_next_hop_router_noc_xy() {
-        uint16_t eth_chan_to_noc_xy_1[2][12] = {
-            {
-                // noc=0
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-            {
-                // noc=1
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-        };
-
         uint32_t dst_mesh_id = packet_header->routing.dst_mesh_id;
         if (dst_mesh_id != routing_table->my_mesh_id) {
             uint32_t next_port = routing_table->inter_mesh_table.dest_entry[dst_mesh_id];
@@ -608,39 +542,6 @@ struct fvc_inbound_push_state_t {
 #endif
 
     uint32_t get_next_hop_router_noc_xy(uint32_t dst_mesh_id, uint32_t dst_dev_id) {
-        uint16_t eth_chan_to_noc_xy_1[2][12] = {
-            {
-                // noc=0
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-            {
-                // noc=1
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-        };
-
         if (dst_mesh_id != routing_table->my_mesh_id) {
             uint32_t next_port = routing_table->inter_mesh_table.dest_entry[dst_mesh_id];
             ASSERT(next_port != INVALID_DIRECTION);
@@ -1255,39 +1156,6 @@ struct fvc_inbound_pull_state_t {
     }
 
     inline void init(uint32_t data_buf_start, uint32_t data_buf_size_words) {
-        uint16_t eth_chan_to_noc_xy_1[2][12] = {
-            {
-                // noc=0
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-            {
-                // noc=1
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-        };
-
         uint32_t words = sizeof(fvc_inbound_pull_state_t) / 4;
         uint32_t* ptr = (uint32_t*)this;
         for (uint32_t i = 0; i < words; i++) {
@@ -1504,39 +1372,6 @@ struct fvc_inbound_pull_state_t {
     }
 
     uint32_t get_next_hop_router_noc_xy() {
-        uint16_t eth_chan_to_noc_xy_1[2][12] = {
-            {
-                // noc=0
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-            {
-                // noc=1
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-        };
-
         uint32_t dst_mesh_id = current_packet_header.routing.dst_mesh_id;
         if (dst_mesh_id != routing_table->my_mesh_id) {
             uint32_t next_port = routing_table->inter_mesh_table.dest_entry[dst_mesh_id];
@@ -2151,39 +1986,6 @@ struct fvcc_inbound_state_t {
     }
 
     uint32_t get_next_hop_router_noc_xy() {
-        uint16_t eth_chan_to_noc_xy_1[2][12] = {
-            {
-                // noc=0
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-            {
-                // noc=1
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 20) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 21) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 22) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 23) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 25) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 26) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 27) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 28) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 29) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 30) << NOC_COORD_REG_OFFSET),
-                (((25 << NOC_ADDR_NODE_ID_BITS) | 31) << NOC_COORD_REG_OFFSET),
-            },
-        };
-
         uint32_t dst_mesh_id = current_packet_header->routing.dst_mesh_id;
         if (dst_mesh_id != routing_table->my_mesh_id) {
             uint32_t next_port = routing_table->inter_mesh_table.dest_entry[dst_mesh_id];
