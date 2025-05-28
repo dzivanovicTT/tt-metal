@@ -1328,7 +1328,7 @@ void noc_async_full_barrier(uint8_t noc_idx = noc_index) {
 // clang-format on
 FORCE_INLINE
 void noc_semaphore_wait(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val) {
-    RECORD_NOC_EVENT(NocEventType::SEMAPHORE_WAIT);
+    // RECORD_NOC_EVENT(NocEventType::SEMAPHORE_WAIT);
 
     WAYPOINT("NSW");
     do {
@@ -1354,7 +1354,7 @@ void noc_semaphore_wait(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val) {
 // clang-format on
 FORCE_INLINE
 void noc_semaphore_wait_min(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val) {
-    RECORD_NOC_EVENT(NocEventType::SEMAPHORE_WAIT);
+    // RECORD_NOC_EVENT(NocEventType::SEMAPHORE_WAIT);
 
     WAYPOINT("NSMW");
     do {
@@ -1380,7 +1380,7 @@ void noc_semaphore_wait_min(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val)
 // clang-format on
 FORCE_INLINE
 void noc_semaphore_set(volatile tt_l1_ptr uint32_t* sem_addr, uint32_t val) {
-    RECORD_NOC_EVENT(NocEventType::SEMAPHORE_SET);
+    // RECORD_NOC_EVENT(NocEventType::SEMAPHORE_SET);
 
     // set semaphore value to val
     (*sem_addr) = val;
