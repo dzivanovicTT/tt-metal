@@ -28,7 +28,7 @@ def test_transpose(device):
         memory_config=ttnn.L1_MEMORY_CONFIG,
     )
 
-    tt_output = ttnn.transpose(tt_input, 0, 1)
+    tt_output = ttnn.permute(tt_input, (1, 0))
 
     # Convert back to PyTorch for comparison
     tt_result = ttnn.to_torch(tt_output)
