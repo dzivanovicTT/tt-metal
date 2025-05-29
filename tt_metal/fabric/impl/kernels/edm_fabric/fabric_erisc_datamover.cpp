@@ -396,6 +396,90 @@ FORCE_INLINE void send_next_data(
     };
     remote_update_ptr_val<to_receiver_pkts_sent_id, sender_txq_id>(packets_to_forward);
     WATCHER_RING_BUFFER_PUSH(0xfacefeed);
+
+    while (internal_::eth_txq_is_busy(DEFAULT_ETH_TXQ)) {
+    };
+
+    for (int i = 0; i < 8192; i++) {
+        asm("nop");
+    }
+
+    uint32_t tx_cnt2 = ETH_READ_REG(0xFFB90030);
+    uint32_t local_rn2 = ETH_READ_REG(0xFFB94040);
+    uint32_t remote_rn2 = ETH_READ_REG(0xFFB94044);
+    uint32_t dropped2 = ETH_READ_REG(0xFFB9404C);
+
+    DPRINT << "After remote_update_ptr_val: tx_cnt2: " << tx_cnt2 << ", local_rn2: " << local_rn2
+           << ", remote_rn2: " << remote_rn2 << ", dropped2: " << dropped2 << ENDL();
+
+    WATCHER_RING_BUFFER_PUSH(tx_cnt2);
+    WATCHER_RING_BUFFER_PUSH(local_rn2);
+    WATCHER_RING_BUFFER_PUSH(remote_rn2);
+    WATCHER_RING_BUFFER_PUSH(dropped2);
+    WATCHER_RING_BUFFER_PUSH(0xfeedface);
+
+    volatile tt_l1_ptr uint32_t* tx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x33300);
+
+    uint32_t tx_ctrl = ETH_READ_REG(0xFFB90000);
+    uint32_t tx_cmd = ETH_READ_REG(0xFFB90004);
+    uint32_t tx_status = ETH_READ_REG(0xFFB90008);
+    uint32_t max_pkt_size_b = ETH_READ_REG(0xFFB9000C);
+    uint32_t tx_start_addr = ETH_READ_REG(0xFFB90014);
+    uint32_t tx_size_b = ETH_READ_REG(0xFFB90018);
+    uint32_t dst_addr = ETH_READ_REG(0xFFB9001C);
+    uint32_t mac_tx_sop = ETH_READ_REG(0xFFB90020);
+    uint32_t mac_tx_eop = ETH_READ_REG(0xFFB90024);
+    uint32_t mac_tx_eop_stat = ETH_READ_REG(0xFFB90028);
+    uint32_t tx_tx_cnt = ETH_READ_REG(0xFFB90030);
+    uint32_t tx_pkt_st_cnt = ETH_READ_REG(0xFFB90034);
+    uint32_t tx_pkt_end_cnt = ETH_READ_REG(0xFFB9003C);
+    uint32_t tx_wd_cnt = ETH_READ_REG(0xFFB90040);
+    uint32_t tx_remote_reg_data = ETH_READ_REG(0xFFB90044);
+    uint32_t tx_remote_seq_timeout = ETH_READ_REG(0xFFB90048);
+    uint32_t tx_local_seq_update_timeout = ETH_READ_REG(0xFFB9004C);
+    uint32_t tx_min_pkt_size_words = ETH_READ_REG(0xFFB90064);
+    uint32_t tx_resend_cnt = ETH_READ_REG(0xFFB90068);
+    uint32_t tx_data_packet_accept_ahead = ETH_READ_REG(0xFFB9006C);
+    uint32_t tx_afifo_ctrl = ETH_READ_REG(0xFFB90070);
+    uint32_t tx_cfg_sel_sw = ETH_READ_REG(0xFFB90080);
+    uint32_t tx_cfg_sel_hw = ETH_READ_REG(0xFFB90084);
+    uint32_t tx_cfg_sel_ovl = ETH_READ_REG(0xFFB90088);
+    uint32_t tx_timestamp = ETH_READ_REG(0xFFB90090);
+    uint32_t tx_rx_timestamp_lo = ETH_READ_REG(0xFFB90094);
+    uint32_t tx_rx_timestamp_hi = ETH_READ_REG(0xFFB90098);
+    uint32_t tx_pause_stat = ETH_READ_REG(0xFFB900A0);
+
+    uint32_t prev_tx_tx_cnt = *(tx_debug_ptr + 10);
+    uint32_t prev_tx_pkt_st_cnt = *(tx_debug_ptr + 11);
+    uint32_t prev_tx_pkt_end_cnt = *(tx_debug_ptr + 12);
+    uint32_t prev_tx_resend_cnt = *(tx_debug_ptr + 18);
+    *tx_debug_ptr = tx_ctrl;
+    *(tx_debug_ptr + 1) = tx_cmd;
+    *(tx_debug_ptr + 2) = tx_status;
+    *(tx_debug_ptr + 4) = tx_start_addr;
+    *(tx_debug_ptr + 5) = tx_size_b;
+    *(tx_debug_ptr + 6) = dst_addr;
+    *(tx_debug_ptr + 7) = mac_tx_sop;
+    *(tx_debug_ptr + 8) = mac_tx_eop;
+    *(tx_debug_ptr + 9) = mac_tx_eop_stat;
+    *(tx_debug_ptr + 10) = tx_tx_cnt - prev_tx_tx_cnt;
+    *(tx_debug_ptr + 11) = tx_pkt_st_cnt - prev_tx_pkt_st_cnt;
+    *(tx_debug_ptr + 12) = tx_pkt_end_cnt - prev_tx_pkt_end_cnt;
+    *(tx_debug_ptr + 13) = tx_wd_cnt;
+    *(tx_debug_ptr + 14) = tx_remote_reg_data;
+    *(tx_debug_ptr + 15) = tx_remote_seq_timeout;
+    *(tx_debug_ptr + 16) = tx_local_seq_update_timeout;
+    *(tx_debug_ptr + 17) = tx_min_pkt_size_words;
+    *(tx_debug_ptr + 18) = tx_resend_cnt - prev_tx_resend_cnt;
+    *(tx_debug_ptr + 19) = tx_data_packet_accept_ahead;
+    *(tx_debug_ptr + 20) = tx_afifo_ctrl;
+    *(tx_debug_ptr + 21) = tx_cfg_sel_sw;
+    *(tx_debug_ptr + 22) = tx_cfg_sel_hw;
+    *(tx_debug_ptr + 23) = tx_cfg_sel_ovl;
+    *(tx_debug_ptr + 24) = tx_timestamp;
+    *(tx_debug_ptr + 25) = tx_rx_timestamp_lo;
+    *(tx_debug_ptr + 26) = tx_rx_timestamp_hi;
+    *(tx_debug_ptr + 27) = tx_pause_stat;
 }
 
 /////////////////////////////////////////////
@@ -827,6 +911,7 @@ void run_sender_channel_step(
     if (can_send) {
         WATCHER_RING_BUFFER_PUSH(0x34078765);
         did_something = true;
+        WAYPOINT("NAVY");
         if constexpr (enable_packet_header_recording) {
             auto packet_header = reinterpret_cast<PACKET_HEADER_TYPE*>(local_sender_channel.get_buffer_address(
                 local_sender_channel_worker_interface.local_write_counter.get_buffer_index()));
@@ -932,10 +1017,89 @@ void run_receiver_channel_step(
 
     // WATCHER_RING_BUFFER_PUSH(0x31182413);
 
+    uint32_t stream_reg =
+        NOC_STREAM_READ_REG(to_receiver_pkts_sent_id, STREAM_REMOTE_DEST_BUF_SPACE_AVAILABLE_REG_INDEX);
+
     auto pkts_received_since_last_check = get_ptr_val<to_receiver_pkts_sent_id>();
 
+    uint32_t rx_ctrl = ETH_READ_REG(0xFFB94000);
+    uint32_t byte_cnt = ETH_READ_REG(0xFFB94004);
+    uint32_t buf_ptr = ETH_READ_REG(0xFFB94008);
+    uint32_t buf_start_word_addr = ETH_READ_REG(0xFFB9400C);
+    uint32_t buf_size_words = ETH_READ_REG(0xFFB94010);
+    uint32_t word_cnt = ETH_READ_REG(0xFFB94014);
+    uint32_t hdr_ctrl = ETH_READ_REG(0xFFB94018);
+    uint32_t pkt_st_cnt = ETH_READ_REG(0xFFB94024);
+    uint32_t pkt_end_cnt = ETH_READ_REG(0xFFB94028);
+    uint32_t rx_status = ETH_READ_REG(0xFFB94030);
+    uint32_t local_rx_seq_num = ETH_READ_REG(0xFFB94040);
+    uint32_t remote_rx_seq_num = ETH_READ_REG(0xFFB94044);
+    uint32_t tile_header_format = ETH_READ_REG(0xFFB94048);
+    uint32_t pkt_drop_cnt = ETH_READ_REG(0xFFB9404C);
+    uint32_t outstanding_wr_cnt = ETH_READ_REG(0xFFB94050);
+    uint32_t err_enable = ETH_READ_REG(0xFFB94060);
+    uint32_t err_stat_raw = ETH_READ_REG(0xFFB94064);
+    uint32_t err_stat = ETH_READ_REG(0xFFB94068);
+    uint32_t err_clear = ETH_READ_REG(0xFFB9406C);
+    uint32_t rcvd_hdr0 = ETH_READ_REG(0xFFB94070);
+    uint32_t rcvd_hdr1 = ETH_READ_REG(0xFFB94074);
+    uint32_t rcvd_hdr2 = ETH_READ_REG(0xFFB94078);
+    uint32_t rcvd_hdr3 = ETH_READ_REG(0xFFB9407C);
+    uint32_t rcvd_hdr4 = ETH_READ_REG(0xFFB94080);
+    uint32_t rcvd_hdr5 = ETH_READ_REG(0xFFB94084);
+
+    volatile tt_l1_ptr uint32_t* rx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x00022100);
+
+    uint32_t prev_pkt_st_cnt = *(rx_debug_ptr + 7);
+    uint32_t prev_pkt_end_cnt = *(rx_debug_ptr + 8);
+    uint32_t prev_pkt_drop_cnt = *(rx_debug_ptr + 13);
+
+    *rx_debug_ptr = rx_ctrl;
+    *(rx_debug_ptr + 1) = byte_cnt;
+    *(rx_debug_ptr + 2) = buf_ptr;
+    *(rx_debug_ptr + 3) = buf_start_word_addr;
+    *(rx_debug_ptr + 4) = buf_size_words;
+    *(rx_debug_ptr + 5) = word_cnt;
+    *(rx_debug_ptr + 6) = hdr_ctrl;
+    *(rx_debug_ptr + 7) = pkt_st_cnt - prev_pkt_st_cnt;
+    *(rx_debug_ptr + 8) = pkt_end_cnt - prev_pkt_end_cnt;
+    *(rx_debug_ptr + 9) = rx_status;
+    *(rx_debug_ptr + 10) = local_rx_seq_num;
+    *(rx_debug_ptr + 11) = remote_rx_seq_num;
+    *(rx_debug_ptr + 12) = tile_header_format;
+    *(rx_debug_ptr + 13) = pkt_drop_cnt - prev_pkt_drop_cnt;
+    *(rx_debug_ptr + 14) = outstanding_wr_cnt;
+    *(rx_debug_ptr + 15) = err_enable;
+    *(rx_debug_ptr + 16) = err_stat_raw;
+    *(rx_debug_ptr + 17) = err_stat;
+    *(rx_debug_ptr + 18) = err_clear;
+    *(rx_debug_ptr + 19) = rcvd_hdr0;
+    *(rx_debug_ptr + 20) = rcvd_hdr1;
+    *(rx_debug_ptr + 21) = rcvd_hdr2;
+    *(rx_debug_ptr + 22) = rcvd_hdr3;
+    *(rx_debug_ptr + 23) = rcvd_hdr4;
+    *(rx_debug_ptr + 24) = rcvd_hdr5;
+
     // WATCHER_RING_BUFFER_PUSH((uint32_t)to_receiver_pkts_sent_id);
-    // WATCHER_RING_BUFFER_PUSH(pkts_received_since_last_check);
+    // uint32_t local_rn = ETH_READ_REG(0xFFB94040);
+    // volatile tt_l1_ptr uint32_t* debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x00022100);
+    // debug_ptr[0] = local_rn;
+    // WATCHER_RING_BUFFER_PUSH(local_rn);
+
+    // uint32_t pkt_st_cnt = ETH_READ_REG(0xFFB94024);
+    // WATCHER_RING_BUFFER_PUSH(pkt_st_cnt);
+
+    // uint32_t pkt_end_cnt = ETH_READ_REG(0xFFB94028);
+    // WATCHER_RING_BUFFER_PUSH(pkt_end_cnt);
+
+    // uint32_t pkt_drop_cnt = ETH_READ_REG(0xFFB9404C);
+    // WATCHER_RING_BUFFER_PUSH(pkt_drop_cnt);
+
+    // DPRINT << "Receiver stream reg: " << HEX() << stream_reg << " local rx seq num " << local_rn << DEC() << ENDL();
+
+    if (pkts_received_since_last_check != 0) {
+        WATCHER_RING_BUFFER_PUSH((uint32_t)pkts_received_since_last_check);
+    }
 
     // WATCHER_RING_BUFFER_PUSH(0xcabebabe);
     // WATCHER_RING_BUFFER_PUSH((uint32_t)enable_first_level_ack);
