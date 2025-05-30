@@ -279,6 +279,7 @@ set(TTNN_SRC_PYBIND
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/transformer/transformer_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/uniform/uniform_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/transformer/all_reduce_create_qkv_heads/all_reduce_create_qkv_heads_${PY_BINDING}.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/test/test_hang_operation_${PY_BINDING}.cpp
 )
 
 set(CCL_EXPERIMENTAL_TTNN_SRCS_PYBIND
@@ -480,6 +481,7 @@ target_link_libraries(
         TTNN::Ops::Uniform
         TTNN::Ops::Pool
         TTNN::Ops::Normalization
+        TTNN::Ops::Test
 )
 install(TARGETS ttnncpp LIBRARY COMPONENT ttnn-runtime)
 
@@ -623,5 +625,9 @@ add_subdirectory(cpp/ttnn/operations/transformer)
 add_subdirectory(cpp/ttnn/operations/uniform)
 add_subdirectory(cpp/ttnn/operations/pool)
 add_subdirectory(cpp/ttnn/operations/normalization)
+<<<<<<< HEAD
 
 add_subdirectory(cpp/ttnn/deprecated)
+=======
+add_subdirectory(cpp/ttnn/operations/test)
+>>>>>>> a63c0f9ba9 (added a way to get the traces when an operation hangs, it is quite hacky so it is under conditional compilation, also updated our documentation)
