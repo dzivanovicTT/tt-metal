@@ -25,7 +25,6 @@ add_library(TT::NN::Core ALIAS ttnn_core)
 target_compile_definitions(ttnn_core PUBLIC "$<$<CXX_COMPILER_ID:GNU>:DISABLE_NAMESPACE_STATIC_ASSERT>")
 
 set(TENSOR_FLATBUFFER_SCHEMAS
-    ${CMAKE_CURRENT_SOURCE_DIR}/core/tensor/flatbuffer/mesh_coordinate.fbs
     ${CMAKE_CURRENT_SOURCE_DIR}/core/tensor/flatbuffer/mesh_shape.fbs
     ${CMAKE_CURRENT_SOURCE_DIR}/core/tensor/flatbuffer/tensor_spec.fbs
     ${CMAKE_CURRENT_SOURCE_DIR}/core/tensor/flatbuffer/tensor.fbs

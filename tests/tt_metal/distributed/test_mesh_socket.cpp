@@ -16,6 +16,8 @@
 #include "impl/context/metal_context.hpp"
 #include "tt_metal/hw/inc/socket.h"
 #include "tt_metal/test_utils/stimulus.hpp"
+#include "tt_metal/distributed/mesh_socket_utils.hpp"
+#include "tt_metal/distributed/mesh_socket_serialization.hpp"
 #include <tt-metalium/system_mesh.hpp>
 
 namespace tt::tt_metal::distributed {
@@ -2189,6 +2191,126 @@ TEST_F(MeshSocketTest2DFabric, MultiSenderSingleRecvSplitReducer) { run_multi_se
 
 TEST_F(MeshSocketTest2DFabric, MultiConnectionMultiDeviceDataCopy) {
     run_multi_connection_multi_device_data_copy(this);
+}
+
+bool socket_configs_match(const SocketConfig& config_a, const SocketConfig& config_b) {
+    if (config_a.socket_connection_config.size() != config_b.socket_connection_config.size()) {
+        log_warning(LogTest, "Mismatch in number of socket connections.");
+        return false;
+    }
+    // Make sure connections match
+    for (size_t i = 0; i < config_a.socket_connection_config.size(); ++i) {
+        const auto& local_conn = config_a.socket_connection_config[i];
+        const auto& peer_conn = config_b.socket_connection_config[i];
+        if (local_conn.sender_core != peer_conn.sender_core) {
+            log_warning(LogTest, "Mismatch in connection sender core.");
+            return false;
+        }
+        if (local_conn.receiver_core != peer_conn.receiver_core) {
+            log_warning(LogTest, "Mismatch in connection receiver core.");
+            return false;
+        }
+    }
+    // make sure socket memory config matches
+    if (config_a.socket_mem_config.socket_storage_type != config_b.socket_mem_config.socket_storage_type) {
+        log_warning(LogTest, "Mismatch in socket storage type.");
+        return false;
+    }
+    if (config_a.socket_mem_config.fifo_size != config_b.socket_mem_config.fifo_size) {
+        log_warning(LogTest, "Mismatch in socket FIFO size.");
+        return false;
+    }
+    if (config_a.socket_mem_config.sender_sub_device != config_b.socket_mem_config.sender_sub_device) {
+        log_warning(LogTest, "Mismatch in sender sub-device.");
+        return false;
+    }
+    if (config_a.socket_mem_config.receiver_sub_device != config_b.socket_mem_config.receiver_sub_device) {
+        log_warning(LogTest, "Mismatch in receiver sub-device.");
+        return false;
+    }
+    return true;
+}
+
+TEST_F(MeshSocketTest, SocketPeerDescSerialization) {
+    auto md0 = mesh_device_->create_submesh(MeshShape(1, 4), MeshCoordinate(0, 0));
+    auto md1 = mesh_device_->create_submesh(MeshShape(1, 4), MeshCoordinate(1, 0));
+
+    std::size_t socket_fifo_size = 1024;
+    const auto& worker_grid = md0->compute_with_storage_grid_size();
+
+    std::vector<CoreCoord> sender_logical_coords;
+    std::vector<CoreCoord> recv_logical_coords;
+    std::vector<MeshCoordinate> sender_device_coords;
+    std::vector<MeshCoordinate> recv_device_coords;
+    uint32_t core_idx = 0;
+    for (std::size_t x = 0; x < worker_grid.x; x++) {
+        for (std::size_t y = 0; y < worker_grid.y; y++) {
+            sender_logical_coords.push_back(CoreCoord(x, y));
+            recv_logical_coords.push_back(CoreCoord(x, y));
+            sender_device_coords.push_back(MeshCoordinate(0, core_idx % 4));
+            recv_device_coords.push_back(MeshCoordinate(0, core_idx % 4));
+            core_idx++;
+        }
+    }
+
+    // Shuffle core coordinates to randomize the connections
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::shuffle(sender_logical_coords.begin(), sender_logical_coords.end(), generator);
+    std::shuffle(recv_logical_coords.begin(), recv_logical_coords.end(), generator);
+    std::shuffle(sender_device_coords.begin(), sender_device_coords.end(), generator);
+    std::shuffle(recv_device_coords.begin(), recv_device_coords.end(), generator);
+
+    std::vector<SocketConnection> socket_connections;
+
+    for (std::size_t coord_idx = 0; coord_idx < sender_logical_coords.size(); coord_idx++) {
+        SocketConnection socket_connection = {
+            .sender_core = {sender_device_coords[coord_idx], sender_logical_coords[coord_idx]},
+            .receiver_core = {recv_device_coords[coord_idx], recv_logical_coords[coord_idx]}};
+        socket_connections.push_back(socket_connection);
+    }
+
+    SocketConfig socket_config_l1 = {
+        .socket_connection_config = socket_connections,
+        .socket_mem_config =
+            {
+                .socket_storage_type = BufferType::L1,
+                .fifo_size = socket_fifo_size,
+
+            },
+        .sender_rank = 0,
+        .receiver_rank = 1,
+    };
+
+    auto [send_socket_l1, recv_socket_l1] = MeshSocket::create_sockets(md0, md1, socket_config_l1);
+
+    // Populate sender size peer descriptor based on config, addresses and device coordinates
+    SocketPeerDescriptor send_socket_peer_desc_l1 = SocketPeerDescriptor{
+        .config = socket_config_l1,
+        .address = send_socket_l1.get_config_buffer()->address(),
+    };
+
+    for (const auto& coord : sender_device_coords) {
+        send_socket_peer_desc_l1.mesh_ids.push_back(get_physical_mesh_id(md0.get(), coord));
+        send_socket_peer_desc_l1.chip_ids.push_back(md0->get_device(coord)->id());
+    }
+
+    // Populate receiver size peer descriptor based on config, addresses and device coordinates
+    SocketPeerDescriptor recv_socket_peer_desc_l1 = SocketPeerDescriptor{
+        .config = socket_config_l1,
+        .address = recv_socket_l1.get_config_buffer()->address(),
+    };
+    for (const auto& coord : recv_device_coords) {
+        recv_socket_peer_desc_l1.mesh_ids.push_back(get_physical_mesh_id(md1.get(), coord));
+        recv_socket_peer_desc_l1.chip_ids.push_back(md1->get_device(coord)->id());
+    }
+    // Serialize and deserialize the socket peer descriptors
+    auto serialized_send_socket_desc = serialize_to_bytes(send_socket_peer_desc_l1);
+    SocketPeerDescriptor deserialized_send_socket_desc = deserialize_from_bytes(serialized_send_socket_desc);
+    auto serialized_recv_socket_desc = serialize_to_bytes(recv_socket_peer_desc_l1);
+    SocketPeerDescriptor deserialized_recv_socket_desc = deserialize_from_bytes(serialized_recv_socket_desc);
+    EXPECT_TRUE(socket_configs_match(deserialized_send_socket_desc.config, send_socket_peer_desc_l1.config));
+    EXPECT_TRUE(socket_configs_match(deserialized_recv_socket_desc.config, recv_socket_peer_desc_l1.config));
 }
 
 }  // namespace tt::tt_metal::distributed

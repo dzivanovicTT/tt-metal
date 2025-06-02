@@ -12,6 +12,9 @@ namespace tt::tt_metal::distributed {
 struct MeshCoreCoord {
     MeshCoordinate device_coord;
     CoreCoord core_coord;
+    bool operator==(const MeshCoreCoord& other) const {
+        return device_coord == other.device_coord && core_coord == other.core_coord;
+    }
 };
 
 // Specifies how sender cores on a Virtual Mesh connect to receiver cores on the same or another Virtual Mesh.
@@ -41,6 +44,8 @@ struct SocketMemoryConfig {
 struct SocketConfig {
     std::vector<SocketConnection> socket_connection_config;
     SocketMemoryConfig socket_mem_config;
+    uint32_t sender_rank = 0;
+    uint32_t receiver_rank = 0;
 };
 
 // Socket Handle exposed to the user.
@@ -55,6 +60,7 @@ public:
         const std::shared_ptr<MeshDevice>& sender,
         const std::shared_ptr<MeshDevice>& receiver,
         const SocketConfig& config);
+    static uint32_t get_unique_global_id() { return global_id++; };
     // Access the data-buffer associated with the socket on the reciver mesh. Can only be queried for receiver sockets.
     std::shared_ptr<MeshBuffer> get_data_buffer() const;
     // Access the config buffer associated with this socket.
@@ -72,6 +78,7 @@ private:
     std::shared_ptr<MeshBuffer> data_buffer_;
     std::shared_ptr<MeshBuffer> config_buffer_;
     SocketConfig config_;
+    inline static uint32_t global_id = 0;
 };
 
 }  // namespace tt::tt_metal::distributed

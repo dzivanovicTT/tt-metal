@@ -177,7 +177,7 @@ void write_socket_configs(
     bool is_sender = socket_endpoint == SocketEndpoint::SENDER;
 
     auto grouped_connections = group_socket_connections(config, socket_endpoint);
-    auto peer_addr = peer_config_buffer->address();
+    auto address = peer_config_buffer->address();
 
     FabricConfig fabric_config = tt::tt_metal::MetalContext::instance().get_cluster().get_fabric_config();
 
@@ -206,7 +206,7 @@ void write_socket_configs(
                 md.downstream_chip_id = downstream_chip_id;
                 md.downstream_noc_y = recv_virtual_core.y;
                 md.downstream_noc_x = recv_virtual_core.x;
-                md.downstream_bytes_sent_addr = peer_addr;
+                md.downstream_bytes_sent_addr = address;
                 md.is_sender = is_sender;
             }
             distributed::WriteShard(mesh_device->mesh_command_queue(0), config_buffer, config_data, device_coord, true);
@@ -237,7 +237,7 @@ void write_socket_configs(
                 md.upstream_chip_id = upstream_chip_id;
                 md.upstream_noc_y = sender_virtual_core.y;
                 md.upstream_noc_x = sender_virtual_core.x;
-                md.upstream_bytes_acked_addr = peer_addr;
+                md.upstream_bytes_acked_addr = address;
                 md.is_sender = is_sender;
             }
             distributed::WriteShard(mesh_device->mesh_command_queue(0), config_buffer, config_data, device_coord, true);
