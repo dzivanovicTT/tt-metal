@@ -38,95 +38,133 @@ tensor_size = (32 * num_tiles_per_dim * compute_grid.y, 32 * num_tiles_per_dim *
 
 
 @pytest.mark.parametrize(
-    "initial_memory_config",
+    "initial_memory_config, initial_memory_config_str",
     [
-        ttnn.L1_MEMORY_CONFIG,
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.BLOCK,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (ttnn.L1_MEMORY_CONFIG, "INTR"),
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.BLOCK,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "BS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.BLOCK,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.BLOCK,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "BS-CM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.WIDTH,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.WIDTH,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "WS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.WIDTH,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.WIDTH,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "WS-CM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.HEIGHT,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.HEIGHT,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "HS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.HEIGHT,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.HEIGHT,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "HS-CM",
         ),
     ],
 )
 @pytest.mark.parametrize(
-    "new_memory_config",
+    "new_memory_config, new_memory_config_str",
     [
-        ttnn.L1_MEMORY_CONFIG,
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.BLOCK,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (ttnn.L1_MEMORY_CONFIG, "INTR"),
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.BLOCK,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "BS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.BLOCK,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.BLOCK,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "BS-CM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.WIDTH,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.WIDTH,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "WS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.WIDTH,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.WIDTH,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "WS-CM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.HEIGHT,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.HEIGHT,
+                orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            ),
+            "HS-RM",
         ),
-        ttnn.create_sharded_memory_config(
-            shape=tensor_size,
-            core_grid=compute_grid,
-            strategy=ttnn.ShardStrategy.HEIGHT,
-            orientation=ttnn.ShardOrientation.COL_MAJOR,
+        (
+            ttnn.create_sharded_memory_config(
+                shape=tensor_size,
+                core_grid=compute_grid,
+                strategy=ttnn.ShardStrategy.HEIGHT,
+                orientation=ttnn.ShardOrientation.COL_MAJOR,
+            ),
+            "HS-CM",
         ),
     ],
 )
-def test_shard(device, initial_memory_config, new_memory_config):
+def test_shard(device, initial_memory_config, new_memory_config, initial_memory_config_str, new_memory_config_str):
     # Create input tensor
     torch_input = torch.rand(tensor_size, dtype=torch.bfloat16)
 
-    print(initial_memory_config)
-    print(new_memory_config)
+    # print(initial_memory_config)
+    # print(new_memory_config)
+    if initial_memory_config_str != new_memory_config_str:
+        print(f"test config: {initial_memory_config_str}->{new_memory_config_str}")
 
     # TT operations
     tt_input = ttnn.from_torch(
