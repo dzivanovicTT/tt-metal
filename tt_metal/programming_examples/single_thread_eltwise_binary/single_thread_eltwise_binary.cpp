@@ -8,9 +8,7 @@
 
 #include <tt-metalium/host_api.hpp>
 #include <tt-metalium/device.hpp>
-
 #include <tt-metalium/bfloat16.hpp>
-
 #include <magic_enum/magic_enum.hpp>
 
 using namespace tt;
@@ -20,8 +18,6 @@ using namespace tt::tt_metal;
  * 1. Host creates two vectors of data.
  * 2. Device eltwise adds them together.
  * 3. Intermediate result read back to host.
- * 4. Create another vector and send vectors to input DRAMs again.
- * 5. Device eltwise muls them together.
  * 6. Read result back and compare to golden.
  * */
 
@@ -205,88 +201,9 @@ int main() {
         std::vector<uint32_t> result_vec;
         EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
 
-        /*
-         * Move src data back into DRAM src buffer 0 to do another eltwise calculation
-         */
-        Program program_mul = CreateProgram();
+       EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
 
-        /*
-         * Because we're using a new program, we must redeclare all the
-         * circular buffers and kernels.
-         */
-        tt_metal::CreateCircularBuffer(program_mul, core, cb_src0_config);
-        tt_metal::CreateCircularBuffer(program_mul, core, cb_src1_config);
-        tt_metal::CreateCircularBuffer(program_mul, core, cb_output_config);
-
-        binary_reader_kernel_id = CreateKernel(
-            program_mul,
-            "tt_metal/kernels/dataflow/reader_binary_diff_lengths.cpp",
-            core,
-            DataMovementConfig{.processor = DataMovementProcessor::RISCV_1, .noc = NOC::RISCV_1_default});
-
-        unary_writer_kernel_id = CreateKernel(
-            program_mul,
-            "tt_metal/kernels/dataflow/writer_unary.cpp",
-            core,
-            DataMovementConfig{.processor = DataMovementProcessor::RISCV_0, .noc = NOC::RISCV_0_default});
-
-        /*
-         * But now let's do an eltwise mul!
-         */
-        eltwise_binary_kernel_id = CreateKernel(
-            program_mul,
-            "tt_metal/kernels/compute/eltwise_binary.cpp",
-            core,
-            ComputeConfig{
-                .math_fidelity = MathFidelity::HiFi4,
-                .fp32_dest_acc_en = fp32_dest_acc_en,
-                .math_approx_mode = math_approx_mode,
-                .compile_args = compute_kernel_args,
-                .defines = get_defines(BinaryOpType::MUL)});
-
-        /*
-         * Send new input data.
-         */
-        EnqueueWriteBuffer(cq, src0_dram_buffer, result_vec, false);
-
-        constexpr float val_to_mul = 2.0f;
-        src1_vec = create_constant_vector_of_bfloat16(dram_buffer_size, val_to_mul);
-
-        EnqueueWriteBuffer(cq, src1_dram_buffer, src1_vec, false);
-
-        /*
-         * Configure program and runtime kernel arguments.
-         */
-        SetRuntimeArgs(
-            program_mul,
-            binary_reader_kernel_id,
-            core,
-            {src0_dram_buffer->address(),
-             src0_bank_id,
-             num_tiles,
-             src1_dram_buffer->address(),
-             src1_bank_id,
-             num_tiles,
-             0});
-
-        SetRuntimeArgs(program_mul, eltwise_binary_kernel_id, core, {num_tiles, 1});
-
-        SetRuntimeArgs(program_mul, unary_writer_kernel_id, core, {dst_dram_buffer->address(), dst_bank_id, num_tiles});
-
-        /*
-         * Execute.
-         */
-
-        EnqueueProgram(cq, program_mul, false);
-        Finish(cq);
-
-        /*
-         * Read the result and compare to a golden result. Record pass/fail
-         * and teardown.
-         */
-        EnqueueReadBuffer(cq, dst_dram_buffer, result_vec, true);
-
-        auto transform_to_golden = [](const bfloat16& a) { return bfloat16((a.to_float() + val_to_add) * val_to_mul); };
+        auto transform_to_golden = [](const bfloat16& a) { return bfloat16(a.to_float() + val_to_add); };
         std::vector<uint32_t> golden_vec =
             pack_bfloat16_vec_into_uint32_vec(unpack_uint32_vec_into_bfloat16_vec(src0_vec, transform_to_golden));
 
