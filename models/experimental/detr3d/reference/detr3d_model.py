@@ -7,13 +7,13 @@ import torch.nn as nn
 from torch import Tensor
 import torch.nn.functional as F
 from typing import List, Optional
-from models.experimental.DETR3D.reference.model_utils import (
+from models.experimental.detr3d.reference.model_utils import (
     QueryAndGroup,
-    SharedMLP,
     GatherOperation,
     FurthestPointSampling,
     shift_scale_points,
     BoxProcessor,
+    Conv2d,
 )
 import copy
 import math
@@ -39,6 +39,37 @@ def truncate_nested_list(lst, max_items=3):
     return lst
 
 
+class SharedMLP(nn.Sequential):
+    def __init__(
+        self,
+        args: List[int],
+        *,
+        bn: bool = False,
+        activation=nn.ReLU(inplace=True),
+        preact: bool = False,
+        first: bool = False,
+        name: str = "",
+    ):
+        super().__init__()
+
+        for i in range(len(args) - 1):
+            print(
+                "i and args are  ",
+                i,
+                ((not first or not preact or (i != 0)) and bn),
+            )
+            self.add_module(
+                name + "layer{}".format(i),
+                Conv2d(
+                    args[i],
+                    args[i + 1],
+                    bn=(not first or not preact or (i != 0)) and bn,
+                    activation=activation if (not first or not preact or (i != 0)) else None,
+                    preact=preact,
+                ),
+            )
+
+
 # 1: PointnetSAModuleVotes
 class PointnetSAModuleVotes(nn.Module):
     """Modified based on _PointnetSAModuleBase and PointnetSAModuleMSG
@@ -60,10 +91,10 @@ class PointnetSAModuleVotes(nn.Module):
         ret_unique_cnt: bool = False,
     ):
         super().__init__()
-        # params = {k: v for k, v in locals().items() if k != 'self'}
+        params = {k: v for k, v in locals().items() if k != "self"}
         print("ref PointnetSAModuleVotes init is called with params:")
-        # for k, v in params.items():
-        #     print(f"  {k}: {v}")
+        for k, v in params.items():
+            print(f"  {k}: {v}")
 
         self.npoint = npoint
         self.radius = radius
@@ -93,6 +124,7 @@ class PointnetSAModuleVotes(nn.Module):
         mlp_spec = mlp
         if use_xyz and len(mlp_spec) > 0:
             mlp_spec[0] += 3
+        print("inputs to SharedMLP", mlp_spec, bn)
         self.mlp_module = SharedMLP(mlp_spec, bn=bn)
         self.gather_operation = GatherOperation()
         self.furthest_point_sample = FurthestPointSampling()
@@ -147,7 +179,7 @@ class PointnetSAModuleVotes(nn.Module):
             grouped_features, grouped_xyz, unique_cnt = self.grouper(
                 xyz, new_xyz, features
             )  # (B, C, npoint, nsample), (B,3,npoint,nsample), (B,npoint)
-
+        print("input to shared mlpforward ", grouped_features.shape)
         new_features = self.mlp_module(grouped_features)  # (B, mlp[-1], npoint, nsample)
         if self.pooling == "max":
             new_features = F.max_pool2d(new_features, kernel_size=[1, new_features.size(3)])  # (B, mlp[-1], npoint, 1)
@@ -443,8 +475,8 @@ class GenericMLP(nn.Module):
         super().__init__()
         params = {k: v for k, v in locals().items() if k != "self"}
         print("GenericMLP init is called")
-        # for k, v in params.items():
-        #     print(f"  {k}: {v}")
+        for k, v in params.items():
+            print(f"  {k}: {v}")
         activation = nn.ReLU
         norm = None
         if norm_fn_name is not None:
@@ -459,6 +491,7 @@ class GenericMLP(nn.Module):
         layers = []
         prev_dim = input_dim
         for idx, x in enumerate(hidden_dims):
+            print("hiii")
             if use_conv:
                 layer = nn.Conv1d(prev_dim, x, 1, bias=hidden_use_bias)
             else:
@@ -477,6 +510,7 @@ class GenericMLP(nn.Module):
         layers.append(layer)
 
         if output_use_norm:
+            print("iwbefiuwbefw")
             layers.append(norm(output_dim))
 
         if output_use_activation:
@@ -487,6 +521,8 @@ class GenericMLP(nn.Module):
         if weight_init_name is not None:
             self.do_weight_init(weight_init_name)
 
+        print("wifne", self.layers)
+
     def do_weight_init(self, weight_init_name):
         func = None
         for _, param in self.named_parameters():
@@ -495,17 +531,20 @@ class GenericMLP(nn.Module):
 
     def forward(self, x):
         print("GenericMLP forward is called")
-        # params = {k: v for k, v in locals().items() if k != 'self'}
-        # for k, v in params.items():
-        #     if isinstance(v, torch.Tensor):
-        #         print(f"  {k}: Tensor(shape={tuple(v.shape)}, dtype={v.dtype})")
-        #     elif isinstance(v, (int, float, bool)):
-        #         print(f"  {k}: {v}")
-        #     elif v is None:
-        #         print(f"  {k}: None")
-        #     else:
-        #         print(f"  {k}: {type(v).__name__}")
+        params = {k: v for k, v in locals().items() if k != "self"}
+        for k, v in params.items():
+            if isinstance(v, torch.Tensor):
+                print(f"  {k}: Tensor(shape={tuple(v.shape)}, dtype={v.dtype})")
+            elif isinstance(v, (int, float, bool)):
+                print(f"  {k}: {v}")
+            elif v is None:
+                print(f"  {k}: None")
+            else:
+                print(f"  {k}: {type(v).__name__}")
         output = self.layers(x)
+        # for i, layer in enumerate(self.layers):
+        #     output = layer(x)
+        #     print(f"torch layer no{i} out is",output.shape)
         return output
 
 
@@ -1037,6 +1076,12 @@ class Model3DETR(nn.Module):
             output_use_norm=True,
             output_use_bias=False,
         )
+        print(
+            "args are",
+            encoder_dim,
+            hidden_dims,
+            decoder_dim,
+        )
         self.pos_embedding = PositionEmbeddingCoordsSine(d_pos=decoder_dim, pos_type=position_embedding, normalize=True)
         self.query_projection = GenericMLP(
             input_dim=decoder_dim,
@@ -1210,6 +1255,7 @@ class Model3DETR(nn.Module):
         point_clouds = inputs["point_clouds"]
 
         enc_xyz, enc_features, enc_inds = self.run_encoder(point_clouds)
+        print("input tn gen", enc_features.shape)
         enc_features = self.encoder_to_decoder_projection(enc_features.permute(1, 2, 0)).permute(2, 0, 1)
         # encoder features: npoints x batch x channel
         # encoder xyz: npoints x batch x 3

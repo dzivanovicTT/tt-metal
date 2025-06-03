@@ -4,7 +4,7 @@
 
 import torch
 import torch.nn as nn
-from typing import List, Tuple
+from typing import Tuple
 import numpy as np
 
 
@@ -311,32 +311,6 @@ class Conv2d(_ConvBase):
             preact=preact,
             name=name,
         )
-
-
-class SharedMLP(nn.Sequential):
-    def __init__(
-        self,
-        args: List[int],
-        *,
-        bn: bool = False,
-        activation=nn.ReLU(inplace=True),
-        preact: bool = False,
-        first: bool = False,
-        name: str = "",
-    ):
-        super().__init__()
-
-        for i in range(len(args) - 1):
-            self.add_module(
-                name + "layer{}".format(i),
-                Conv2d(
-                    args[i],
-                    args[i + 1],
-                    bn=(not first or not preact or (i != 0)) and bn,
-                    activation=activation if (not first or not preact or (i != 0)) else None,
-                    preact=preact,
-                ),
-            )
 
 
 def shift_scale_points(pred_xyz, src_range, dst_range=None):
