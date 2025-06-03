@@ -150,7 +150,7 @@ int main() {
          */
         KernelHandle eltwise_binary_kernel_id = CreateKernel(
             program,
-            "tt_metal/kernels/compute/eltwise_binary.cpp",
+            "tt_metal/kernels/compute/single_thread_eltwise_binary.cpp",
             core,
             ComputeConfig{
                 .math_fidelity = MathFidelity::HiFi4,
