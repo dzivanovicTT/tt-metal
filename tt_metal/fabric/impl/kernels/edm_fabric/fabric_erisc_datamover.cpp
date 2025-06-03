@@ -404,18 +404,6 @@ FORCE_INLINE void send_next_data(
         asm("nop");
     }
 
-    uint32_t tx_cnt2 = ETH_READ_REG(0xFFB90030);
-    uint32_t local_rn2 = ETH_READ_REG(0xFFB94040);
-    uint32_t remote_rn2 = ETH_READ_REG(0xFFB94044);
-    uint32_t dropped2 = ETH_READ_REG(0xFFB9404C);
-
-    DPRINT << "After remote_update_ptr_val: tx_cnt2: " << tx_cnt2 << ", local_rn2: " << local_rn2
-           << ", remote_rn2: " << remote_rn2 << ", dropped2: " << dropped2 << ENDL();
-
-    WATCHER_RING_BUFFER_PUSH(tx_cnt2);
-    WATCHER_RING_BUFFER_PUSH(local_rn2);
-    WATCHER_RING_BUFFER_PUSH(remote_rn2);
-    WATCHER_RING_BUFFER_PUSH(dropped2);
     WATCHER_RING_BUFFER_PUSH(0xfeedface);
 
     volatile tt_l1_ptr uint32_t* tx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x33300);
@@ -449,37 +437,42 @@ FORCE_INLINE void send_next_data(
     uint32_t tx_rx_timestamp_hi = ETH_READ_REG(0xFFB90098);
     uint32_t tx_pause_stat = ETH_READ_REG(0xFFB900A0);
 
-    uint32_t prev_tx_tx_cnt = *(tx_debug_ptr + 10);
-    uint32_t prev_tx_pkt_st_cnt = *(tx_debug_ptr + 11);
-    uint32_t prev_tx_pkt_end_cnt = *(tx_debug_ptr + 12);
-    uint32_t prev_tx_resend_cnt = *(tx_debug_ptr + 18);
-    *tx_debug_ptr = tx_ctrl;
-    *(tx_debug_ptr + 1) = tx_cmd;
-    *(tx_debug_ptr + 2) = tx_status;
-    *(tx_debug_ptr + 4) = tx_start_addr;
-    *(tx_debug_ptr + 5) = tx_size_b;
-    *(tx_debug_ptr + 6) = dst_addr;
-    *(tx_debug_ptr + 7) = mac_tx_sop;
-    *(tx_debug_ptr + 8) = mac_tx_eop;
-    *(tx_debug_ptr + 9) = mac_tx_eop_stat;
-    *(tx_debug_ptr + 10) = tx_tx_cnt - prev_tx_tx_cnt;
-    *(tx_debug_ptr + 11) = tx_pkt_st_cnt - prev_tx_pkt_st_cnt;
-    *(tx_debug_ptr + 12) = tx_pkt_end_cnt - prev_tx_pkt_end_cnt;
-    *(tx_debug_ptr + 13) = tx_wd_cnt;
-    *(tx_debug_ptr + 14) = tx_remote_reg_data;
-    *(tx_debug_ptr + 15) = tx_remote_seq_timeout;
-    *(tx_debug_ptr + 16) = tx_local_seq_update_timeout;
-    *(tx_debug_ptr + 17) = tx_min_pkt_size_words;
-    *(tx_debug_ptr + 18) = tx_resend_cnt - prev_tx_resend_cnt;
-    *(tx_debug_ptr + 19) = tx_data_packet_accept_ahead;
-    *(tx_debug_ptr + 20) = tx_afifo_ctrl;
-    *(tx_debug_ptr + 21) = tx_cfg_sel_sw;
-    *(tx_debug_ptr + 22) = tx_cfg_sel_hw;
-    *(tx_debug_ptr + 23) = tx_cfg_sel_ovl;
-    *(tx_debug_ptr + 24) = tx_timestamp;
-    *(tx_debug_ptr + 25) = tx_rx_timestamp_lo;
-    *(tx_debug_ptr + 26) = tx_rx_timestamp_hi;
-    *(tx_debug_ptr + 27) = tx_pause_stat;
+    uint32_t remote_rx_seq_num = ETH_READ_REG(0xFFB94044);
+
+    DPRINT << "In send next data: tx_size_b: " << tx_size_b << "dest addr: " << HEX() << dst_addr << DEC()
+           << " remote rx seq num " << remote_rx_seq_num << ENDL();
+
+    // uint32_t prev_tx_tx_cnt = *(tx_debug_ptr + 10);
+    // uint32_t prev_tx_pkt_st_cnt = *(tx_debug_ptr + 11);
+    // uint32_t prev_tx_pkt_end_cnt = *(tx_debug_ptr + 12);
+    // uint32_t prev_tx_resend_cnt = *(tx_debug_ptr + 18);
+    // *tx_debug_ptr = tx_ctrl;
+    // *(tx_debug_ptr + 1) = tx_cmd;
+    // *(tx_debug_ptr + 2) = tx_status;
+    // *(tx_debug_ptr + 4) = tx_start_addr;
+    // *(tx_debug_ptr + 5) = tx_size_b;
+    // *(tx_debug_ptr + 6) = dst_addr;
+    // *(tx_debug_ptr + 7) = mac_tx_sop;
+    // *(tx_debug_ptr + 8) = mac_tx_eop;
+    // *(tx_debug_ptr + 9) = mac_tx_eop_stat;
+    // *(tx_debug_ptr + 10) = tx_tx_cnt - prev_tx_tx_cnt;
+    // *(tx_debug_ptr + 11) = tx_pkt_st_cnt - prev_tx_pkt_st_cnt;
+    // *(tx_debug_ptr + 12) = tx_pkt_end_cnt - prev_tx_pkt_end_cnt;
+    // *(tx_debug_ptr + 13) = tx_wd_cnt;
+    // *(tx_debug_ptr + 14) = tx_remote_reg_data;
+    // *(tx_debug_ptr + 15) = tx_remote_seq_timeout;
+    // *(tx_debug_ptr + 16) = tx_local_seq_update_timeout;
+    // *(tx_debug_ptr + 17) = tx_min_pkt_size_words;
+    // *(tx_debug_ptr + 18) = tx_resend_cnt - prev_tx_resend_cnt;
+    // *(tx_debug_ptr + 19) = tx_data_packet_accept_ahead;
+    // *(tx_debug_ptr + 20) = tx_afifo_ctrl;
+    // *(tx_debug_ptr + 21) = tx_cfg_sel_sw;
+    // *(tx_debug_ptr + 22) = tx_cfg_sel_hw;
+    // *(tx_debug_ptr + 23) = tx_cfg_sel_ovl;
+    // *(tx_debug_ptr + 24) = tx_timestamp;
+    // *(tx_debug_ptr + 25) = tx_rx_timestamp_lo;
+    // *(tx_debug_ptr + 26) = tx_rx_timestamp_hi;
+    // *(tx_debug_ptr + 27) = tx_pause_stat;
 }
 
 /////////////////////////////////////////////
@@ -990,7 +983,6 @@ void run_sender_channel_step(
                 channel_connection_established,
                 sender_channel_free_slots_stream_id);
         }
-        WAYPOINT("BHAS");
     }
 };
 
@@ -1048,37 +1040,40 @@ void run_receiver_channel_step(
     uint32_t rcvd_hdr4 = ETH_READ_REG(0xFFB94080);
     uint32_t rcvd_hdr5 = ETH_READ_REG(0xFFB94084);
 
-    volatile tt_l1_ptr uint32_t* rx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x00022100);
+    DPRINT << "In receiver: local_rx_seq_num: " << local_rx_seq_num << "pkts_received_since_last_check : " << HEX()
+           << pkts_received_since_last_check << DEC() << ENDL();
 
-    uint32_t prev_pkt_st_cnt = *(rx_debug_ptr + 7);
-    uint32_t prev_pkt_end_cnt = *(rx_debug_ptr + 8);
-    uint32_t prev_pkt_drop_cnt = *(rx_debug_ptr + 13);
+    // volatile tt_l1_ptr uint32_t* rx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x00022100);
 
-    *rx_debug_ptr = rx_ctrl;
-    *(rx_debug_ptr + 1) = byte_cnt;
-    *(rx_debug_ptr + 2) = buf_ptr;
-    *(rx_debug_ptr + 3) = buf_start_word_addr;
-    *(rx_debug_ptr + 4) = buf_size_words;
-    *(rx_debug_ptr + 5) = word_cnt;
-    *(rx_debug_ptr + 6) = hdr_ctrl;
-    *(rx_debug_ptr + 7) = pkt_st_cnt - prev_pkt_st_cnt;
-    *(rx_debug_ptr + 8) = pkt_end_cnt - prev_pkt_end_cnt;
-    *(rx_debug_ptr + 9) = rx_status;
-    *(rx_debug_ptr + 10) = local_rx_seq_num;
-    *(rx_debug_ptr + 11) = remote_rx_seq_num;
-    *(rx_debug_ptr + 12) = tile_header_format;
-    *(rx_debug_ptr + 13) = pkt_drop_cnt - prev_pkt_drop_cnt;
-    *(rx_debug_ptr + 14) = outstanding_wr_cnt;
-    *(rx_debug_ptr + 15) = err_enable;
-    *(rx_debug_ptr + 16) = err_stat_raw;
-    *(rx_debug_ptr + 17) = err_stat;
-    *(rx_debug_ptr + 18) = err_clear;
-    *(rx_debug_ptr + 19) = rcvd_hdr0;
-    *(rx_debug_ptr + 20) = rcvd_hdr1;
-    *(rx_debug_ptr + 21) = rcvd_hdr2;
-    *(rx_debug_ptr + 22) = rcvd_hdr3;
-    *(rx_debug_ptr + 23) = rcvd_hdr4;
-    *(rx_debug_ptr + 24) = rcvd_hdr5;
+    // uint32_t prev_pkt_st_cnt = *(rx_debug_ptr + 7);
+    // uint32_t prev_pkt_end_cnt = *(rx_debug_ptr + 8);
+    // uint32_t prev_pkt_drop_cnt = *(rx_debug_ptr + 13);
+
+    // *rx_debug_ptr = rx_ctrl;
+    // *(rx_debug_ptr + 1) = byte_cnt;
+    // *(rx_debug_ptr + 2) = buf_ptr;
+    // *(rx_debug_ptr + 3) = buf_start_word_addr;
+    // *(rx_debug_ptr + 4) = buf_size_words;
+    // *(rx_debug_ptr + 5) = word_cnt;
+    // *(rx_debug_ptr + 6) = hdr_ctrl;
+    // *(rx_debug_ptr + 7) = pkt_st_cnt - prev_pkt_st_cnt;
+    // *(rx_debug_ptr + 8) = pkt_end_cnt - prev_pkt_end_cnt;
+    // *(rx_debug_ptr + 9) = rx_status;
+    // *(rx_debug_ptr + 10) = local_rx_seq_num;
+    // *(rx_debug_ptr + 11) = remote_rx_seq_num;
+    // *(rx_debug_ptr + 12) = tile_header_format;
+    // *(rx_debug_ptr + 13) = pkt_drop_cnt - prev_pkt_drop_cnt;
+    // *(rx_debug_ptr + 14) = outstanding_wr_cnt;
+    // *(rx_debug_ptr + 15) = err_enable;
+    // *(rx_debug_ptr + 16) = err_stat_raw;
+    // *(rx_debug_ptr + 17) = err_stat;
+    // *(rx_debug_ptr + 18) = err_clear;
+    // *(rx_debug_ptr + 19) = rcvd_hdr0;
+    // *(rx_debug_ptr + 20) = rcvd_hdr1;
+    // *(rx_debug_ptr + 21) = rcvd_hdr2;
+    // *(rx_debug_ptr + 22) = rcvd_hdr3;
+    // *(rx_debug_ptr + 23) = rcvd_hdr4;
+    // *(rx_debug_ptr + 24) = rcvd_hdr5;
 
     // WATCHER_RING_BUFFER_PUSH((uint32_t)to_receiver_pkts_sent_id);
     // uint32_t local_rn = ETH_READ_REG(0xFFB94040);
@@ -1363,7 +1358,9 @@ void run_fabric_edm_main_loop(
 
             // There are some cases, mainly for performance, where we don't want to switch between sender channels
             // so we interoduce this to provide finer grain control over when we disable the automatic switching
+            WAYPOINT("VAIN");
             if constexpr (is_sender_channel_serviced[0]) {
+                // WAYPOINT("NAV1");
                 run_sender_channel_step<
                     enable_packet_header_recording,
                     enable_fabric_counters,
@@ -1382,6 +1379,7 @@ void run_fabric_edm_main_loop(
                     local_sender_channel_free_slots_stream_ids_ordered[0]);
             }
             if constexpr (is_receiver_channel_serviced[0]) {
+                WAYPOINT("NAV2");
                 if constexpr (!dateline_connection) {
                     run_receiver_channel_step<
                         enable_packet_header_recording,
@@ -1699,6 +1697,8 @@ void kernel_main() {
             erisc::datamover::handshake::receiver_side_start(handshake_addr);
         }
     }
+
+    DPRINT << "Started edm handshake" << ENDL();
 
     // TODO: CONVERT TO SEMAPHORE
     volatile auto termination_signal_ptr =
@@ -2157,7 +2157,10 @@ void kernel_main() {
             erisc::datamover::handshake::receiver_side_finish(handshake_addr, DEFAULT_HANDSHAKE_CONTEXT_SWITCH_TIMEOUT);
         }
 
+        DPRINT << "EDM handshake complete" << ENDL();
+
         *edm_status_ptr = tt::tt_fabric::EDMStatus::REMOTE_HANDSHAKE_COMPLETE;
+        WAYPOINT("BUL2");
 
         if constexpr (wait_for_host_signal) {
             if constexpr (is_local_handshake_master) {
@@ -2168,6 +2171,10 @@ void kernel_main() {
                 notify_master_router(local_handshake_master_eth_chan, (uint32_t)edm_local_sync_ptr);
                 wait_for_notification((uint32_t)edm_local_sync_ptr, num_local_edms);
             }
+
+            WAYPOINT("BUL3");
+
+            DPRINT << "EDM local sync complete" << ENDL();
 
             *edm_status_ptr = tt::tt_fabric::EDMStatus::LOCAL_HANDSHAKE_COMPLETE;
 
@@ -2182,6 +2189,8 @@ void kernel_main() {
             }
         }
         WAYPOINT("BUL4");
+    } else {
+        DPRINT << "Eth handshake not enabled" << ENDL();
     }
 
     WAYPOINT("SHAK");
@@ -2232,6 +2241,8 @@ void kernel_main() {
 
     wait_for_static_connection_to_ready(
         local_sender_channel_worker_interfaces, local_sender_channel_free_slots_stream_ids_ordered);
+
+    WAYPOINT("READ");
 
     //////////////////////////////
     //////////////////////////////

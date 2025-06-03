@@ -61,7 +61,8 @@ FabricRiscConfig::FabricRiscConfig(uint32_t risc_id) :
         this->is_receiver_channel_serviced_.fill(true);
     } else if (arch == tt::ARCH::BLACKHOLE) {
         this->is_sender_channel_serviced_.fill(risc_id == 0);
-        this->is_receiver_channel_serviced_.fill(risc_id == 1);
+        // set this to be risc_id == 1 when we want to split sender/receiver on the two eriscs
+        this->is_receiver_channel_serviced_.fill(risc_id == 0);
         this->enable_context_switch_ = false;
         this->enable_interrupts_ = false;
     } else {
@@ -90,6 +91,7 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(Topology topology) {
     uint32_t buffer_address = edm_status_address + field_size;
     this->num_riscv_cores = tt::tt_metal::MetalContext::instance().hal().get_processor_classes_count(
         tt::tt_metal::HalProgrammableCoreType::ACTIVE_ETH);
+    std::cout << "num_riscv_cores: " << this->num_riscv_cores << std::endl;
     for (uint32_t risc_id = 0; risc_id < this->num_riscv_cores; risc_id++) {
         this->risc_configs.emplace_back(risc_id);
     }

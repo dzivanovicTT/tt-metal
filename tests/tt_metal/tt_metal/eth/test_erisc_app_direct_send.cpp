@@ -20,6 +20,7 @@
 #include <utility>
 #include <variant>
 #include <vector>
+#include <queue>
 
 #include <tt-metalium/assert.hpp>
 #include "command_queue_fixture.hpp"
@@ -943,6 +944,188 @@ TEST_F(CommandQueueMultiDeviceProgramFixture, ActiveEthKernelsDirectSendAllConne
                     receiver_core));
             }
         }
+    }
+}
+
+struct SenderReceiverPair {
+    // In bidirectional mode each eth core acts as sender and receiver but we still have an assigned "base" mode
+    // Measurements are always taken from the "base" sender
+    tt_cxy_pair sender;
+    tt_cxy_pair receiver;
+
+    bool operator==(const SenderReceiverPair& other) const {
+        bool same_s_r = sender.chip == other.sender.chip && sender.x == other.sender.x && sender.y == other.sender.y &&
+                        receiver.chip == other.receiver.chip && receiver.x == other.receiver.x &&
+                        receiver.y == other.receiver.y;
+        bool r_is_s = sender.chip == other.receiver.chip && sender.x == other.receiver.x &&
+                      sender.y == other.receiver.y && receiver.chip == other.sender.chip &&
+                      receiver.x == other.sender.x && receiver.y == other.sender.y;
+        return same_s_r || r_is_s;
+    }
+
+    bool operator<(const SenderReceiverPair& other) const {
+        if (*this == other) {
+            return false;
+        }
+        // this and other are diff
+        // this sender before the other sender means less then
+        auto sender_coord = CoreCoord(sender.x, sender.y);
+        auto receiver_coord = CoreCoord(receiver.x, receiver.y);
+        auto other_sender_coord = CoreCoord(other.sender.x, other.sender.y);
+        auto other_receiver_coord = CoreCoord(other.receiver.x, other.receiver.y);
+
+        // Order based on sender
+        bool result = (sender.chip < other.sender.chip) ||
+                      (sender.chip == other.sender.chip && sender_coord < other_sender_coord) ||
+                      (sender.chip == other.sender.chip && receiver.chip < other.receiver.chip) ||
+                      (sender.chip == other.sender.chip && receiver.chip == other.receiver.chip &&
+                       receiver_coord < other_receiver_coord);
+        return result;
+    }
+};
+
+std::set<SenderReceiverPair> initialize_sender_receiver_pairs(const std::vector<tt::tt_metal::IDevice*>& devices) {
+    std::set<SenderReceiverPair> unique_links;
+    // chip id -> active eth ch on chip -> (connected chip, remote active eth ch)
+    auto all_eth_connections = tt::tt_metal::MetalContext::instance().get_cluster().get_ethernet_connections();
+
+    std::set<chip_id_t> sender_chips, receiver_chips;
+    bool slow_dispath_mode = (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr);
+
+    std::queue<chip_id_t> chip_q;
+    chip_q.push(devices.at(0)->id());
+    sender_chips.insert(devices.at(0)->id());
+    std::unordered_set<chip_id_t> visited_chips;
+
+    // Need sender and receiver chips to be disjoint because we profile wrt. sender and don't want devices to be out
+    // of sync
+    while (visited_chips.size() != devices.size()) {
+        while (!chip_q.empty()) {
+            chip_id_t chip_id = chip_q.front();
+            chip_q.pop();
+            visited_chips.insert(chip_id);
+
+            bool is_sender = sender_chips.find(chip_id) != sender_chips.end();
+            bool is_receiver = receiver_chips.find(chip_id) != receiver_chips.end();
+
+            for (chip_id_t connected_chip :
+                 tt::tt_metal::MetalContext::instance().get_cluster().get_ethernet_connected_device_ids(chip_id)) {
+                bool connected_chip_is_sender = sender_chips.find(connected_chip) != sender_chips.end();
+                bool connected_chip_is_receiver = receiver_chips.find(connected_chip) != receiver_chips.end();
+                if (!connected_chip_is_sender and !connected_chip_is_receiver) {
+                    if (is_sender) {
+                        receiver_chips.insert(connected_chip);
+                    } else {
+                        TT_FATAL(is_receiver, "Chip {} should be marked as a receiver", chip_id);
+                        sender_chips.insert(connected_chip);
+                    }
+                    chip_q.push(connected_chip);
+                } else if (is_sender && connected_chip_is_sender) {
+                    TT_FATAL(false, "Chip {} and connected chip {} are both senders!", chip_id, connected_chip);
+                } else if (is_receiver && connected_chip_is_receiver) {
+                    TT_FATAL(false, "Chip {} and connected chip {} are both receivers!", chip_id, connected_chip);
+                }
+            }
+        }
+
+        // Handle other unconnected device clusters
+        for (auto device : devices) {
+            if (visited_chips.find(device->id()) == visited_chips.end()) {
+                // This device is not connected others visited above, mark it as a sender for its connected cluster
+                chip_q.push(device->id());
+                sender_chips.insert(device->id());
+                break;
+            }
+        }
+    }
+
+    std::vector<int> s_r_chip_intersection;
+    std::set_intersection(
+        sender_chips.begin(),
+        sender_chips.end(),
+        receiver_chips.begin(),
+        receiver_chips.end(),
+        std::back_inserter(s_r_chip_intersection));
+    TT_FATAL(s_r_chip_intersection.empty(), "Expected no overlap between senders and receivers");
+
+    for (auto sender_chip_id : sender_chips) {
+        auto non_tunneling_eth_cores = tt::tt_metal::MetalContext::instance().get_cluster().get_active_ethernet_cores(
+            sender_chip_id, !slow_dispath_mode);
+        for (auto logical_active_eth : non_tunneling_eth_cores) {
+            if (!tt::tt_metal::MetalContext::instance().get_cluster().is_ethernet_link_up(
+                    sender_chip_id, logical_active_eth)) {
+                continue;
+            }
+            auto sender_eth = tt_cxy_pair(sender_chip_id, logical_active_eth);
+            auto receiver_eth_tuple = tt::tt_metal::MetalContext::instance().get_cluster().get_connected_ethernet_core(
+                std::make_tuple(sender_chip_id, logical_active_eth));
+            auto receiver_eth = tt_cxy_pair(std::get<0>(receiver_eth_tuple), std::get<1>(receiver_eth_tuple));
+            unique_links.insert(SenderReceiverPair{.sender = sender_eth, .receiver = receiver_eth});
+        }
+    }
+
+    return unique_links;
+}
+
+tt_metal::IDevice* find_device_with_id(const std::vector<tt_metal::IDevice*>& devices, chip_id_t chip_id) {
+    for (auto device : devices) {
+        if (device->id() == chip_id) {
+            return device;
+        }
+    }
+    TT_FATAL(false, "Unexpected device id {}", chip_id);
+    return nullptr;
+}
+
+TEST_F(CommandQueueMultiDeviceProgramFixture, AllLinksSendToRemoteStreamReg) {
+    using namespace CMAKE_UNIQUE_NAMESPACE;
+
+    std::vector<tt_metal::Program> programs(devices_.size());
+
+    const size_t handshake_addr =
+        MetalContext::instance().hal().get_dev_addr(HalProgrammableCoreType::ACTIVE_ETH, HalL1MemAddrType::UNRESERVED);
+    std::vector<uint32_t> sender_args = {1, (uint32_t)handshake_addr, 0};
+    std::vector<uint32_t> receiver_args = {0, (uint32_t)handshake_addr, 0};
+
+    auto unique_links = initialize_sender_receiver_pairs(devices_);
+
+    for (const auto& link : unique_links) {
+        auto& sender_program = programs.at(link.sender.chip);
+        auto& receiver_program = programs.at(link.receiver.chip);
+
+        auto sender_device = find_device_with_id(devices_, link.sender.chip);
+        auto receiver_device = find_device_with_id(devices_, link.receiver.chip);
+
+        auto sender_core = CoreCoord(link.sender.x, link.sender.y);
+        auto receiver_core = CoreCoord(link.receiver.x, link.receiver.y);
+
+        auto sender_eth_kernel = tt_metal::CreateKernel(
+            sender_program,
+            "tests/tt_metal/tt_metal/test_kernels/dataflow/unit_tests/erisc/eth_send_receive_stream_reg.cpp",
+            sender_core,
+            tt_metal::EthernetConfig{.noc = tt_metal::NOC::NOC_0});
+
+        tt_metal::SetRuntimeArgs(sender_program, sender_eth_kernel, sender_core, sender_args);
+
+        auto receiver_eth_kernel = tt_metal::CreateKernel(
+            receiver_program,
+            "tests/tt_metal/tt_metal/test_kernels/dataflow/unit_tests/erisc/eth_send_receive_stream_reg.cpp",
+            receiver_core,
+            tt_metal::EthernetConfig{.noc = tt_metal::NOC::NOC_0, .compile_args = {0, (uint32_t)handshake_addr, 0}});
+
+        tt_metal::SetRuntimeArgs(receiver_program, receiver_eth_kernel, receiver_core, receiver_args);
+    }
+
+    for (auto device : devices_) {
+        tt_metal::detail::CompileProgram(device, programs.at(device->id()));
+    }
+
+    for (auto device : devices_) {
+        tt_metal::EnqueueProgram(device->command_queue(), programs.at(device->id()), false);
+    }
+
+    for (auto device : devices_) {
+        tt_metal::Finish(device->command_queue());
     }
 }
 

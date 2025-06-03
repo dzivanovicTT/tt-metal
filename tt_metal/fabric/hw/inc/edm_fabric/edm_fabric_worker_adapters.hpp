@@ -15,10 +15,11 @@
 #include "edm_fabric_flow_control_helpers.hpp"
 #include "tt_metal/fabric/hw/inc/edm_fabric/fabric_stream_regs.hpp"
 #include "tt_metal/hw/inc/utils/utils.h"
-#include "tt_metal/hw/inc/wormhole/core_config.h"
+// #include "tt_metal/hw/inc/wormhole/core_config.h"
 #include "debug/assert.h"
 #include "debug/dprint.h"
 #include "debug/pause.h"
+#include "debug/ring_buffer.h"
 #include <cstdint>
 #include <array>
 
@@ -307,6 +308,7 @@ struct WorkerToFabricEdmSenderImpl {
             // then once we get it we will use that address for the teardown ack
             // Note this is safe because only the worker can initiate teardown (and it will not do it until)
             // some time atleast after it copied the wrptr out of the worker_teardown_addr
+            WAYPOINT("WAXE");
             noc_async_read(
                 remote_buffer_index_addr,
                 reinterpret_cast<size_t>(this->worker_teardown_addr),
@@ -318,6 +320,15 @@ struct WorkerToFabricEdmSenderImpl {
                                         edm_worker_location_info_addr +
                                         offsetof(tt::tt_fabric::EDMChannelWorkerLocationInfo, edm_read_counter));
         // Read the read/pointer or buffer free slots
+        WATCHER_RING_BUFFER_PUSH(0x43215678);
+        WATCHER_RING_BUFFER_PUSH(this->edm_noc_x);
+        WATCHER_RING_BUFFER_PUSH(this->edm_noc_y);
+        WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(
+            edm_worker_location_info_addr + offsetof(tt::tt_fabric::EDMChannelWorkerLocationInfo, edm_read_counter)));
+        WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr));
+        // WAYPOINT("WAXQ");
+        DPRINT << "local addr is " << uint32_t(reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr))
+               << ENDL();
         noc_async_read(
             edm_read_free_slots_or_read_counter_addr,
             reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr),
@@ -368,6 +379,7 @@ struct WorkerToFabricEdmSenderImpl {
     void open_finish() {
         const uint64_t edm_connection_handshake_noc_addr =
             get_noc_addr(this->edm_noc_x, this->edm_noc_y, edm_connection_handshake_l1_addr);
+        // WAYPOINT("WAXY");
         noc_async_read_barrier();
         // Order here is important
         // We need to write our read counter value to the register before we signal the EDM
@@ -395,7 +407,7 @@ struct WorkerToFabricEdmSenderImpl {
     void open() {
         open_start<posted, WORKER_HANDSHAKE_NOC>();
         open_finish<posted, WORKER_HANDSHAKE_NOC>();
-        WAYPOINT("BUBU");
+        // WAYPOINT("BUBU");
     }
 
     // Advanced usage API:

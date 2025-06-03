@@ -538,10 +538,10 @@ inline void noc_async_read(
     if constexpr (max_page_size <= NOC_MAX_BURST_SIZE) {
         noc_async_read_one_packet(src_noc_addr, dst_local_l1_addr, size, noc);
     } else {
-        WAYPOINT("NARW");
+        // WAYPOINT("NARW");
         DEBUG_SANITIZE_NOC_READ_TRANSACTION(noc, src_noc_addr, dst_local_l1_addr, size);
         ncrisc_noc_fast_read_any_len<noc_mode>(noc, read_cmd_buf, src_noc_addr, dst_local_l1_addr, size);
-        WAYPOINT("NARD");
+        // WAYPOINT("NARD");
     }
 }
 
@@ -1345,7 +1345,7 @@ inline void noc_async_write_multicast_loopback_src(
 void noc_async_read_barrier(uint8_t noc = noc_index) {
     RECORD_NOC_EVENT(NocEventType::READ_BARRIER_START);
 
-    WAYPOINT("NRBW");
+    // WAYPOINT("NRBW");
     if constexpr (noc_mode == DM_DYNAMIC_NOC) {
         while (!ncrisc_dynamic_noc_reads_flushed(noc)) {
             invalidate_l1_cache();
@@ -1354,7 +1354,7 @@ void noc_async_read_barrier(uint8_t noc = noc_index) {
         while (!ncrisc_noc_reads_flushed(noc));
     }
     invalidate_l1_cache();
-    WAYPOINT("NRBD");
+    // WAYPOINT("NRBD");
 
     RECORD_NOC_EVENT(NocEventType::READ_BARRIER_END);
 }

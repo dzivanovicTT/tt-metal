@@ -195,7 +195,7 @@ void RunTestLineMcast(
     auto mesh_shape = control_plane->get_physical_mesh_shape(sender_id.mesh_id);
 
     auto worker_mem_map = generate_worker_mem_map(sender_device, edm_config.topology);
-    uint32_t num_packets = 1;
+    uint32_t num_packets = 100;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
     // common compile time args for sender and receiver
@@ -371,8 +371,7 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
     }
 
     // Pick any port, for now pick the 1st one in the set
-    // edm_port = *eth_chans.begin();
-    edm_port = 4;
+    edm_port = *eth_chans.begin();
 
     tt::log_info(tt::LogTest, "mesh dimensions {:x}", mesh_shape.dims());
     tt::log_info(tt::LogTest, "mesh size {:x}", mesh_shape.mesh_size());
@@ -389,6 +388,9 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
 
     auto* sender_device = DevicePool::instance().get_active_device(src_physical_device_id);
     auto* receiver_device = DevicePool::instance().get_active_device(dst_physical_device_id);
+
+    tt::log_info(tt::LogTest, "Sender device: {} Receiver device: {}", sender_device->id(), receiver_device->id());
+
     CoreCoord sender_virtual_core = sender_device->worker_core_from_logical_core(sender_logical_core);
     CoreCoord receiver_virtual_core = receiver_device->worker_core_from_logical_core(receiver_logical_core);
 
@@ -397,7 +399,7 @@ void RunTestUnicastRaw(BaseFabricFixture* fixture, uint32_t num_hops, RoutingDir
 
     // test parameters
     auto worker_mem_map = generate_worker_mem_map(sender_device, topology);
-    uint32_t num_packets = 1;
+    uint32_t num_packets = 10;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
     const auto fabric_config = tt::tt_metal::MetalContext::instance().get_cluster().get_fabric_config();
@@ -555,7 +557,7 @@ void run_unicast_test_bw_chips(
 
     // test parameters
     auto worker_mem_map = generate_worker_mem_map(sender_device, topology);
-    uint32_t num_packets = 1;
+    uint32_t num_packets = 10;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
     // common compile time args for sender and receiver
@@ -797,7 +799,7 @@ void RunTestMCastConnAPI(
 
     // test parameters
     auto worker_mem_map = generate_worker_mem_map(sender_device, topology);
-    uint32_t num_packets = 1;
+    uint32_t num_packets = 100;
     uint32_t time_seed = std::chrono::system_clock::now().time_since_epoch().count();
 
     const auto fabric_config = tt::tt_metal::MetalContext::instance().get_cluster().get_fabric_config();

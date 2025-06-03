@@ -15,9 +15,11 @@ public:
     // make the connection live
     inline void open() {
         if (has_forward_connection()) {
+            WAYPOINT("OPN1");
             forward_fabric_sender.open_start();
         }
         if (has_backward_connection()) {
+            WAYPOINT("OPN2");
             backward_fabric_sender.open_start();
         }
         if (has_forward_connection()) {
@@ -81,6 +83,7 @@ public:
             connection_manager.forward_fabric_sender =
                 tt::tt_fabric::WorkerToFabricEdmSender::build_from_args<ProgrammableCoreType::TENSIX>(arg_idx);
             if constexpr (connect) {
+                WAYPOINT("FCF1");
                 connection_manager.forward_fabric_sender.open_start();
             }
         }
@@ -90,6 +93,7 @@ public:
             connection_manager.backward_fabric_sender =
                 tt::tt_fabric::WorkerToFabricEdmSender::build_from_args<ProgrammableCoreType::TENSIX>(arg_idx);
             if constexpr (connect) {
+                WAYPOINT("FCF2");
                 connection_manager.backward_fabric_sender.open_start();
             }
         }
