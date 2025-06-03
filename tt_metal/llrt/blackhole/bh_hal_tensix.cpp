@@ -126,6 +126,10 @@ HalCoreInfoType create_tensix_mem_map() {
         }
         processor_classes[processor_class_idx] = processor_types;
     }
+
+    // No eth fw on tensix. all zero addresses
+    std::vector<uint32_t> fw_mailbox_addr(static_cast<std::size_t>(FWMailboxMsg::COUNT), 0);
+
     static_assert(llrt_common::k_SingleProcessorMailboxSize<TensixProcessorTypes> <= MEM_MAILBOX_SIZE);
     return {
         HalProgrammableCoreType::TENSIX,
@@ -133,6 +137,7 @@ HalCoreInfoType create_tensix_mem_map() {
         processor_classes,
         mem_map_bases,
         mem_map_sizes,
+        fw_mailbox_addr,
         true /*supports_cbs*/,
         true /*supports_receiving_multicast_cmds*/};
 }

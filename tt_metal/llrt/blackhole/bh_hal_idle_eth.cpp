@@ -18,6 +18,7 @@
 #include "core_config.h"
 #include "dev_mem_map.h"
 #include "hal_types.hpp"
+#include "eth_fw_api.h"
 #include "llrt/hal.hpp"
 #include "noc/noc_parameters.h"
 #include <umd/device/tt_core_coordinates.h>
@@ -32,7 +33,7 @@ HalCoreInfoType create_idle_eth_mem_map() {
     static_assert(MEM_IERISC_MAP_END % L1_ALIGNMENT == 0);
 
     std::vector<DeviceAddr> mem_map_bases;
-    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
+    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT), 0);
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BASE)] = MEM_ETH_BASE;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BARRIER)] = MEM_L1_BARRIER;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::MAILBOX)] = MEM_IERISC_MAILBOX_BASE;
@@ -48,6 +49,14 @@ HalCoreInfoType create_idle_eth_mem_map() {
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::LAUNCH_MSG_BUFFER_RD_PTR)] =
         GET_IERISC_MAILBOX_ADDRESS_HOST(launch_msg_rd_ptr);
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BANK_TO_NOC_SCRATCH)] = MEM_IERISC_BANK_TO_NOC_SCRATCH;
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_MSG)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, msg);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG0)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[0]);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG1)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[1]);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG2)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[2]);
 
     std::vector<std::uint32_t> mem_map_sizes;
     mem_map_sizes.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
@@ -65,13 +74,16 @@ HalCoreInfoType create_idle_eth_mem_map() {
     mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::GO_MSG)] = sizeof(go_msg_t);
     mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::LAUNCH_MSG_BUFFER_RD_PTR)] = sizeof(std::uint32_t);
     mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::BANK_TO_NOC_SCRATCH)] = MEM_IERISC_BANK_TO_NOC_SIZE;
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_MSG)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG0)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG1)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG2)] = sizeof(uint32_t);
 
-    std::vector<std::vector<HalJitBuildConfig>> processor_classes(NumEthDispatchClasses);
+    std::vector<std::vector<HalJitBuildConfig>> processor_classes(NumEthDispatchClasses);  // DM0 and DM1
     std::vector<HalJitBuildConfig> processor_types(1);
     for (std::uint8_t processor_class_idx = 0; processor_class_idx < NumEthDispatchClasses; processor_class_idx++) {
         DeviceAddr fw_base, local_init, fw_launch;
         uint32_t fw_launch_value;
-        ll_api::memory::Loading memory_load = ll_api::memory::Loading::CONTIGUOUS_XIP;
         switch (static_cast<EthProcessorTypes>(processor_class_idx)) {
             case EthProcessorTypes::DM0: {
                 fw_base = MEM_IERISC_FIRMWARE_BASE;
@@ -85,18 +97,26 @@ HalCoreInfoType create_idle_eth_mem_map() {
                 fw_launch = SUBORDINATE_IERISC_RESET_PC;
                 fw_launch_value = fw_base;
             } break;
-            default:
-                TT_THROW("Unexpected processor class {} for Blackhole Idle Ethernet", processor_class_idx);
+            default: TT_THROW("Unexpected processor class {} for Blackhole Active Ethernet", processor_class_idx);
         }
         processor_types[0] = HalJitBuildConfig{
             .fw_base_addr = fw_base,
             .local_init_addr = local_init,
             .fw_launch_addr = fw_launch,
             .fw_launch_addr_value = fw_launch_value,
-            .memory_load = memory_load,
+            .memory_load = ll_api::memory::Loading::CONTIGUOUS_XIP,
         };
         processor_classes[processor_class_idx] = processor_types;
     }
+
+    std::vector<uint32_t> fw_mailbox_addr(static_cast<std::size_t>(FWMailboxMsg::COUNT), 0);
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_CALL)] = MEM_SYSENG_ETH_MSG_CALL;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_DONE)] = MEM_SYSENG_ETH_MSG_DONE;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_LINK_STATUS_CHECK)] =
+        MEM_SYSENG_ETH_MSG_LINK_STATUS_CHECK;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_RELEASE_CORE)] =
+        MEM_SYSENG_ETH_MSG_RELEASE_CORE;
+
     // TODO: Review if this should  be 2 (the number of eth processors)
     // Hardcode to 1 to keep size as before
     static_assert(llrt_common::k_SingleProcessorMailboxSize<EthProcessorTypes> <= MEM_IERISC_MAILBOX_SIZE);
@@ -106,6 +126,7 @@ HalCoreInfoType create_idle_eth_mem_map() {
         processor_classes,
         mem_map_bases,
         mem_map_sizes,
+        fw_mailbox_addr,
         false /*supports_cbs*/,
         false /*supports_receiving_multicast_cmds*/};
 }

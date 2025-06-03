@@ -65,6 +65,13 @@ uint32_t sumIDs[SUM_COUNT] __attribute__((used));
 }  // namespace kernel_profiler
 #endif
 
+void set_deassert_addresses() {
+    // Bring DM1 out of reset
+#ifdef ARCH_BLACKHOLE
+    WRITE_REG(SUBORDINATE_AERISC_RESET_PC, MEM_SUBORDINATE_AERISC_FIRMWARE_BASE);
+#endif
+}
+
 int main() {
     configure_csr();
     DIRTY_STACK_MEMORY();
@@ -87,7 +94,7 @@ int main() {
     for (uint32_t n = 0; n < NUM_NOCS; n++) {
         noc_local_state_init(n);
     }
-
+    deassert_all_reset();
     mailboxes->go_message.signal = RUN_MSG_DONE;
 
     while (1) {

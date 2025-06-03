@@ -25,7 +25,7 @@ namespace tt::tt_metal::wormhole {
 HalCoreInfoType create_active_eth_mem_map(bool is_base_routing_fw_enabled) {
     std::vector<DeviceAddr> mem_map_bases;
 
-    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
+    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT), 0);
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BASE)] = 0x0;  // Anything better to use?
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BARRIER)] = eth_l1_mem::address_map::ERISC_BARRIER_BASE;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::MAILBOX)] =
@@ -100,12 +100,14 @@ HalCoreInfoType create_active_eth_mem_map(bool is_base_routing_fw_enabled) {
         sizeof(mailboxes_t) - sizeof(profiler_msg_t::buffer) +
         sizeof(profiler_msg_t::buffer) / PROFILER_RISC_COUNT * static_cast<uint8_t>(EthProcessorTypes::COUNT);
     static_assert(mailbox_size <= eth_l1_mem::address_map::ERISC_MEM_MAILBOX_SIZE);
+    std::vector<uint32_t> fw_mailbox_addr(static_cast<std::size_t>(FWMailboxMsg::COUNT), 0);
     return {
         HalProgrammableCoreType::ACTIVE_ETH,
         CoreType::ETH,
         processor_classes,
         mem_map_bases,
         mem_map_sizes,
+        fw_mailbox_addr,
         false /*supports_cbs*/,
         false /*supports_receiving_multicast_cmds*/};
 }

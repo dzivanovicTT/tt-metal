@@ -16,6 +16,7 @@
 #include "core_config.h"
 #include "dev_mem_map.h"
 #include "eth_l1_address_map.h"
+#include "eth_fw_api.h"
 #include "hal_types.hpp"
 #include "llrt/hal.hpp"
 #include <umd/device/tt_core_coordinates.h>
@@ -31,7 +32,7 @@ HalCoreInfoType create_active_eth_mem_map() {
     static_assert(MEM_IERISC_MAP_END % L1_ALIGNMENT == 0);
 
     std::vector<DeviceAddr> mem_map_bases;
-    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
+    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT), 0);
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BASE)] = MEM_ERISC_BASE;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BARRIER)] = MEM_L1_BARRIER;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::MAILBOX)] = MEM_AERISC_MAILBOX_BASE;
@@ -53,6 +54,14 @@ HalCoreInfoType create_active_eth_mem_map() {
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::RETRAIN_FORCE)] = MEM_RETRAIN_FORCE_ADDR;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::FABRIC_ROUTER_CONFIG)] =
         MEM_ERISC_FABRIC_ROUTER_CONFIG_BASE;
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_MSG)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, msg);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG0)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[0]);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG1)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[1]);
+    mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG2)] =
+        MEM_SYSENG_ETH_MAILBOX_ADDR + offsetof(EthFwMailbox, arg[2]);
 
     std::vector<std::uint32_t> mem_map_sizes;
     mem_map_sizes.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
@@ -76,22 +85,50 @@ HalCoreInfoType create_active_eth_mem_map() {
     mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::RETRAIN_FORCE)] = sizeof(uint32_t);
     mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::FABRIC_ROUTER_CONFIG)] =
         MEM_ERISC_FABRIC_ROUTER_CONFIG_SIZE;
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_MSG)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG0)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG1)] = sizeof(uint32_t);
+    mem_map_sizes[static_cast<std::size_t>(HalL1MemAddrType::ETH_FW_MAILBOX_ARG2)] = sizeof(uint32_t);
 
-    std::vector<std::vector<HalJitBuildConfig>> processor_classes(NumEthDispatchClasses - 1);
+    std::vector<std::vector<HalJitBuildConfig>> processor_classes(NumEthDispatchClasses);  // DM0 and DM1
     std::vector<HalJitBuildConfig> processor_types(1);
     for (std::size_t processor_class_idx = 0; processor_class_idx < processor_classes.size(); processor_class_idx++) {
-        // BH active ethernet runs idle erisc FW on the second ethernet
+        DeviceAddr fw_base, local_init, fw_launch;
+        uint32_t fw_launch_value;
+        // DM0 is shared with base FW. It is the "primary" erisc and is responsible to deassert DM1
+        switch (static_cast<EthProcessorTypes>(processor_class_idx)) {
+            case EthProcessorTypes::DM0: {
+                fw_base = MEM_AERISC_FIRMWARE_BASE;
+                local_init = MEM_AERISC_INIT_LOCAL_L1_BASE_SCRATCH;
+                fw_launch = AERISC_RESET_PC;
+                fw_launch_value = fw_base;
+            } break;
+            case EthProcessorTypes::DM1: {
+                fw_base = MEM_SUBORDINATE_AERISC_FIRMWARE_BASE;
+                local_init = MEM_SUBORDINATE_AERISC_INIT_LOCAL_L1_BASE_SCRATCH;
+                fw_launch = SUBORDINATE_AERISC_RESET_PC;
+                fw_launch_value = fw_base;
+            } break;
+            default: TT_THROW("Unexpected processor class {} for Blackhole Idle Ethernet", processor_class_idx);
+        }
         processor_types[0] = HalJitBuildConfig{
-            .fw_base_addr = MEM_AERISC_FIRMWARE_BASE,
-            .local_init_addr = MEM_AERISC_INIT_LOCAL_L1_BASE_SCRATCH,
-            .fw_launch_addr = SUBORDINATE_IERISC_RESET_PC,
-            .fw_launch_addr_value = MEM_AERISC_FIRMWARE_BASE,
+            .fw_base_addr = fw_base,
+            .local_init_addr = local_init,
+            .fw_launch_addr = fw_launch,
+            .fw_launch_addr_value = fw_launch_value,
             .memory_load = ll_api::memory::Loading::CONTIGUOUS,
         };
         processor_classes[processor_class_idx] = processor_types;
     }
-    // TODO: Review if this should  be 2 (the number of eth processors)
-    // Hardcode to 1 to keep size as before
+
+    std::vector<uint32_t> fw_mailbox_addr(static_cast<std::size_t>(FWMailboxMsg::COUNT), 0);
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_CALL)] = MEM_SYSENG_ETH_MSG_CALL;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_DONE)] = MEM_SYSENG_ETH_MSG_DONE;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_LINK_STATUS_CHECK)] =
+        MEM_SYSENG_ETH_MSG_LINK_STATUS_CHECK;
+    fw_mailbox_addr[utils::underlying_type<FWMailboxMsg>(FWMailboxMsg::ETH_MSG_RELEASE_CORE)] =
+        MEM_SYSENG_ETH_MSG_RELEASE_CORE;
+
     static_assert(llrt_common::k_SingleProcessorMailboxSize<EthProcessorTypes> <= MEM_AERISC_MAILBOX_SIZE);
     return {
         HalProgrammableCoreType::ACTIVE_ETH,
@@ -99,6 +136,7 @@ HalCoreInfoType create_active_eth_mem_map() {
         processor_classes,
         mem_map_bases,
         mem_map_sizes,
+        fw_mailbox_addr,
         false /*supports_cbs*/,
         false /*supports_receiving_multicast_cmds*/};
 }

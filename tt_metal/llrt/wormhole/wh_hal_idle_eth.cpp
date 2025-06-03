@@ -31,7 +31,7 @@ HalCoreInfoType create_idle_eth_mem_map() {
     std::vector<DeviceAddr> mem_map_bases;
     constexpr std::uint32_t L1_KERNEL_CONFIG_SIZE = 69 * 1024;
 
-    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT));
+    mem_map_bases.resize(static_cast<std::size_t>(HalL1MemAddrType::COUNT), 0);
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BASE)] = MEM_ETH_BASE;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::BARRIER)] = MEM_L1_BARRIER;
     mem_map_bases[static_cast<std::size_t>(HalL1MemAddrType::MAILBOX)] = MEM_IERISC_MAILBOX_BASE;
@@ -82,12 +82,14 @@ HalCoreInfoType create_idle_eth_mem_map() {
         sizeof(mailboxes_t) - sizeof(profiler_msg_t::buffer) +
         sizeof(profiler_msg_t::buffer) / PROFILER_RISC_COUNT * static_cast<uint8_t>(EthProcessorTypes::COUNT);
     static_assert(mailbox_size <= MEM_IERISC_MAILBOX_SIZE);
+    std::vector<uint32_t> fw_mailbox_addr(static_cast<std::size_t>(FWMailboxMsg::COUNT), 0);
     return {
         HalProgrammableCoreType::IDLE_ETH,
         CoreType::ETH,
         processor_classes,
         mem_map_bases,
         mem_map_sizes,
+        fw_mailbox_addr,
         false /*supports_cbs*/,
         false /*supports_receiving_multicast_cmds*/};
 }
