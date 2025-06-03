@@ -38,7 +38,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
     uint32_t src_cb_id = CBIndex::c_0;
     auto input_data_format = datatype_to_dataformat_converter(input.get_dtype());
     uint32_t input_unit_size = compute_unit_size(input, input_data_format);
-    uint32_t aligned_input_unit_size = round_up_to_mul32(input_unit_size);
+    uint32_t aligned_input_unit_size = round_up_to_mul16(input_unit_size);
     uint32_t src_total_size = input.get_logical_shape()[0] * aligned_input_unit_size;
 
     tt::tt_metal::CircularBufferConfig src_cb_config =
@@ -50,7 +50,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
     uint32_t dst_cb_id = CBIndex::c_1;
     auto output_data_format = datatype_to_dataformat_converter(output.get_dtype());
     uint32_t output_unit_size = compute_unit_size(output, output_data_format);
-    uint32_t aligned_output_unit_size = round_up_to_mul32(output_unit_size);
+    uint32_t aligned_output_unit_size = round_up_to_mul16(output_unit_size);
     uint32_t dst_total_size = output.get_logical_shape()[0] * aligned_output_unit_size;
 
     tt::tt_metal::CircularBufferConfig dst_cb_config =
