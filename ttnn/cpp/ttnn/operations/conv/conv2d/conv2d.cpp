@@ -612,15 +612,15 @@ Result conv2d_L1(
                 true,
                 conv_config.in_place);
 
-            if (conv_config.deallocate_activation) {
-                input_tensor_post_tm.deallocate(/*force*/ true);
-            }
+            // if (conv_config.deallocate_activation) {
+            //     input_tensor_post_tm.deallocate(/*force*/ true);
+            // }
 
             input_tensor_post_tm = std::move(halo_output);
 
-            if (conv_config.reallocate_halo_output) {
-                input_tensor_post_tm = ttnn::move(input_tensor_post_tm);
-            }
+            // if (conv_config.reallocate_halo_output) {
+            //     input_tensor_post_tm = ttnn::move(input_tensor_post_tm);
+            // }
         }
 
         bool enable_split_reader = conv_config.enable_split_reader;

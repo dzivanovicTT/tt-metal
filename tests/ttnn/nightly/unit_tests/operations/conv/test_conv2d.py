@@ -198,7 +198,7 @@ def run_conv(
         dtype=output_dtype,
         weights_dtype=weights_dtype,
         shard_layout=shard_layout if not auto_shard else None,
-        deallocate_activation=deallocate_activation,
+        deallocate_activation=False,
         enable_act_double_buffer=enable_act_double_buffer,
         enable_weights_double_buffer=enable_weights_double_buffer,
         enable_split_reader=enable_split_reader,
@@ -208,7 +208,7 @@ def run_conv(
         transpose_shards=transpose_shards,
         preprocess_weights_on_device=preprocess_weights_on_device,
         always_preprocess_weights=False,
-        in_place=in_place,
+        in_place=True,
         enable_kernel_stride_folding=enable_kernel_stride_folding,
     )
     compute_config = ttnn.init_device_compute_kernel_config(
