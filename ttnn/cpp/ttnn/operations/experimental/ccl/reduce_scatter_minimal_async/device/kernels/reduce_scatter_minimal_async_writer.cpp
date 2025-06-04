@@ -230,12 +230,10 @@ void kernel_main() {
                     size_t l1_read_addr = get_read_ptr(cb_output_id);
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
 
-                    for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
-                        for (uint32_t t = 0; t < contig_pages_advanced; t++) {
-                            noc_async_write_tile(tile_id_start + tiles_read, output_addrgen, l1_read_addr);
-                            l1_read_addr += intermediate_page_size;
-                            tiles_read++;
-                        }
+                    for (uint32_t j = 0; j < num_pages_to_read; j++) {
+                        noc_async_write_tile(tile_id_start + tiles_read, output_addrgen, l1_read_addr);
+                        l1_read_addr += intermediate_page_size;
+                        tiles_read++;
                     }
 
                     noc_async_writes_flushed();
