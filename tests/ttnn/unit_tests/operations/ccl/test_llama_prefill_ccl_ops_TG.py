@@ -411,23 +411,6 @@ def test_reduce_scatter_TG(
 ):
     if len(mesh_device.get_devices()) != 32:
         pytest.skip("Not TG!")
-    # run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
-    #     mesh_device,
-    #     num_devices,
-    #     per_chip_output_shape,
-    #     ttnn.TensorMemoryLayout.INTERLEAVED,
-    #     dim,
-    #     num_links,
-    #     input_dtype,
-    #     layout,
-    #     buffer_type,
-    #     use_program_cache,
-    #     function_level_defaults,
-    #     warmup_iters=15,
-    #     num_iters=num_iters,
-    #     num_all_gather_instances=replication_factor,
-    #     cluster_axis=cluster_axis,
-    # )
 
     run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
         mesh_device,
