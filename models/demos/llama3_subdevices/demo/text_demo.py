@@ -673,6 +673,8 @@ def test_demo_text(
                                         logger.info(
                                             "More mismatches exist but will not be logged for this comparison (limit reached)."
                                         )
+                                        print(f"Actual: {actual_text_clean}")
+                                        print(f"Expected: {expected_text_clean}")
                                         assert (
                                             False
                                         ), "More mismatches exist but will not be logged for this comparison (limit reached)."

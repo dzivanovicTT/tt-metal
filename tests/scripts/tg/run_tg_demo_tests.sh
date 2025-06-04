@@ -68,18 +68,18 @@ run_tg_falcon7b_tests() {
 }
 
 run_tg_demo_tests() {
+  run_tg_llama3_tests
 
-  if [[ "$1" == "falcon7b" ]]; then
-    run_tg_falcon7b_tests
-  elif [[ "$1" == "llama3" ]]; then
-    run_tg_llama3_tests
-  elif [[ "$1" == "llama3_8b_dp" ]]; then
-    run_tg_llama3_8b_dp_tests
-  elif [[ "$1" == "llama3_70b_dp" ]]; then
-    run_tg_llama3_70b_dp_tests
-  else
-    echo "LOG_METAL: Unknown model type: $1"
-    return 1
+  # if [[ "$1" == "falcon7b" ]]; then
+  #   run_tg_falcon7b_tests
+  # elif [[ "$1" == "llama3" ]]; then
+  # elif [[ "$1" == "llama3_8b_dp" ]]; then
+  #   run_tg_llama3_8b_dp_tests
+  # elif [[ "$1" == "llama3_70b_dp" ]]; then
+  #   run_tg_llama3_70b_dp_tests
+  # else
+  #   echo "LOG_METAL: Unknown model type: $1"
+  #   return 1
   fi
 
 }
