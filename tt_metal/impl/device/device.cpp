@@ -961,6 +961,7 @@ void Device::init_command_queue_host() {
 }
 
 void Device::init_command_queue_device() {
+    TT_FATAL(this->command_queue_programs_.size() == 0, "Command queue device is already initialized");
     if (tt_metal::MetalContext::instance().rtoptions().get_skip_loading_fw()) {
         detail::EnablePersistentKernelCache();
         this->compile_command_queue_programs();
