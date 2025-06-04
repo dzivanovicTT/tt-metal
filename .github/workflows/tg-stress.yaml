@@ -60,9 +60,9 @@ jobs:
           build-artifact-name: ${{ inputs.build-artifact-name }}
           wheel-artifact-name: ${{ inputs.wheel-artifact-name }}
       - name: Run stress tests
-        timeout-minutes: 100
+        timeout-minutes: 600
         run: |
-          for i in {1..5}; do
+          for i in {1..30}; do
             echo "🔁 Run #$i"
             timeout --preserve-status 1200 pytest models/demos/llama3_subdevices/demo/demo_decode.py -k "nd-hang-test"
           done
