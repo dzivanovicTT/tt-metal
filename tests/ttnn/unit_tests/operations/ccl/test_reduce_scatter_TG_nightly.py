@@ -231,6 +231,8 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
         persistent_buffers = None
         if use_persistent_output:
             tile = (32, 32)
+            padded_per_chip_input_shape = list(per_chip_input_shape)
+            padded_per_chip_input_shape[0] += 2
             persistent_buffers = [
                 ttnn.from_torch(
                     torch.zeros(per_chip_output_shape),
@@ -242,7 +244,7 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
                     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
                 ),
                 ttnn.from_torch(
-                    torch.zeros(per_chip_input_shape),
+                    torch.zeros(padded_per_chip_input_shape),
                     tile=ttnn.Tile(tile),
                     dtype=input_dtype,
                     device=mesh_device,

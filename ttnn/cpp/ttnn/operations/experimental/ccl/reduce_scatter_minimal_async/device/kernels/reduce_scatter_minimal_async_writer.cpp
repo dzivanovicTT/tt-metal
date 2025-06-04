@@ -87,8 +87,6 @@ void kernel_main() {
 
     uint32_t slice_Wt = input_tensor_Wt / ring_size;
 
-    uint32_t payload_size_bytes = contig_pages_advanced * intermediate_page_size;
-
     // interleaved addrgen
     constexpr bool intermediate_is_dram = intermediate_type == tt::tt_metal::BufferType::DRAM;
     auto intermediate_addrgen = InterleavedAddrGenFast<intermediate_is_dram>{
@@ -124,12 +122,14 @@ void kernel_main() {
                 uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
                 DPRINT << "WRITER: for link " << link << ", tiles_read: " << tiles_read
                        << ", tiles_to_read: " << tiles_to_read << ", "
-                       << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << "\n";
+                       << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << ", "
+                       << "slice_Wt: " << slice_Wt << ", stride_Wt: " << stride_Wt << ", batch_offset: " << batch_offset
+                       << "\n";
                 uint32_t fwd_tile_id_start = actual_fwd_slice_idx * slice_Wt;
                 uint32_t bwd_tile_id_start = actual_bwd_slice_idx * slice_Wt;
                 bool write_forward = true;
 
-                uint32_t packet_id = 0;
+                uint32_t packet_id = (tiles_read + contig_pages_advanced - 1) / contig_pages_advanced;
                 while (tiles_read < tiles_to_read) {
                     // Alternate writes in forward and backward direction
                     cb_wait_front(cb_output_id, tile_granularity);
@@ -137,6 +137,8 @@ void kernel_main() {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
 
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
+                        uint32_t payload_size_bytes =
+                            std::min(contig_pages_advanced, num_pages_to_read - j) * intermediate_page_size;
                         if (write_forward) {
                             uint32_t intermediate_packet_id = actual_fwd_slice_idx + packet_id * ring_size;
                             uint32_t intermediate_packet_first_tile_id =

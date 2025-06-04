@@ -64,8 +64,6 @@ void kernel_main() {
         matmul_receiver = ReduceScatterOpReceiver(arg_idx);
     }
 
-    uint32_t payload_size_bytes = contig_pages_advanced * input_tensor_page_size;
-
     constexpr uint32_t slice_Wt = input_tensor_Wt / ring_size;
 
     constexpr uint32_t batch_num_pages = batch_slice_num_pages * ring_size;
@@ -113,7 +111,9 @@ void kernel_main() {
             uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
             DPRINT << "READER: for link " << link << ", tiles_read: " << tiles_read
                    << ", tiles_to_read: " << tiles_to_read << ", "
-                   << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << "\n";
+                   << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset
+                   << ", slice_Wt: " << slice_Wt << ", stride_Wt: " << stride_Wt << ", batch_offset: " << batch_offset
+                   << "\n";
 
             /**
              * Interleave forward and backward ring reads
@@ -127,7 +127,7 @@ void kernel_main() {
             }
             DPRINT << "Got semaphore for link " << link << "\n";
             bool read_forward = true;
-            uint32_t packet_id = 0;
+            uint32_t packet_id = (tiles_read + contig_pages_advanced - 1) / contig_pages_advanced;
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
 
@@ -159,6 +159,8 @@ void kernel_main() {
                     cb_reserve_back(cb_intermediate_id, num_pages_to_read);
                     size_t intermediate_l1_write_addr = get_write_ptr(cb_intermediate_id);
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
+                        uint32_t payload_size_bytes =
+                            input_tensor_page_size * std::min(contig_pages_advanced, num_pages_to_read - j);
                         uint32_t intermediate_packet_id =
                             (read_forward ? actual_fwd_slice_idx : actual_bwd_slice_idx) + packet_id * ring_size;
 

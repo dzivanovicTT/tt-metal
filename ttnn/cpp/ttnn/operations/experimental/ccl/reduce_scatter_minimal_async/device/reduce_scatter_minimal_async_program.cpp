@@ -122,7 +122,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
     uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
 
     uint32_t tile_granularity = 4 * num_pages_per_packet;
-    uint32_t cb_num_pages = 2 * tile_granularity;  // double buffering
+    uint32_t cb_num_pages = 3 * tile_granularity;  // double buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
     uint32_t input_cb_index = tt::CB::c_in0;
