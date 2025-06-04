@@ -12,6 +12,7 @@ target_sources(
         dispatch_program/test_sub_device.cpp
         dispatch_util/test_device_command.cpp
         dispatch_util/test_dispatch_settings.cpp
+        dispatch_buffer/test_EnqueueWriteBuffer_and_EnqueueReadBuffer.cpp # FIXME: Fix the heap-buffer-overflow in here and see if it's fast enough for Basic
 )
 target_include_directories(
     unit_tests_dispatch_smoke
@@ -54,7 +55,6 @@ TT_ENABLE_UNITY_BUILD(unit_tests_dispatch_slow)
 target_sources(
     unit_tests_dispatch_slow
     PRIVATE
-        dispatch_buffer/test_EnqueueWriteBuffer_and_EnqueueReadBuffer.cpp # FIXME: Fix the heap-buffer-overflow in here and see if it's fast enough for Basic
         dispatch_program/test_EnqueueProgram.cpp
         dispatch_trace/test_EnqueueTrace.cpp
 )
