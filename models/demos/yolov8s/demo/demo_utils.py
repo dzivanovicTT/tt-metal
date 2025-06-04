@@ -241,11 +241,8 @@ def Boxes(data):
     return {"xyxy": data[:, :4], "conf": data[:, -2], "cls": data[:, -1]}
 
 
-def Results(orig_img, path=None, names=None, boxes=None):
-    if path:
-        return {"orig_img": orig_img, "path": path, "names": names, "boxes": Boxes(boxes)}
-    else:
-        return {"orig_img": orig_img, "names": names, "boxes": Boxes(boxes)}
+def Results(orig_img, path, names, boxes):
+    return {"orig_img": orig_img, "path": path, "names": names, "boxes": Boxes(boxes)}
 
 
 def clip_boxes(boxes, shape):
@@ -292,6 +289,7 @@ def postprocess(preds, img, orig_imgs, batch=None, names=None):
         max_det=args["max_det"],
         classes=args["classes"],
     )
+
     results = []
     if batch:
         for pred, orig_img, img_path in zip(preds, orig_imgs, batch[0]):
@@ -299,7 +297,7 @@ def postprocess(preds, img, orig_imgs, batch=None, names=None):
             results.append(Results(orig_img, path=img_path, names=names, boxes=pred))
     else:
         for pred, orig_img in zip(preds, orig_imgs):
-            ##pred[:, :4] = scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
+            pred[:, :4] = scale_boxes(img.shape[2:], pred[:, :4], orig_img.shape)
             results.append(Results(orig_img, names=names, boxes=pred))
 
     return results

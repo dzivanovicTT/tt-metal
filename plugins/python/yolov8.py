@@ -19,20 +19,20 @@ import ttnn
 # print("ARCH YAML   ", os.environ["WH_ARCH_YAML"])
 from models.experimental.yolo_evaluation.yolo_common_evaluation import save_yolo_predictions_by_model
 
-from models.demos.yolov9c.runner.performant_runner import YOLOv9PerformantRunner
+from models.demos.yolov8s.tests.yolov8s_e2e_performant import Yolov8sTrace2CQ
 from models.experimental.yolo_evaluation.yolo_evaluation_utils import LoadImages, postprocess, preprocess
 from models.demos.yolov9c.demo.demo_utils import load_coco_class_names
 from ttnn.model_preprocessing import preprocess_model_parameters
 from models.utility_functions import is_wormhole_b0, torch2tt_tensor, is_blackhole
 
 
-# from models.demos.yolov9.post_processing import (
+# from models.demos.yolov8.post_processing import (
 #    load_class_names,
 #    plot_boxes_cv2,
 #    post_processing,
 # )
 
-# from models.experimental.yolov9.performant_files.mv2like_test_infra import create_test_infra
+# from models.experimental.yolov8.performant_files.mv2like_test_infra import create_test_infra
 from models.utility_functions import (
     is_wormhole_b0,
     enable_persistent_kernel_cache,
@@ -48,13 +48,13 @@ Gst.init(None)
 
 
 # --- Element Class Definition ---
-class Yolov9(GstBase.BaseTransform):
+class Yolov8(GstBase.BaseTransform):
     # Element metadata (for GStreamer)
 
-    __gtype_name__ = "GstYolov9PythonBatching"
+    __gtype_name__ = "GstYolov8PythonBatching"
 
     __gstmetadata__ = (
-        "Yolov9 Python",  # Long name
+        "Yolov8 Python",  # Long name
         "Filter/Effect/Converter",  # Classification
         "Prepends a configurable string to text buffer data",  # Description
         "Your Name <your.email@example.com>",  # Author
@@ -97,15 +97,11 @@ class Yolov9(GstBase.BaseTransform):
         )
         #        self.batch_size=1
         self.device.enable_program_cache()
-        self.model = YOLOv9PerformantRunner(
+        self.model = Yolov8sTrace2CQ()
+        self.model.initialize_yolov8s_trace_2cqs_inference(
             self.device,
             self.batch_size,
-            ttnn.bfloat16,
-            ttnn.bfloat16,
-            resolution=(640, 640),
-            model_location_generator=None,
         )
-        self.model._capture_yolov9_trace_2cqs()
         print("########################################", self.batch_size)
 
     def get_dispatch_core_config(self):
@@ -142,7 +138,7 @@ class Yolov9(GstBase.BaseTransform):
         try:
             success, in_map_info = inbuf.map(Gst.MapFlags.READ)
             if not success:
-                Gst.error("Yolov9: Failed to map input buffer")
+                Gst.error("Yolov8: Failed to map input buffer")
                 return Gst.FlowReturn.ERROR
 
             # original_data = in_map_info.data
@@ -182,22 +178,22 @@ class Yolov9(GstBase.BaseTransform):
             # nms_thresh = 0.4
 
             # boxes = post_processing(img, conf_thresh, nms_thresh, output)
-            # namesfile = "models/demos/yolov9/resources/coco.names"
+            # namesfile = "models/demos/yolov8/resources/coco.names"
             # class_names = load_class_names(namesfile)
             # img = cv2.imread(imgfile)
-            # plot_boxes_cv2(img, boxes[0], "ttnn_yolov9_prediction_demo.jpg", class_names)
+            # plot_boxes_cv2(img, boxes[0], "ttnn_yolov8_prediction_demo.jpg", class_names)
 
             inbuf.unmap(in_map_info)
 
             success, out_map_info = outbuf.map(Gst.MapFlags.WRITE)
             if not success:
-                Gst.error("Yolov9: Failed to map output buffer for writing")
+                Gst.error("Yolov8: Failed to map output buffer for writing")
                 return Gst.FlowReturn.ERROR
 
             # Ensure the output buffer has enough space for the transformed image
             required_size = outImage.nbytes
             if outbuf.get_size() < required_size:
-                Gst.error(f"Yolov9: Output buffer too small. Required: {required_size}, Actual: {outbuf.get_size()}")
+                Gst.error(f"Yolov8: Output buffer too small. Required: {required_size}, Actual: {outbuf.get_size()}")
                 return Gst.FlowReturn.ERROR
 
             # Corrected line: assign bytes to the memoryview slice
@@ -217,7 +213,7 @@ class Yolov9(GstBase.BaseTransform):
             return Gst.FlowReturn.OK
 
         except Exception as e:
-            Gst.error(f"Yolov9: Error in transform: {e}")
+            Gst.error(f"Yolov8: Error in transform: {e}")
             return Gst.FlowReturn.ERROR
         finally:
             # Ensure buffers are unmapped even if an error occurs
@@ -227,10 +223,10 @@ class Yolov9(GstBase.BaseTransform):
             #    outbuf.unmap(out_map_info)
 
 
-GObject.type_register(Yolov9)
+GObject.type_register(Yolov8)
 
-__gstelementfactory__ = ("yolov9", Gst.Rank.NONE, Yolov9)
+__gstelementfactory__ = ("yolov8", Gst.Rank.NONE, Yolov8)
 
 # The following are not strictly needed for __gstelementfactory__ but good for plugin tools
-GST_PLUGIN_NAME = "yolov9plugin"
+GST_PLUGIN_NAME = "yolov8plugin"
 __gstplugininit__ = None  # Not using a plugin_init function with __gstelementfactory__
