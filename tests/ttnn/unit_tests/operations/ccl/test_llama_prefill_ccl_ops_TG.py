@@ -15,6 +15,9 @@ from tests.ttnn.unit_tests.operations.ccl.test_all_gather_TG_post_commit import 
 )
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from tracy import signpost
+from tests.ttnn.unit_tests.operations.ccl.test_reduce_scatter_TG_nightly import (
+    run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows,
+)
 
 NUM_BUFFERS = 8
 
@@ -315,7 +318,7 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     "num_devices, num_links, per_chip_output_shape, dim, layout, input_dtype, cluster_axis",
     [
         # (8, 4, [1, 1, 8192, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0),
-        (4, 2, [1, 1, 128, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
+        (4, 4, [1, 1, 4096, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
         # (4, 4, [1, 1, 8192, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
         # (4, 2, [1, 1, 128, 32 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1),
         # multi link
@@ -366,4 +369,81 @@ def test_all_gather_TG(
         num_iters=num_iters,
         num_all_gather_instances=replication_factor,
         cluster_axis=cluster_axis,
+    )
+
+
+# Enumerate the post-commit cases explicitly
+@skip_for_grayskull("Requires eth connected devices to run")
+@pytest.mark.parametrize(
+    "num_devices, num_links, rs_input_shape, dim, layout, input_dtype, cluster_axis",
+    [
+        (8, 4, [1, 1, 4096, 2048], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0),
+        # (4, 1, [1, 1, 4096, 1280], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
+        # (4, 1, [1, 1, 4096, 3584], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1),
+    ],
+)
+@pytest.mark.parametrize(
+    "buffer_type",
+    [
+        ttnn.BufferType.DRAM,
+        # ttnn.BufferType.L1,
+    ],
+)
+@pytest.mark.parametrize("replication_factor", [4])
+@pytest.mark.parametrize("mesh_device", [pytest.param((8, 4), id="8x4_grid")], indirect=True)
+@pytest.mark.parametrize(
+    "device_params", [{"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING, "trace_region_size": 5554176}], indirect=True
+)
+def test_reduce_scatter_TG(
+    mesh_device,
+    num_devices,
+    rs_input_shape,
+    dim,
+    num_links,
+    input_dtype,
+    layout,
+    buffer_type,
+    cluster_axis,
+    use_program_cache,
+    function_level_defaults,
+    replication_factor,
+    num_iters=1,
+):
+    if len(mesh_device.get_devices()) != 32:
+        pytest.skip("Not TG!")
+    # run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
+    #     mesh_device,
+    #     num_devices,
+    #     per_chip_output_shape,
+    #     ttnn.TensorMemoryLayout.INTERLEAVED,
+    #     dim,
+    #     num_links,
+    #     input_dtype,
+    #     layout,
+    #     buffer_type,
+    #     use_program_cache,
+    #     function_level_defaults,
+    #     warmup_iters=15,
+    #     num_iters=num_iters,
+    #     num_all_gather_instances=replication_factor,
+    #     cluster_axis=cluster_axis,
+    # )
+
+    run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
+        mesh_device,
+        num_devices,
+        rs_input_shape,
+        ttnn.TensorMemoryLayout.INTERLEAVED,
+        dim,
+        num_links,
+        ttnn.ReduceType.Sum,
+        input_dtype,
+        layout,
+        buffer_type,
+        use_program_cache,
+        function_level_defaults,
+        num_iters=num_iters,
+        num_reduce_scatter_instances=replication_factor,
+        cluster_axis=cluster_axis,
+        use_reduce_scatter_async=True,
     )

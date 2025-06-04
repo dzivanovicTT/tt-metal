@@ -14,8 +14,9 @@ void MAIN {
     constexpr uint32_t tile_granularity = get_compile_time_arg_val(4);
     constexpr uint32_t ring_size = get_compile_time_arg_val(5);
     constexpr uint32_t num_batches = get_compile_time_arg_val(6);
+    constexpr uint32_t num_links = get_compile_time_arg_val(7);
 
-    const uint32_t num_packets = batch_slice_num_pages / tile_granularity;
+    const uint32_t num_packets = batch_slice_num_pages / tile_granularity / num_links;
 
     for (uint32_t b = 0; b < num_batches; b++) {
         for (uint32_t i = 0; i < ring_size - 1; i++) {  // Don't reduce on the first slice
