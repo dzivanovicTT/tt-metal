@@ -42,6 +42,19 @@ void kernel_main() {
     size_t out_ready_sem_fwd = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem_bwd = get_arg_val<uint32_t>(arg_idx++);
     size_t batch_ready_sem = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t num_links = get_arg_val<uint32_t>(arg_idx++);
+
+    // DPRINT all uint32_t args
+    DPRINT << "my_chip_id: " << my_chip_id << "\n";
+    DPRINT << "tile_granularity: " << tile_granularity << "\n";
+    DPRINT << "input_tensor_Wt: " << input_tensor_Wt << "\n";
+    DPRINT << "input_tensor_page_size: " << input_tensor_page_size << "\n";
+    DPRINT << "batch_slice_num_pages: " << batch_slice_num_pages << "\n";
+    DPRINT << "ring_size: " << ring_size << "\n";
+    DPRINT << "num_batches: " << num_batches << "\n";
+    DPRINT << "link: " << link << "\n";
+    DPRINT << "num_links: " << num_links << "\n";
 
     ReduceScatterOpReceiver matmul_receiver;
     if constexpr (fuse_op) {
@@ -88,21 +101,26 @@ void kernel_main() {
             uint32_t fwd_intermediate_tile_id_start = actual_fwd_slice_idx * slice_Wt;
             uint32_t bwd_input_tile_id_start = actual_bwd_slice_idx * slice_Wt + batch_offset;
             uint32_t bwd_intermediate_tile_id_start = actual_bwd_slice_idx * slice_Wt;
-            uint32_t pages_read_in_row = 0;
-            uint32_t row_offset = 0;
-            uint32_t tiles_read = 0;
-            uint32_t tiles_to_read = batch_slice_num_pages;
             uint32_t stride_Wt = input_tensor_Wt;
+            uint32_t pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
+            uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
+            uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
+            uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
+            DPRINT << "READER: for link " << link << ", tiles_read: " << tiles_read
+                   << ", tiles_to_read: " << tiles_to_read << ", "
+                   << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << "\n";
 
             /**
              * Interleave forward and backward ring reads
              * forward handles even tiles, backward handles odd tiles
              * after ring_size-1 steps, we've transferred all tiles
              */
+            DPRINT << "Waiting on semaphore for link " << link << "\n";
             if (do_reduce) {
                 while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_fwd) <= i - 1);
                 while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_bwd) <= i - 1);
             }
+            DPRINT << "Got semaphore for link " << link << "\n";
             bool read_forward = true;
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
@@ -162,4 +180,5 @@ void kernel_main() {
             bwd_slice_idx++;
         }
     }
+    DPRINT << "Done Reader\n";
 }

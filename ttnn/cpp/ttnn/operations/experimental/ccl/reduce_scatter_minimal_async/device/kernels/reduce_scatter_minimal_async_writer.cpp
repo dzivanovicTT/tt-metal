@@ -46,8 +46,19 @@ void kernel_main() {
     size_t out_ready_sem_fwd = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem_bwd = get_arg_val<uint32_t>(arg_idx++);
     size_t batch_ready_sem = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t num_links = get_arg_val<uint32_t>(arg_idx++);
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
+
+    DPRINT << "my_chip_id: " << my_chip_id << "\n";
+    DPRINT << "tile_granularity: " << tile_granularity << "\n";
+    DPRINT << "input_tensor_Wt: " << input_tensor_Wt << "\n";
+    DPRINT << "batch_slice_num_pages: " << batch_slice_num_pages << "\n";
+    DPRINT << "ring_size: " << ring_size << "\n";
+    DPRINT << "num_batches: " << num_batches << "\n";
+    DPRINT << "link: " << link << "\n";
+    DPRINT << "num_links: " << num_links << "\n";
 
     // packet header cb
     cb_reserve_back(reserved_packet_header_cb_id, 1);
@@ -104,10 +115,14 @@ void kernel_main() {
             uint32_t cb_output_id = i > 0 ? cb_compute_output_id : cb_reader_output_id;
             // If not the last slice, write what's on cb_output_id forward
             if (i < (ring_size - 1)) {
-                uint32_t pages_read_in_row = 0;
-                uint32_t row_offset = 0;
-                uint32_t tiles_read = 0;
-                uint32_t tiles_to_read = batch_slice_num_pages;
+                uint32_t stride_Wt = input_tensor_Wt;
+                uint32_t pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
+                uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
+                uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
+                uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
+                DPRINT << "WRITER: for link " << link << ", tiles_read: " << tiles_read
+                       << ", tiles_to_read: " << tiles_to_read << ", "
+                       << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << "\n";
                 uint32_t fwd_tile_id_start = actual_fwd_slice_idx * slice_Wt;
                 uint32_t bwd_tile_id_start = actual_bwd_slice_idx * slice_Wt;
                 bool write_forward = true;
@@ -203,8 +218,8 @@ void kernel_main() {
                 noc_async_writes_flushed();
             } else {
                 // Otherwise, on the last slice, write it to output buffer
-                uint32_t tiles_read = 0;
-                uint32_t tiles_to_read = batch_slice_num_pages;
+                uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
+                uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
                 uint32_t tile_id_start = batch_offset;
                 while (tiles_read < tiles_to_read) {
                     cb_wait_front(cb_output_id, tile_granularity);
@@ -260,4 +275,5 @@ void kernel_main() {
     }
 
     noc_async_write_barrier();
+    DPRINT << "Done Writer\n";
 }

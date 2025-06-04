@@ -233,7 +233,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         tile_granularity,
         ring_size,
         num_batches,
-    };
+        num_links};
 
     auto sender_reduce_kernel_id = tt::tt_metal::CreateKernel(
         program,
@@ -247,10 +247,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
                                 // semaphore
     for (uint32_t link = 0; link < num_links; link++) {
         CoreCoord core = sender_worker_cores[link];
-        if (link == 0) {
-            // drain sync core is the first worker core
-            drain_sync_core = mesh_device->worker_core_from_logical_core(core);
-        }
+        drain_sync_core = mesh_device->worker_core_from_logical_core(core);
 
         if (fuse_op) {
             auto sender_workers = corerange_to_cores(sender_worker_core_range, std::nullopt, true);
@@ -260,10 +257,11 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         std::vector<uint32_t> reader_rt_args = {
             input_tensor.buffer()->address(),         // input_tensor_address
             intermediate_tensor.buffer()->address(),  // intermediate_tensor_address
-            semaphore.at(0).address(),                // out_ready_fwd_semaphore
-            semaphore.at(1).address(),                // out_ready_bwd_semaphore
-            semaphore.at(2).address(),                // batch_ready_semaphore
-        };
+            semaphore.at(0 + link * 3).address(),     // out_ready_fwd_semaphore
+            semaphore.at(1 + link * 3).address(),     // out_ready_bwd_semaphore
+            semaphore.at(2 + link * 3).address(),     // batch_ready_semaphore
+            link,
+            num_links};
         if (fuse_op) {
             fused_op_signaler->push_reduce_scatter_fused_op_rt_args(reader_rt_args);
         }
@@ -274,10 +272,11 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
             output_tensor.buffer()->address(),        // output_tensor_address
             drain_sync_core.x,                        // out_ready_sem_noc0_x
             drain_sync_core.y,                        // out_ready_sem_noc0_y
-            semaphore.at(0).address(),                // out_ready_fwd_semaphore
-            semaphore.at(1).address(),                // out_ready_bwd_semaphore
-            semaphore.at(2).address(),                // batch_ready_semaphore
-        };
+            semaphore.at(0 + link * 3).address(),     // out_ready_fwd_semaphore
+            semaphore.at(1 + link * 3).address(),     // out_ready_bwd_semaphore
+            semaphore.at(2 + link * 3).address(),     // batch_ready_semaphore
+            link,
+            num_links};
         writer_rt_args.push_back(forward_device.has_value());
         if (forward_device.has_value()) {
             tt::tt_fabric::append_fabric_connection_rt_args(
