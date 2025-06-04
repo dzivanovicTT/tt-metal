@@ -344,8 +344,8 @@ Result conv2d_DRAM(
                 sliced_input_tensor_memory_config);
         }
         auto conv_config_l1 = conv_config;
-        conv_config_l1.deallocate_activation = true;
-        conv_config_l1.reallocate_halo_output = true;
+        conv_config_l1.deallocate_activation = false;
+        conv_config_l1.reallocate_halo_output = false;
 
         ttnn::Tensor sliced_output_tensor;
         std::tie(sliced_output_tensor, std::ignore, std::ignore, weight_tensor_on_device, bias_tensor_on_device) =
@@ -601,6 +601,7 @@ Result conv2d_L1(
                     ttnn::to_layout(input_tensor_post_tm, Layout::ROW_MAJOR, std::nullopt, std::nullopt, device);
             }
         } else {
+            printf("conv halo\n");
             Tensor halo_output = ttnn::halo(
                 queue_id,
                 input_tensor_post_tm,
@@ -613,12 +614,14 @@ Result conv2d_L1(
                 conv_config.in_place);
 
             if (conv_config.deallocate_activation) {
+                printf("deallocating activations\n");
                 input_tensor_post_tm.deallocate(/*force*/ true);
             }
 
             input_tensor_post_tm = std::move(halo_output);
 
             if (conv_config.reallocate_halo_output) {
+                printf("reallocating halo output\n");
                 input_tensor_post_tm = ttnn::move(input_tensor_post_tm);
             }
         }

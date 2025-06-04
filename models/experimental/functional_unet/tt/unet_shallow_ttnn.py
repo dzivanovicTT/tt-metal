@@ -169,7 +169,7 @@ class UNetConv2D:
             dtype=activation_dtype,
             weights_dtype=weights_dtype,
             shard_layout=shard_layout,
-            deallocate_activation=True,
+            deallocate_activation=False,
             enable_act_double_buffer=(
                 conv.use_activation_double_buffer if "use_activation_double_buffer" in conv else False
             ),
@@ -178,8 +178,9 @@ class UNetConv2D:
             activation=activation,
             output_layout=output_layout,
             reshard_if_not_optimal=reshard_if_not_optimal,
-            reallocate_halo_output=reallocate_halo_output,
+            reallocate_halo_output=False,
             enable_weights_double_buffer=True,
+            in_place=True,
         )
 
         if override_core_grid is not None:

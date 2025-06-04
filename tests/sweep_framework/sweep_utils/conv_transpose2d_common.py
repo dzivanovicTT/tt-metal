@@ -121,7 +121,7 @@ def run_full(
         weights_dtype=weights_dtype,
         math_fidelity=math_fidelity,
         shard_layout=None,
-        deallocate_activation=deallocate_activation,
+        deallocate_activation=False,
         fp32_dest_acc_enabled=fp32_accum,
         packer_l1_accum_enabled=packer_l1_acc,
         override_sharding_config=override_sharding_config,

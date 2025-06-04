@@ -117,7 +117,7 @@ def run_conv2d_full_sweep(
         dtype=activations_dtype,
         weights_dtype=weights_dtype,
         shard_layout=None,
-        deallocate_activation=deallocate_activation,
+        deallocate_activation=False,
         override_sharding_config=override_sharding_config,
         output_layout=output_layout,
         enable_act_double_buffer=enable_act_double_buffer,
