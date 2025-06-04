@@ -63,11 +63,6 @@ inline void send_packet(
     tt_l1_ptr uint32_t* last_word_addr =
         reinterpret_cast<tt_l1_ptr uint32_t*>(source_l1_buffer_address + packet_payload_size_bytes - 4);
 #endif
-    volatile tt::tt_fabric::LowLatencyRoutingFields& routing_type = packet_header->routing_fields;
-    uint32_t routing = routing_type.value & tt::tt_fabric::LowLatencyRoutingFields::FIELD_MASK;
-
-    DPRINT << "Routing is " << HEX() << routing << DEC() << ENDL();
-
     connection.wait_for_empty_write_slot();
     connection.send_payload_without_header_non_blocking_from_address(
         source_l1_buffer_address, packet_payload_size_bytes);

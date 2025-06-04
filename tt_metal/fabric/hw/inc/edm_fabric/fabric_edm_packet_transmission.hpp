@@ -134,6 +134,7 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
     switch (noc_send_type) {
         case tt::tt_fabric::NocSendType::NOC_UNICAST_WRITE: {
             const auto dest_address = header.command_fields.unicast_write.noc_address;
+            WAYPOINT("FAC4");
             noc_async_write_one_packet_with_trid<false, false>(
                 payload_start_address,
                 dest_address,
@@ -155,6 +156,7 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
                 header.command_fields.mcast_write.address);
             const auto num_dests = header.command_fields.mcast_write.mcast_rect_size_x *
                                    header.command_fields.mcast_write.mcast_rect_size_y;
+            WAYPOINT("FAC5");
             noc_async_write_one_packet_with_trid(
                 payload_start_address, mcast_dest_address, payload_size_bytes, num_dests, transaction_id);
         } break;
@@ -187,6 +189,7 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
 
         case tt::tt_fabric::NocSendType::NOC_FUSED_UNICAST_ATOMIC_INC: {
             const auto dest_address = header.command_fields.unicast_seminc_fused.noc_address;
+            WAYPOINT("FAC6");
             noc_async_write_one_packet_with_trid<false, false>(
                 payload_start_address,
                 dest_address,

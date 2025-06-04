@@ -68,9 +68,6 @@ FORCE_INLINE void check_worker_connections(
 // !!!FORCE_INLINE could potentially cause stack corruption as seen in the past
 inline void wait_for_notification(uint32_t address, uint32_t value) {
     volatile tt_l1_ptr uint32_t* poll_addr = (volatile tt_l1_ptr uint32_t*)address;
-    // WATCHER_RING_BUFFER_PUSH(0xdeadbeef);
-    // WATCHER_RING_BUFFER_PUSH(poll_addr[0]);
-    // WATCHER_RING_BUFFER_PUSH(value);
     while (*poll_addr != value) {
         invalidate_l1_cache();
         // context switch while waiting to allow slow dispatch traffic to go through
@@ -83,13 +80,6 @@ inline void notify_master_router(uint32_t master_eth_chan, uint32_t address) {
     // send semaphore increment to master router on this device.
     // semaphore notifies all other routers that this router has completed
     // startup handshake with its ethernet peer.
-    // WATCHER_RING_BUFFER_PUSH(0xdeadbeef);
-    // WATCHER_RING_BUFFER_PUSH(0xfacefeed);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)noc_index);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)master_eth_chan);
-    // WATCHER_RING_BUFFER_PUSH(eth_chan_to_noc_xy[noc_index][master_eth_chan]);
-    // WATCHER_RING_BUFFER_PUSH(address);
-    // WATCHER_RING_BUFFER_PUSH( uint32_t(((25 << NOC_ADDR_NODE_ID_BITS) | 24) << NOC_COORD_REG_OFFSET) );
 
     uint64_t dest_addr = get_noc_addr_helper(eth_chan_to_noc_xy[noc_index][master_eth_chan], address);
     noc_fast_atomic_increment<DM_DEDICATED_NOC, true>(
@@ -114,11 +104,6 @@ inline void notify_subordinate_routers(
             break;
         }
         if ((remaining_cores & (0x1 << i)) && (master_eth_chan != i)) {
-            // WATCHER_RING_BUFFER_PUSH((uint32_t)noc_index);
-            // WATCHER_RING_BUFFER_PUSH(i);
-            // WATCHER_RING_BUFFER_PUSH((uint32_t)NOC_ADDR_NODE_ID_BITS);
-            // WATCHER_RING_BUFFER_PUSH((uint32_t)NOC_COORD_REG_OFFSET);
-            // WATCHER_RING_BUFFER_PUSH((uint32_t)eth_chan_to_noc_xy[noc_index][i]);
             uint64_t dest_addr = get_noc_addr_helper(eth_chan_to_noc_xy[noc_index][i], address);
             noc_inline_dw_write(dest_addr, notification);
             remaining_cores &= ~(0x1 << i);

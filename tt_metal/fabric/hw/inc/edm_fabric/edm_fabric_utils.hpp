@@ -25,9 +25,11 @@ FORCE_INLINE void send_chunk_from_address_with_trid(
     uint8_t noc,
     uint8_t cmd_buf) {
     if constexpr (stateful_api) {
+        WAYPOINT("FACT");
         noc_async_write_one_packet_with_trid_with_state<false, false>(
             local_l1_address, remote_l1_write_addr_l, page_size * num_pages, trid, cmd_buf, noc);
     } else {
+        WAYPOINT("FAC2");
         noc_async_write_one_packet_with_trid<false, false>(
             local_l1_address,
             get_noc_addr_helper(remote_l1_write_addr_h, remote_l1_write_addr_l),

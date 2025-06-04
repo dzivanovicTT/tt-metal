@@ -364,7 +364,7 @@ FORCE_INLINE void send_next_data(
     size_t payload_size_bytes = pkt_header->get_payload_size_including_header();
     auto dest_addr = receiver_buffer_channel.get_cached_next_buffer_slot_addr();
     pkt_header->src_ch_id = sender_channel_index;
-    WATCHER_RING_BUFFER_PUSH(0x397fab25);
+    // WATCHER_RING_BUFFER_PUSH(0x397fab25);
 
     if constexpr (ETH_TXQ_SPIN_WAIT_SEND_NEXT_DATA) {
         while (internal_::eth_txq_is_busy(sender_txq_id)) {
@@ -395,7 +395,7 @@ FORCE_INLINE void send_next_data(
     while (internal_::eth_txq_is_busy(sender_txq_id)) {
     };
     remote_update_ptr_val<to_receiver_pkts_sent_id, sender_txq_id>(packets_to_forward);
-    WATCHER_RING_BUFFER_PUSH(0xfacefeed);
+    // WATCHER_RING_BUFFER_PUSH(0xfacefeed);
 
     while (internal_::eth_txq_is_busy(DEFAULT_ETH_TXQ)) {
     };
@@ -404,7 +404,7 @@ FORCE_INLINE void send_next_data(
         asm("nop");
     }
 
-    WATCHER_RING_BUFFER_PUSH(0xfeedface);
+    // WATCHER_RING_BUFFER_PUSH(0xfeedface);
 
     volatile tt_l1_ptr uint32_t* tx_debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x33300);
 
@@ -653,6 +653,7 @@ FORCE_INLINE void receiver_forward_packet(
 #endif
     if constexpr (std::is_same_v<ROUTING_FIELDS_TYPE, tt::tt_fabric::RoutingFields>) {
         // If the packet is a terminal packet, then we can just deliver it locally
+        WAYPOINT("TERM");
         bool start_distance_is_terminal_value =
             (cached_routing_fields.value & tt::tt_fabric::RoutingFields::HOP_DISTANCE_MASK) ==
             tt::tt_fabric::RoutingFields::LAST_HOP_DISTANCE_VAL;
@@ -670,18 +671,24 @@ FORCE_INLINE void receiver_forward_packet(
         uint32_t routing = cached_routing_fields.value & tt::tt_fabric::LowLatencyRoutingFields::FIELD_MASK;
         uint16_t payload_size_bytes = packet_start->payload_size_bytes;
         switch (routing) {
-            case tt::tt_fabric::LowLatencyRoutingFields::WRITE_ONLY:
+            case tt::tt_fabric::LowLatencyRoutingFields::WRITE_ONLY: {
+                WAYPOINT("ONLY");
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
                 break;
-            case tt::tt_fabric::LowLatencyRoutingFields::FORWARD_ONLY:
+            }
+            case tt::tt_fabric::LowLatencyRoutingFields::FORWARD_ONLY: {
+                WAYPOINT("FNLY");
                 forward_payload_to_downstream_edm<SENDER_NUM_BUFFERS, enable_ring_support, ENABLE_STATEFUL_NOC_APIS>(
                     packet_start, payload_size_bytes, cached_routing_fields, downstream_edm_interface, transaction_id);
                 break;
-            case tt::tt_fabric::LowLatencyRoutingFields::WRITE_AND_FORWARD:
+            }
+            case tt::tt_fabric::LowLatencyRoutingFields::WRITE_AND_FORWARD: {
+                WAYPOINT("JNLY");
                 forward_payload_to_downstream_edm<SENDER_NUM_BUFFERS, enable_ring_support, ENABLE_STATEFUL_NOC_APIS>(
                     packet_start, payload_size_bytes, cached_routing_fields, downstream_edm_interface, transaction_id);
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
                 break;
+            }
             default: {
                 WAYPOINT("FAKE");
                 ASSERT(false);
@@ -708,7 +715,10 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
     tt_l1_ptr fabric_router_l1_config_t* routing_table =
         reinterpret_cast<tt_l1_ptr fabric_router_l1_config_t*>(eth_l1_mem::address_map::FABRIC_ROUTER_CONFIG_BASE);
 
+    WAYPOINT("2FWD");
+
     if (dest_mesh_id != routing_table->my_mesh_id) {
+        WAYPOINT("MESH");
         uint32_t downstream_channel = routing_table->inter_mesh_table.dest_entry[dest_mesh_id];
         ASSERT(downstream_channel != INVALID_DIRECTION);
         auto downstream_direction = port_direction_table[downstream_channel];
@@ -719,7 +729,9 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             downstream_edm_interface[downstream_direction],
             transaction_id);
     } else {
+        WAYPOINT("CHIP");
         if (dest_chip_id == routing_table->my_device_id || mcast_active) {
+            WAYPOINT("LOQS");
             execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             if (mcast_active) {
                 // This packet is in an active mcast
@@ -736,6 +748,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
                 }
             }
         } else {
+            WAYPOINT("UNIQ");
             // Unicast forward packet to downstream
             auto downstream_channel = routing_table->intra_mesh_table.dest_entry[dest_chip_id];
             ASSERT(downstream_channel != INVALID_DIRECTION);
@@ -762,12 +775,16 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
     uint32_t hop_cmd) {
     uint16_t payload_size_bytes = packet_start->payload_size_bytes;
 
+    WAYPOINT("HELP");
     switch (hop_cmd) {
         case LowLatencyMeshRoutingFields::NOOP: break;
         case LowLatencyMeshRoutingFields::FORWARD_EAST:
+            WAYPOINT("EAST");
             if constexpr (my_direction == eth_chan_directions::EAST) {
+                WAYPOINT("TAST");
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             } else {
+                WAYPOINT("HAST");
                 forward_payload_to_downstream_edm<SENDER_NUM_BUFFERS, enable_ring_support, false>(
                     packet_start,
                     payload_size_bytes,
@@ -777,6 +794,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             }
             break;
         case LowLatencyMeshRoutingFields::FORWARD_WEST:
+            WAYPOINT("WEST");
             if constexpr (my_direction == eth_chan_directions::WEST) {
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             } else {
@@ -789,6 +807,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             }
             break;
         case LowLatencyMeshRoutingFields::WRITE_AND_FORWARD_EW:
+            WAYPOINT("WAFW");
             if constexpr (my_direction == eth_chan_directions::WEST) {
                 forward_payload_to_downstream_edm<SENDER_NUM_BUFFERS, enable_ring_support, false>(
                     packet_start,
@@ -807,6 +826,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             break;
         case LowLatencyMeshRoutingFields::FORWARD_NORTH:
+            WAYPOINT("FNOL");
             if constexpr (my_direction == eth_chan_directions::NORTH) {
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             } else {
@@ -819,6 +839,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             }
             break;
         case LowLatencyMeshRoutingFields::FORWARD_SOUTH:
+            WAYPOINT("FSOU");
             if constexpr (my_direction == eth_chan_directions::SOUTH) {
                 execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
             } else {
@@ -831,6 +852,7 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             }
             break;
         case LowLatencyMeshRoutingFields::WRITE_AND_FORWARD_NS:
+            WAYPOINT("WAFS");
             if constexpr (my_direction == eth_chan_directions::SOUTH) {
                 forward_payload_to_downstream_edm<SENDER_NUM_BUFFERS, enable_ring_support, false>(
                     packet_start,
@@ -884,12 +906,6 @@ void run_sender_channel_step(
     // TODO: convert to loop to send multiple packets back to back (or support sending multiple packets in one shot)
     //       when moving to stream regs to manage rd/wr ptrs
     // TODO: update to be stream reg based. Initialize to space available and simply check for non-zero
-    // invalidate_l1_cache();
-    // asm("fence");
-    // WATCHER_RING_BUFFER_PUSH(0xabcd1234);
-    // for (int i = 0; i < 2048; i++) {
-    //     asm("fence");
-    // }
     bool receiver_has_space_for_packet = outbound_to_receiver_channel_pointers.has_space_for_packet();
     uint32_t free_slots = get_ptr_val(sender_channel_free_slots_stream_id);
     bool has_unsent_packet = free_slots != SENDER_NUM_BUFFERS;
@@ -902,7 +918,7 @@ void run_sender_channel_step(
         can_send = can_send && !sender_backpressured_from_sender_side;
     }
     if (can_send) {
-        WATCHER_RING_BUFFER_PUSH(0x34078765);
+        // WATCHER_RING_BUFFER_PUSH(0x34078765);
         did_something = true;
         WAYPOINT("NAVY");
         if constexpr (enable_packet_header_recording) {
@@ -1007,8 +1023,6 @@ void run_receiver_channel_step(
     std::array<uint8_t, num_eth_ports>& port_direction_table) {
     auto& ack_counter = receiver_channel_pointers.ack_counter;
 
-    // WATCHER_RING_BUFFER_PUSH(0x31182413);
-
     uint32_t stream_reg =
         NOC_STREAM_READ_REG(to_receiver_pkts_sent_id, STREAM_REMOTE_DEST_BUF_SPACE_AVAILABLE_REG_INDEX);
 
@@ -1075,29 +1089,12 @@ void run_receiver_channel_step(
     // *(rx_debug_ptr + 23) = rcvd_hdr4;
     // *(rx_debug_ptr + 24) = rcvd_hdr5;
 
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)to_receiver_pkts_sent_id);
-    // uint32_t local_rn = ETH_READ_REG(0xFFB94040);
-    // volatile tt_l1_ptr uint32_t* debug_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(0x00022100);
-    // debug_ptr[0] = local_rn;
-    // WATCHER_RING_BUFFER_PUSH(local_rn);
-
-    // uint32_t pkt_st_cnt = ETH_READ_REG(0xFFB94024);
-    // WATCHER_RING_BUFFER_PUSH(pkt_st_cnt);
-
-    // uint32_t pkt_end_cnt = ETH_READ_REG(0xFFB94028);
-    // WATCHER_RING_BUFFER_PUSH(pkt_end_cnt);
-
-    // uint32_t pkt_drop_cnt = ETH_READ_REG(0xFFB9404C);
-    // WATCHER_RING_BUFFER_PUSH(pkt_drop_cnt);
-
     // DPRINT << "Receiver stream reg: " << HEX() << stream_reg << " local rx seq num " << local_rn << DEC() << ENDL();
 
-    if (pkts_received_since_last_check != 0) {
-        WATCHER_RING_BUFFER_PUSH((uint32_t)pkts_received_since_last_check);
-    }
+    // if (pkts_received_since_last_check != 0) {
+    //     WATCHER_RING_BUFFER_PUSH((uint32_t)pkts_received_since_last_check);
+    // }
 
-    // WATCHER_RING_BUFFER_PUSH(0xcabebabe);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)enable_first_level_ack);
     if constexpr (enable_first_level_ack) {
         bool pkts_received = pkts_received_since_last_check > 0;
         ASSERT(receiver_channel_pointers.completion_counter - ack_counter < RECEIVER_NUM_BUFFERS);
@@ -1113,12 +1110,11 @@ void run_receiver_channel_step(
         // and only increment the counter
         ack_counter.counter += pkts_received_since_last_check;
     }
-    // WAYPOINT("SQRT");
 
     auto& wr_sent_counter = receiver_channel_pointers.wr_sent_counter;
     bool unwritten_packets = !wr_sent_counter.is_caught_up_to(ack_counter);
     if (unwritten_packets) {
-        WATCHER_RING_BUFFER_PUSH(0x8BADF00D);
+        // WATCHER_RING_BUFFER_PUSH(0x8BADF00D);
         auto receiver_buffer_index = wr_sent_counter.get_buffer_index();
         tt_l1_ptr PACKET_HEADER_TYPE* packet_header = const_cast<PACKET_HEADER_TYPE*>(
             local_receiver_channel.template get_packet_header<PACKET_HEADER_TYPE>(receiver_buffer_index));
@@ -1148,9 +1144,11 @@ void run_receiver_channel_step(
             //  mcast)
 #if defined(FABRIC_2D) && defined(DYNAMIC_ROUTING_ENABLED)
             // need this ifdef since the 2D dynamic routing packet header contains unique fields
+            WAYPOINT("DYNA");
             can_send_to_all_local_chip_receivers =
                 can_forward_packet_completely(packet_header, downstream_edm_interface, port_direction_table);
 #elif defined(FABRIC_2D)
+            WAYPOINT("FYNA");
             // need this ifdef since the packet header for 1D does not have router_buffer field in it.
             hop_cmd = packet_header->route_buffer[cached_routing_fields.value];
             can_send_to_all_local_chip_receivers = can_forward_packet_completely(hop_cmd, downstream_edm_interface);
@@ -1159,6 +1157,7 @@ void run_receiver_channel_step(
             can_send_to_all_local_chip_receivers =
                 can_forward_packet_completely(cached_routing_fields, downstream_edm_interface[receiver_channel]);
         }
+        WAYPOINT("WYNA");
         bool trid_flushed = receiver_channel_trid_tracker.transaction_flushed(receiver_buffer_index);
         if (can_send_to_all_local_chip_receivers && trid_flushed) {
             did_something = true;
@@ -1166,6 +1165,7 @@ void run_receiver_channel_step(
                 receiver_buffer_index);
             if constexpr (is_2d_fabric) {
 #if defined(DYNAMIC_ROUTING_ENABLED)
+                WAYPOINT("ZYNA");
                 receiver_forward_packet(
                     packet_header,
                     cached_routing_fields,
@@ -1174,6 +1174,7 @@ void run_receiver_channel_step(
                     rx_channel_id,
                     port_direction_table);
 #else
+                WAYPOINT("QYNA");
                 receiver_forward_packet(
                     packet_header, cached_routing_fields, downstream_edm_interface, trid, rx_channel_id, hop_cmd);
 #endif
@@ -1188,6 +1189,8 @@ void run_receiver_channel_step(
             wr_sent_counter.increment();
         }
     }
+
+    WAYPOINT("RUTA");
 
     if constexpr (!fuse_receiver_flush_and_completion_ptr) {
         auto& wr_flush_counter = receiver_channel_pointers.wr_flush_counter;
@@ -1399,6 +1402,7 @@ void run_fabric_edm_main_loop(
                         0,
                         port_direction_table);
                 }
+                // WAYPOINT("NAV6");
             }
             if constexpr (is_receiver_channel_serviced[1]) {
                 if constexpr (enable_ring_support) {
@@ -1498,6 +1502,10 @@ void run_fabric_edm_main_loop(
                         local_sender_channel_free_slots_stream_ids_ordered[NUM_SENDER_CHANNELS - 1]);
                 }
             }
+        }
+
+        if (did_something) {
+            WATCHER_RING_BUFFER_PUSH(0xfebafeba);
         }
 
         if constexpr (enable_context_switch) {
@@ -1829,8 +1837,6 @@ void kernel_main() {
     ////////////////////////
     // Sender runtime args
     ////////////////////////
-    // WATCHER_RING_BUFFER_PUSH(0x70098778);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)arg_idx);
     auto sender0_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(
         persistent_mode ? get_arg_val<uint32_t>(arg_idx++)
                         : get_semaphore<ProgrammableCoreType::ACTIVE_ETH>(get_arg_val<uint32_t>(arg_idx++)));
@@ -1842,10 +1848,6 @@ void kernel_main() {
                      : get_semaphore<ProgrammableCoreType::ACTIVE_ETH>(get_arg_val<uint32_t>(arg_idx++)));
     auto sender3_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(get_arg_val<uint32_t>(arg_idx++));
     auto sender4_worker_semaphore_ptr = reinterpret_cast<volatile uint32_t*>(get_arg_val<uint32_t>(arg_idx++));
-    // WATCHER_RING_BUFFER_PUSH(0x70098778);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)sender0_worker_semaphore_ptr);
-    // WATCHER_RING_BUFFER_PUSH((uint32_t)sender1_worker_semaphore_ptr);
-    // WATCHER_RING_BUFFER_PUSH(0x50098778);
 
     const size_t local_sender_channel_0_connection_buffer_index_addr =
         persistent_mode ? local_sender_channel_0_connection_buffer_index_id

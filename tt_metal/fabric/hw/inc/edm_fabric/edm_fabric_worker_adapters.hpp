@@ -218,6 +218,7 @@ struct WorkerToFabricEdmSenderImpl {
     template <uint8_t EDM_TO_DOWNSTREAM_NOC = noc_index, uint8_t EDM_TO_DOWNSTREAM_NOC_VC = NOC_UNICAST_WRITE_VC>
     FORCE_INLINE void setup_edm_noc_cmd_buf() const {
         uint64_t edm_noc_addr = get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0, EDM_TO_DOWNSTREAM_NOC);
+        WAYPOINT("FAC3");
         noc_async_write_one_packet_with_trid_set_state(
             edm_noc_addr, this->data_noc_cmd_buf, EDM_TO_DOWNSTREAM_NOC, EDM_TO_DOWNSTREAM_NOC_VC);
         const uint64_t noc_sem_addr = get_noc_addr(
@@ -320,12 +321,13 @@ struct WorkerToFabricEdmSenderImpl {
                                         edm_worker_location_info_addr +
                                         offsetof(tt::tt_fabric::EDMChannelWorkerLocationInfo, edm_read_counter));
         // Read the read/pointer or buffer free slots
-        WATCHER_RING_BUFFER_PUSH(0x43215678);
-        WATCHER_RING_BUFFER_PUSH(this->edm_noc_x);
-        WATCHER_RING_BUFFER_PUSH(this->edm_noc_y);
-        WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(
-            edm_worker_location_info_addr + offsetof(tt::tt_fabric::EDMChannelWorkerLocationInfo, edm_read_counter)));
-        WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr));
+        // WATCHER_RING_BUFFER_PUSH(0x43215678);
+        // WATCHER_RING_BUFFER_PUSH(this->edm_noc_x);
+        // WATCHER_RING_BUFFER_PUSH(this->edm_noc_y);
+        // WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(
+        //     edm_worker_location_info_addr + offsetof(tt::tt_fabric::EDMChannelWorkerLocationInfo,
+        //     edm_read_counter)));
+        // WATCHER_RING_BUFFER_PUSH(reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr));
         // WAYPOINT("WAXQ");
         DPRINT << "local addr is " << uint32_t(reinterpret_cast<size_t>(this->from_remote_buffer_free_slots_ptr))
                << ENDL();
@@ -601,21 +603,23 @@ private:
         ASSERT(tt::tt_fabric::is_valid(
             *const_cast<PACKET_HEADER_TYPE*>(reinterpret_cast<volatile PACKET_HEADER_TYPE*>(source_address))));
         if constexpr (USER_DEFINED_NUM_BUFFER_SLOTS) {
+            WAYPOINT("MUST");
             send_chunk_from_address_with_trid<blocking_mode, stateful_api>(
                 source_address,
                 1,
                 size_bytes,
-                get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0) >> 32,
+                get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0) >> NOC_ADDR_COORD_SHIFT,
                 this->edm_buffer_slot_addrs[this->get_buffer_slot_index()],
                 trid,
                 EDM_TO_DOWNSTREAM_NOC,
                 this->data_noc_cmd_buf);
         } else {
+            WAYPOINT("QUST");
             send_chunk_from_address_with_trid<blocking_mode, stateful_api>(
                 source_address,
                 1,
                 size_bytes,
-                get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0) >> 32,
+                get_noc_addr(this->edm_noc_x, this->edm_noc_y, 0) >> NOC_ADDR_COORD_SHIFT,
                 this->edm_buffer_addr,
                 trid,
                 EDM_TO_DOWNSTREAM_NOC,

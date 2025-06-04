@@ -1114,7 +1114,7 @@ inline void noc_async_write(
     } else {
         RECORD_NOC_EVENT_WITH_ADDR(NocEventType::WRITE_, dst_noc_addr, size, NOC_UNICAST_WRITE_VC);
 
-        WAYPOINT("NAWW");
+        WAYPOINT("NAW1");
         DEBUG_SANITIZE_NOC_WRITE_TRANSACTION(noc, dst_noc_addr, src_local_l1_addr, size);
         ncrisc_noc_fast_write_any_len<noc_mode>(
             noc, write_cmd_buf, src_local_l1_addr, dst_noc_addr, size, NOC_UNICAST_WRITE_VC, false, false, 1, true);
@@ -1870,7 +1870,7 @@ FORCE_INLINE void noc_async_write_one_packet_with_trid_set_state(
     uint8_t cmd_buf = write_cmd_buf,
     uint8_t noc = noc_index,
     uint8_t vc = NOC_UNICAST_WRITE_VC) {
-    WAYPOINT("NAWW");
+    WAYPOINT("NAW2");
     RECORD_NOC_EVENT_WITH_ADDR(NocEventType::WRITE_WITH_TRID_SET_STATE, dst_noc_addr, 0, vc);
     while (!noc_cmd_buf_ready(noc, cmd_buf));
     WAYPOINT("NAWD");
@@ -1949,7 +1949,7 @@ FORCE_INLINE void noc_async_write_one_packet_with_trid(
             }
         }
     }
-    WAYPOINT("NAWW");
+    // WAYPOINT("NAW3");
     RECORD_NOC_EVENT_WITH_ADDR(NocEventType::WRITE_WITH_TRID, dst_noc_addr, size, -1);
     DEBUG_SANITIZE_NOC_WRITE_TRANSACTION(noc, dst_noc_addr, src_local_l1_addr, size);
     while (!noc_cmd_buf_ready(noc, cmd_buf));

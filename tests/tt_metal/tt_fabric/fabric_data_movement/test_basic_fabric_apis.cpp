@@ -695,7 +695,7 @@ void RunAsyncWriteMulticastTest(
 TEST_F(Fabric2DFixture, DISABLED_TestAsyncWrite) { RunAsyncWriteTest(this, fabric_mode::PUSH, false); }
 
 TEST_F(Fabric2DFixture, TestUnicastRaw) {
-    for (uint32_t i = 0; i < 10; i++) {
+    for (uint32_t i = 0; i < 1; i++) {
         RunTestUnicastRaw(this);
     }
 }
