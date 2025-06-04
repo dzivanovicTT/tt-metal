@@ -103,6 +103,8 @@ private:
         bool blocking,
         tt::stl::Span<const SubDeviceId> sub_device_ids = {});
 
+    void set_in_use();
+
     // Shared across all MeshCommandQueue instances for a MeshDevice.
     std::shared_ptr<DispatchArray<LaunchMessageRingBufferState>> worker_launch_message_buffer_state_;
 

@@ -190,7 +190,7 @@ void FDMeshCommandQueue::clear_expected_num_workers_completed() {
 }
 
 void FDMeshCommandQueue::enqueue_mesh_workload(MeshWorkload& mesh_workload, bool blocking) {
-    in_use_ = true;
+    set_in_use();
     uint64_t command_hash = *mesh_device_->get_active_sub_device_manager_id();
     std::unordered_set<SubDeviceId> sub_device_ids = mesh_workload.impl().determine_sub_device_ids(mesh_device_);
     TT_FATAL(sub_device_ids.size() == 1, "Programs must be executed on a single sub-device");
@@ -331,7 +331,7 @@ void FDMeshCommandQueue::enqueue_write_shard_to_core(
     uint32_t size_bytes,
     bool blocking,
     tt::stl::Span<const SubDeviceId> sub_device_ids) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Writes are not supported during trace capture.");
 
     IDevice* device = mesh_device_->get_device(address.device_coord);
@@ -360,7 +360,7 @@ void FDMeshCommandQueue::enqueue_read_shard_from_core(
     uint32_t size_bytes,
     bool blocking,
     tt::stl::Span<const SubDeviceId> sub_device_ids) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Reads are not supported during trace capture.");
 
     IDevice* device = mesh_device_->get_device(address.device_coord);
@@ -400,7 +400,7 @@ void FDMeshCommandQueue::write_shard_to_device(
     const void* src,
     const std::optional<BufferRegion>& region,
     tt::stl::Span<const SubDeviceId> sub_device_ids) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Writes are not supported during trace capture.");
 
     const auto shard_view = buffer.get_device_buffer(device_coord);
@@ -443,7 +443,7 @@ void FDMeshCommandQueue::read_shard_from_device(
     const std::optional<BufferRegion>& region,
     std::unordered_map<IDevice*, uint32_t>& num_txns_per_device,
     tt::stl::Span<const SubDeviceId> sub_device_ids) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Reads are not supported during trace capture.");
 
     const auto shard_view = buffer.get_device_buffer(device_coord);
@@ -542,7 +542,7 @@ MeshEvent FDMeshCommandQueue::enqueue_record_event_helper(
     tt::stl::Span<const SubDeviceId> sub_device_ids,
     bool notify_host,
     const std::optional<MeshCoordinateRange>& device_range) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Event Synchronization is not supported during trace capture.");
     auto& sysmem_manager = this->reference_sysmem_manager();
     auto event = MeshEvent(
@@ -587,7 +587,7 @@ MeshEvent FDMeshCommandQueue::enqueue_record_event_to_host(
 }
 
 void FDMeshCommandQueue::enqueue_wait_for_event(const MeshEvent& sync_event) {
-    in_use_ = true;
+    set_in_use();
     TT_FATAL(!trace_id_.has_value(), "Event Synchronization is not supported during trace capture.");
     for (const auto& coord : sync_event.device_range()) {
         event_dispatch::issue_wait_for_event_commands(
@@ -705,7 +705,7 @@ void FDMeshCommandQueue::read_l1_data_from_completion_queue(MeshCoreDataReadDesc
 
 void FDMeshCommandQueue::reset_worker_state(
     bool reset_launch_msg_state, uint32_t num_sub_devices, const vector_aligned<uint32_t>& go_signal_noc_data) {
-    in_use_ = true;
+    set_in_use();
     for (auto device : mesh_device_->get_devices()) {
         program_dispatch::reset_worker_dispatch_state_on_device(
             mesh_device_,
@@ -845,7 +845,7 @@ void FDMeshCommandQueue::capture_go_signal_trace_on_unused_subgrids(
 }
 
 void FDMeshCommandQueue::enqueue_trace(const MeshTraceId& trace_id, bool blocking) {
-    in_use_ = true;
+    set_in_use();
     auto trace_inst = mesh_device_->get_mesh_trace(trace_id);
     auto descriptor = trace_inst->desc;
     auto buffer = trace_inst->mesh_buffer;
@@ -926,5 +926,7 @@ void FDMeshCommandQueue::update_launch_messages_for_device_profiler(
     }
 #endif
 }
+
+void FDMeshCommandQueue::set_in_use() { in_use_.store(true, std::memory_order_seq_cst); }
 
 }  // namespace tt::tt_metal::distributed
