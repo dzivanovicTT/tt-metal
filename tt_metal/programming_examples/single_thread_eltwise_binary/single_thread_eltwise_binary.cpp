@@ -21,40 +21,6 @@ using namespace tt::tt_metal;
  * 6. Read result back and compare to golden.
  * */
 
-/*
- * We need to copy the types of the compute kernel arguments to use them host-
- * side.
- */
-
-struct BinaryOpType {
-    enum Enum { ADD = 0, SUB = 1, MUL = 2 };
-    static auto all() { return magic_enum::enum_values<Enum>(); }
-};
-
-std::map<std::string, std::string> get_defines(BinaryOpType::Enum op_type) {
-    std::map<std::string, std::string> defines;
-    // TODO(AP): remove duplication
-    std::string op_name, op_binary_type;
-    switch (op_type) {
-        case BinaryOpType::ADD:
-            op_name = "add_tiles";
-            op_binary_type = "EltwiseBinaryType::ELWADD";
-            break;
-        case BinaryOpType::SUB:
-            op_name = "sub_tiles";
-            op_binary_type = "EltwiseBinaryType::ELWSUB";
-            break;
-        case BinaryOpType::MUL:
-            op_name = "mul_tiles";
-            op_binary_type = "EltwiseBinaryType::ELWMUL";
-            break;
-        default: TT_ASSERT(false && "Undefined op type");
-    }
-    defines["ELTWISE_OP"] = op_name.c_str();
-    defines["ELTWISE_OP_TYPE"] = op_binary_type.c_str();
-    return defines;
-}
-
 int main() {
     if (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr) {
         TT_THROW("Test not supported w/ slow dispatch, exiting");
@@ -156,8 +122,7 @@ int main() {
                 .math_fidelity = MathFidelity::HiFi4,
                 .fp32_dest_acc_en = fp32_dest_acc_en,
                 .math_approx_mode = math_approx_mode,
-                .compile_args = compute_kernel_args,
-                .defines = get_defines(BinaryOpType::ADD)});
+                .compile_args = compute_kernel_args});
 
         /*
          * Create source data and write to DRAM.

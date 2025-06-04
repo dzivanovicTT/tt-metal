@@ -21,11 +21,11 @@ void MAIN {
     constexpr auto cb_in1 = tt::CBIndex::c_1;
     constexpr auto cb_out0 = tt::CBIndex::c_16;
 
-    // Initialize the parts that are common among binary operationsx.
+    // Initialize the parts that are common among binary operations
     binary_op_init_common(cb_in0, cb_in1, cb_out0);
 
-    // TODO: Differentiate : Initialize the parts that are common among binary operationsx.
-    binary_tiles_init<false, ELTWISE_OP_TYPE>(cb_in0, cb_in1);
+    // Initialize the parts that required specifically for this binary operatoins
+    binary_tiles_init<false, EltwiseBinaryType::ELWADD>(cb_in0, cb_in1);
 
     for (uint32_t block = 0; block < per_core_block_cnt; ++block) {
 	// Wait for the input circular buffers to be filled with per_core_block_size tiles
@@ -41,7 +41,7 @@ void MAIN {
 	// Perform the elementwise operation on the tiles in the block 
 	// and store them in the destination register
         for (uint32_t i = 0; i < per_core_block_size; ++i) {
-            ELTWISE_OP(cb_in0, cb_in1, i, i, i);
+            add_tiles(cb_in0, cb_in1, i, i, i);
         }
 
         tile_regs_commit();
