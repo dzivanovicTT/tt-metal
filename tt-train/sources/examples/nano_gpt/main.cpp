@@ -857,6 +857,9 @@ int main(int argc, char **argv) {
 
     const uint32_t num_epochs = config.num_epochs;
     auto gradient_accumulator_helper = GradientAccumulator(config.gradient_accumulation_steps);
+
+    bool is_everything_compiled = false;
+
     for (uint32_t epoch = 0; epoch < num_epochs; ++epoch) {
         for (auto [features, target, masks] : train_dataloader) {
             auto start_timer = std::chrono::high_resolution_clock::now();
@@ -917,6 +920,11 @@ int main(int argc, char **argv) {
                 }
 
                 gradient_accumulator_helper.reset();
+
+                if (!is_everything_compiled) {
+                    ttml::autograd::ctx().get_profiler().dump_results(device, "compilation_finished");
+                    is_everything_compiled = true;
+                }
             }
             auto end_timer = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_timer - start_timer).count();
@@ -956,7 +964,8 @@ int main(int argc, char **argv) {
         wandbcpp::finish();
     }
 
-    ttml::autograd::ctx().get_profiler().dump_results(device, tt::tt_metal::ProfilerDumpState::CLOSE_DEVICE_SYNC);
+    ttml::autograd::ctx().get_profiler().dump_results(
+        device, "close_device", /* number_of_noops */ 0, tt::tt_metal::ProfilerDumpState::CLOSE_DEVICE_SYNC);
     ttml::autograd::ctx().close_device();
     return 0;
 }

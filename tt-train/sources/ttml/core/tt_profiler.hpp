@@ -15,9 +15,12 @@ public:
     TTProfiler& operator=(TTProfiler&&) = delete;
     void dump_results(
         ttnn::distributed::MeshDevice* device,
+        const std::string& noop_identifier = "noop_identifier",
+        const size_t number_of_noops = 5U,
         tt::tt_metal::ProfilerDumpState dump_state = tt::tt_metal::ProfilerDumpState::NORMAL) const;
 
-    void call_device_noop(ttnn::distributed::MeshDevice* device, int count = 1) const;
+    void call_device_noop(
+        ttnn::distributed::MeshDevice* device, size_t count, const std::string& noop_identifier) const;
 
     [[nodiscard]] bool is_enabled() const;
     void enable();

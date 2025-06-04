@@ -139,8 +139,8 @@ ProfilerNoopProgramFactory::cached_program_t ProfilerNoopProgramFactory::create(
 
     uint32_t bfloat16_single_tile_size_bytes = tt::tt_metal::detail::TileSize(tt::DataFormat::Float16_b);
 
-    auto padded_tensor_shape = input.padded_shape();
-    auto padded_tensor_volume = input.padded_volume();
+    auto padded_tensor_shape = output.padded_shape();
+    auto padded_tensor_volume = output.padded_volume();
 
     TT_FATAL(
         padded_tensor_volume % tt::constants::TILE_HW == 0, "Padded input tensor volume must be divisible by TILE_HW");

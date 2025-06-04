@@ -14,39 +14,52 @@ constexpr bool is_tracy_enabled = false;
 #endif
 
 namespace ttml::core {
-void TTProfiler::dump_results(ttnn::distributed::MeshDevice* device, tt::tt_metal::ProfilerDumpState dump_state) const {
+
+void TTProfiler::dump_results(
+    ttnn::distributed::MeshDevice* device,
+    const std::string& noop_identifier,
+    const size_t number_of_noops,
+    tt::tt_metal::ProfilerDumpState dump_state) const {
     assert(device);
     if (!m_enabled) {
         return;
     }
-    call_device_noop(device, 2);
     for (auto& dev : device->get_devices()) {
         tt::tt_metal::detail::DumpDeviceProfileResults(dev, dump_state);
     }
+    call_device_noop(device, number_of_noops, noop_identifier);
 }
-void TTProfiler::call_device_noop(ttnn::distributed::MeshDevice* device, int count) const {
+
+void TTProfiler::call_device_noop(
+    ttnn::distributed::MeshDevice* device, size_t count, const std::string& noop_identifier) const {
     assert(device);
     if (!m_enabled) {
         return;
     }
-    auto fake_tensor = ttml::core::from_vector({1.F}, ttml::core::create_shape({1, 1, 1, 1}), device);
-    for (int i = 0; i < count; ++i) {
-        [[maybe_unused]] auto _ = ttml::metal::profiler_no_op(fake_tensor);
+
+    auto fake_tensor =
+        ttml::core::from_vector({1.F}, ttml::core::create_shape({1, 1, 1, 1}), device, ttnn::Layout::ROW_MAJOR);
+    for (size_t i = 0; i < count; ++i) {
+        [[maybe_unused]] auto _ = ttml::metal::profiler_no_op(fake_tensor, noop_identifier);
     }
 }
 
 bool TTProfiler::is_enabled() const {
     return m_enabled;
 }
+
 void TTProfiler::enable() {
     m_enabled = true;
 }
+
 void TTProfiler::disable() {
     m_enabled = false;
 }
+
 TTProfiler::TTProfiler() {
     if (is_tracy_enabled) {
         enable();
     }
 }
+
 }  // namespace ttml::core
