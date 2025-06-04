@@ -549,7 +549,7 @@ class UNet:
         )
         return ttnn.experimental.convert_to_chw(x, memory_config=output_memory_config, dtype=ttnn.bfloat16)
 
-    def __call__(self, x, move_input_tensor_to_device=True, deallocate_input_activation=True):
+    def __call__(self, x, move_input_tensor_to_device=True, deallocate_input_activation=False):
         assert len(x.shape) == 4, f"Expected UNet input tensors to be rank 4 (was {len(x.shape)})"
 
         if move_input_tensor_to_device:
