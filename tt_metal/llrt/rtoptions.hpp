@@ -167,6 +167,9 @@ class RunTimeOptions {
     // Buffer in DRAM to store various ARC processor samples. Feature not ready yet
     uint32_t arc_debug_buffer_size = 0;
 
+    // Force disables using DMA for reads and writes
+    bool disable_dma_ops = false;
+
 public:
     RunTimeOptions();
     RunTimeOptions(const RunTimeOptions&) = delete;
@@ -382,6 +385,8 @@ public:
 
     inline uint32_t get_arc_debug_buffer_size() { return arc_debug_buffer_size; }
     inline void set_arc_debug_buffer_size(uint32_t size) { arc_debug_buffer_size = size; }
+
+    inline bool get_disable_dma_ops() const { return disable_dma_ops; }
 
     inline void set_target_chip_ids(const std::unordered_set<int>& chip_ids) { target_chip_ids = chip_ids; }
     inline const std::unordered_set<int>& get_target_chip_ids() const { return target_chip_ids; }

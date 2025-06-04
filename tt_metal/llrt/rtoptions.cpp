@@ -208,6 +208,13 @@ RunTimeOptions::RunTimeOptions() {
         sscanf(arc_debug_enabled_str, "%u", &arc_debug_buffer_size);
     }
 
+    const char* disable_dma_ops_str = std::getenv("TT_METAL_DISABLE_DMA_OPS");
+    if (disable_dma_ops_str != nullptr) {
+        if (disable_dma_ops_str[0] == '1') {
+            this->disable_dma_ops = true;
+        }
+    }
+
     // Parse visible devices from TT_METAL_VISIBLE_DEVICES environment variable
     const char* visible_devices_str = std::getenv(TT_METAL_VISIBLE_DEVICES_ENV_VAR);
     if (visible_devices_str != nullptr) {
