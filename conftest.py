@@ -430,7 +430,8 @@ def mesh_device(request, silicon_arch_name, device_params):
     ttnn.DumpDeviceProfiler(mesh_device)
 
     ttnn.close_mesh_device(mesh_device)
-    reset_fabric(fabric_config)
+    # !TODO figure out why this line triggers hangs for subsequent tests
+    # reset_fabric(fabric_config)
     del mesh_device
 
 
