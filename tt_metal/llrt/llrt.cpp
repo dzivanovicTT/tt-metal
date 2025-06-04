@@ -141,7 +141,7 @@ bool test_load_write_read_risc_binary(
                                    .local_init_addr;
     auto core_type = tt::tt_metal::MetalContext::instance().hal().get_programmable_core_type(core_type_idx);
 
-    log_debug(tt::LogLLRuntime, "hex_vec size = {}, size_in_bytes = {}", mem.size(), mem.size()*sizeof(uint32_t));
+    log_info(tt::LogLLRuntime, "hex_vec size = {}, size_in_bytes = {}", mem.size(), mem.size() * sizeof(uint32_t));
     mem.process_spans([&](std::vector<uint32_t>::const_iterator mem_ptr, uint64_t addr, uint32_t len_words) {
         uint64_t relo_addr = tt::tt_metal::MetalContext::instance().hal().relocate_dev_addr(addr, local_init_addr);
 
@@ -149,12 +149,12 @@ bool test_load_write_read_risc_binary(
             &*mem_ptr, len_words * sizeof(uint32_t), tt_cxy_pair(chip_id, core), relo_addr);
     });
 
-    log_debug(tt::LogLLRuntime, "wrote hex to core {}", core.str().c_str());
+    log_info(tt::LogLLRuntime, "wrote hex to core {}", core.str().c_str());
 
     if (std::getenv("TT_METAL_KERNEL_READBACK_ENABLE") != nullptr) {
         tt::tt_metal::MetalContext::instance().get_cluster().l1_barrier(chip_id);
         ll_api::memory read_mem = read_mem_from_core(chip_id, core, mem, local_init_addr);
-        log_debug(tt::LogLLRuntime, "read hex back from the core");
+        log_info(tt::LogLLRuntime, "read hex back from the core");
         return mem == read_mem;
     }
 
@@ -228,13 +228,25 @@ void wait_until_cores_done(
     auto start = std::chrono::high_resolution_clock::now();
     const auto& rtoptions = tt_metal::MetalContext::instance().rtoptions();
     bool is_simulator = rtoptions.get_simulator_enabled();
+    // sleep(20);
 
     if (is_simulator) timeout_ms = 0;
     while (!not_done_phys_cores.empty()) {
         if (timeout_ms > 0) {
             auto now = std::chrono::high_resolution_clock::now();
             auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - start).count();
+            // log_info(
+            //     tt::LogMetal,
+            //     "Start time: {}, Current time: {}, Elapsed time: {} ms",
+            //     std::chrono::duration_cast<std::chrono::milliseconds>(start.time_since_epoch()).count(),
+            //     std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count(),
+            //     elapsed);
             if (elapsed > timeout_ms) {
+                // log_info(
+                //     tt::LogMetal,
+                //     "Device {}: Timeout ({} ms) waiting for physical cores to finish.",
+                //     device_id,
+                //     timeout_ms);
                 std::string cores = fmt::format("{}", fmt::join(not_done_phys_cores, ", "));
                 TT_THROW(
                     "Device {}: Timeout ({} ms) waiting for physical cores to finish: {}.",
@@ -276,6 +288,7 @@ void wait_until_cores_done(
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
         }
     }
+    // sleep(20);
 }
 
 }  // namespace internal_

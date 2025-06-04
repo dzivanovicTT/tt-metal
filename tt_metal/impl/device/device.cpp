@@ -336,12 +336,13 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
                                        .get_firmware_build_state(id_, core_type_idx, processor_class, riscv_id)
                                        .get_target_out_path("");
                     const ll_api::memory& binary_mem = llrt::get_risc_binary(fw_path);
+                    log_info(LogDevice, "RISC {} fw binary path: {}", riscv_id, fw_path);
                     uint32_t fw_size = binary_mem.get_text_size();
                     if (riscv_id + build_idx == 1) {  // TODO: clean up how brisc/ncrisc are handled
                         // In this context, ncrisc_kernel_size16 is the size of the fw
                         launch_msg->kernel_config.ncrisc_kernel_size16 = (fw_size + 15) >> 4;
                     }
-                    log_debug(LogDevice, "RISC {} fw binary size: {} in bytes", riscv_id, fw_size);
+                    log_info(LogDevice, "RISC {} fw binary size: {} in bytes", riscv_id, fw_size);
 
                     if (not rtoptions.get_skip_loading_fw()) {
                         llrt::test_load_write_read_risc_binary(
@@ -808,14 +809,16 @@ void Device::initialize_and_launch_firmware() {
 
     // Wait until fw init is done, ensures the next launch msg doesn't get
     // written while fw is still in init
-    log_debug("Waiting for firmware init complete");
+    log_info("Waiting for firmware init complete");
+    // sleep(20); THIS DOESN'T HELP
     const int timeout_ms = 10000; // 10 seconds for now
     try {
         llrt::internal_::wait_until_cores_done(this->id(), RUN_MSG_INIT, not_done_cores, timeout_ms);
     } catch (std::runtime_error &e) {
         TT_THROW("Device {} init: failed to initialize FW! Try resetting the board.", this->id());
     }
-    log_debug("Firmware init complete");
+    log_info("Firmware init complete");
+    // sleep(20); THIS HELPS
 }
 
 void Device::clear_l1_state() {
