@@ -11,6 +11,7 @@
 #include "ttnn/decorators.hpp"
 #include "ttnn/device.hpp"
 #include "ttnn/distributed/types.hpp"
+#include "ttnn/distributed/distributed_tensor.hpp"
 #include "ttnn/operations/ccl/all_gather/all_gather.hpp"
 #include "ttnn/operations/ccl/ccl_host_types.hpp"
 #include "ttnn/operations/ccl/reduce_scatter/reduce_scatter.hpp"
@@ -69,7 +70,7 @@ private:
 
 // Wrapper to abstract const-eval logic out of runtime funcs to keep them
 // cleaner.  Invokes constEvalFunc iff outputs is empty.
-void constEvalFuncWrapper(
+inline void constEvalFuncWrapper(
     std::function<std::vector<ttnn::Tensor>(std::vector<ttnn::Tensor>)> constEvalFunc,
     const std::vector<ttnn::Tensor>& inputs,
     std::vector<ttnn::Tensor>* outputs) {
