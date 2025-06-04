@@ -109,7 +109,7 @@ void kernel_main() {
             size_t l1_read_addr = get_read_ptr(cb_intermediate_id);
             for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                 uint32_t first_tile_id = tile_id_start + row_offset + pages_read_in_row;
-                noc_async_write_tile(first_tile_id, output_tensor_addrgen, l1_read_addr);
+                //                noc_async_write_tile(first_tile_id, output_tensor_addrgen, l1_read_addr);
                 pages_read_in_row += 1;
                 if (pages_read_in_row >= input_tensor_Wt) {
                     row_offset += output_tensor_Wt;
@@ -117,7 +117,8 @@ void kernel_main() {
                 }
 
                 uint32_t second_tile_id = tile_id_start + row_offset + pages_read_in_row;
-                noc_async_write_tile(second_tile_id, output_tensor_addrgen, l1_read_addr + output_tensor_page_size);
+                //                noc_async_write_tile(second_tile_id, output_tensor_addrgen, l1_read_addr +
+                //                output_tensor_page_size);
                 pages_read_in_row += 1;
                 if (pages_read_in_row >= input_tensor_Wt) {
                     row_offset += output_tensor_Wt;
@@ -135,5 +136,5 @@ void kernel_main() {
         }
     }
 
-    noc_async_write_barrier();
+    //    noc_async_write_barrier();
 }

@@ -110,7 +110,7 @@ void kernel_main() {
                 tiles_read += contig_pages_advanced;
                 packet_id++;
             }
-            noc_async_read_barrier();
+            //            noc_async_read_barrier();
             cb_push_back(cb_intermediate_id, num_pages_to_read);
         }
     }
