@@ -271,9 +271,10 @@ size_t to_linear_index(const MeshShape& shape, const MeshCoordinate& coord) {
         shape.dims(),
         coord.dims());
 
+    auto shape_span = shape.view();
     size_t linear_index = 0;
     for (size_t dim = 0; dim < coord.dims(); ++dim) {
-        TT_FATAL(coord[dim] < shape[dim], "Coordinate {} is out of bounds for shape {}", coord, shape);
+        TT_FATAL(coord[dim] < shape_span[dim], "Coordinate {} is out of bounds for shape {}", coord, shape);
         linear_index += coord[dim] * shape.get_stride(dim);
     }
     return linear_index;

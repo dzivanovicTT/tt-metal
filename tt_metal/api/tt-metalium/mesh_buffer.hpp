@@ -31,7 +31,7 @@ struct DeviceLocalBufferConfig {
     TensorMemoryLayout buffer_layout = TensorMemoryLayout::INTERLEAVED;
 
     // Must be set for sharded buffer layouts.
-    std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>> shard_parameters;
+    std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>> shard_parameters;
 
     // The direction in which memory for this buffer is allocated.
     std::optional<bool> bottom_up;

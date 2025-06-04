@@ -139,6 +139,17 @@ struct ShardSpecBuffer {
     DeviceAddr num_pages() const;
 };
 
+struct NdShardSpecBuffer {
+    Shape tensor_shape_in_pages;
+    Shape shard_shape_in_pages;
+    CoreRangeSet grid;
+    ShardOrientation shard_orientation;
+
+    std::array<uint32_t, 2> tensor_2d_shape_in_pages() const;
+    std::array<uint32_t, 2> shard_2d_shape_in_pages() const;
+    uint64_t num_pages() const;
+};
+
 struct BufferConfig {
     IDevice* device;
     DeviceAddr size;       // Size in bytes
@@ -164,7 +175,6 @@ bool is_sharded(const TensorMemoryLayout& layout);
 
 struct BufferPageMapping {
     std::vector<CoreCoord> all_cores_;
-    std::vector<uint32_t> core_bank_indices_;
     std::vector<std::vector<uint32_t>> core_host_page_indices_;
     std::vector<uint32_t> dev_page_to_core_mapping_;
 
@@ -207,7 +217,8 @@ public:
         DeviceAddr page_size,
         BufferType buffer_type,
         TensorMemoryLayout buffer_layout = TensorMemoryLayout::INTERLEAVED,
-        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameter = std::nullopt,
+        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameter =
+            std::nullopt,
         std::optional<bool> bottom_up = std::nullopt,
         std::optional<SubDeviceId> sub_device_id = std::nullopt);
     static std::shared_ptr<Buffer> create(
@@ -217,7 +228,8 @@ public:
         DeviceAddr page_size,
         BufferType buffer_type,
         TensorMemoryLayout buffer_layout = TensorMemoryLayout::INTERLEAVED,
-        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameter = std::nullopt,
+        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameter =
+            std::nullopt,
         std::optional<bool> bottom_up = std::nullopt,
         std::optional<SubDeviceId> sub_device_id = std::nullopt);
 
@@ -311,7 +323,7 @@ public:
         DeviceAddr page_size,
         BufferType buffer_type,
         TensorMemoryLayout buffer_layout,
-        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameter,
+        const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameter,
         std::optional<bool> bottom_up,
         std::optional<SubDeviceId> sub_device_id,
         bool owns_data,
@@ -351,6 +363,7 @@ private:
     // These members must be only accessed on the device worker thread
     DeviceAddr page_size_;  // Size of unit being interleaved. For non-interleaved buffers: size == page_size
     std::optional<ShardSpecBuffer> shard_parameters_;
+    std::optional<NdShardSpecBuffer> nd_shard_parameters_;
     std::shared_ptr<const BufferPageMapping> buffer_page_mapping_;
 
     std::optional<BufferDistributionSpec> buffer_distribution_spec_;

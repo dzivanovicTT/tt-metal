@@ -94,6 +94,7 @@ target_link_libraries(
         xtensor
         FlatBuffers::FlatBuffers
         Boost::algorithm
+        Taskflow::Taskflow
 )
 install(TARGETS ttnn_core LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
 
@@ -515,6 +516,7 @@ if(WITH_PYTHON_BINDINGS)
             pybind11::module
             Boost::algorithm
             TT::Metalium
+            Taskflow::Taskflow
     )
 endif()
 

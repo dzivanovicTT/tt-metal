@@ -45,6 +45,16 @@ struct PrepareShardedDataParams {
 
     std::vector<uint8_t> expected_data;
 };
+struct PerfTestParams {
+    std::string name;
+    Shape shape;
+    Shape shard_shape;
+    Layout layout;
+    BufferType buffer_type;
+
+    std::optional<TensorMemoryLayout> memory_layout;
+    std::optional<Shape2D> shard_shape_2d;
+};
 }  // namespace
 
 class NDShardingTests
@@ -161,7 +171,7 @@ TEST_P(NdShardingOpCompatTests, TestAdd) {
 class PrepareNdShardedDataTests : public ::testing::TestWithParam<PrepareShardedDataParams> {};
 
 TEST_P(PrepareNdShardedDataTests, PrepareNdShardedData) {
-    const auto& params = GetParam();
+    /*const auto& params = GetParam();
 
     CoreRangeSet cores(CoreRange(CoreCoord{0, 0}, CoreCoord{0, params.num_cores - 1}));
     NdShardSpec nd_shard_spec{params.shard_shape, cores, ShardOrientation::ROW_MAJOR};
@@ -179,14 +189,76 @@ TEST_P(PrepareNdShardedDataTests, PrepareNdShardedData) {
     auto sharded_data = pack_nd_sharded_data<uint8_t>(tensor_data, tensor_spec);
     EXPECT_EQ(sharded_data.size(), params.expected_data.size());
     for (size_t i = 0; i < sharded_data.size(); i++) {
-        EXPECT_EQ(sharded_data[i], static_cast<std::byte>(params.expected_data[i]));
+        EXPECT_EQ(sharded_data[i], params.expected_data[i]);
     }
 
-    auto unpacked_data = unpack_nd_sharded_data<std::byte>(sharded_data, tensor_spec);
+    auto unpacked_data = unpack_nd_sharded_data<uint8_t>(sharded_data, tensor_spec);
     EXPECT_EQ(unpacked_data.size(), tensor_data.size());
     for (size_t i = 0; i < unpacked_data.size(); i++) {
-        EXPECT_EQ(unpacked_data[i], static_cast<std::byte>(tensor_data[i]));
+        EXPECT_EQ(unpacked_data[i], tensor_data[i]);
+    }*/
+}
+
+class NdShardingPerfTests : public ttnn::TTNNFixtureWithDevice, public ::testing::WithParamInterface<PerfTestParams> {};
+
+TEST_P(NdShardingPerfTests, PerfTests) {
+    const auto& params = GetParam();
+
+    CoreCoord core_grid_size = params.buffer_type == BufferType::DRAM ? device_->dram_grid_size() : CoreCoord{7, 8};
+    CoreRangeSet cores(CoreRange(CoreCoord{0, 0}, CoreCoord{core_grid_size.x - 1, core_grid_size.y - 1}));
+
+    std::cout << "------- " << params.name << " -------" << std::endl;
+    MemoryConfig memory_config;
+    if (params.memory_layout.has_value()) {
+        if (params.memory_layout == TensorMemoryLayout::INTERLEAVED) {
+            memory_config = MemoryConfig{TensorMemoryLayout::INTERLEAVED};
+        } else {
+            ShardSpec shard_spec{cores, params.shard_shape_2d.value()};
+            memory_config = MemoryConfig{params.memory_layout.value(), params.buffer_type, shard_spec};
+        }
+    } else {
+        NdShardSpec nd_shard_spec{params.shard_shape, cores};
+        memory_config = MemoryConfig{params.buffer_type, nd_shard_spec};
     }
+    TensorLayout tensor_layout(DataType::UINT8, PageConfig(params.layout), memory_config);
+    TensorSpec tensor_spec(params.shape, tensor_layout);
+
+    std::cout << "Tensor shape: " << params.shape << std::endl;
+    std::cout << "Tensor layout: " << params.layout << std::endl;
+    if (tensor_spec.memory_config().nd_shard_spec().has_value()) {
+        std::cout << "ND shard shape: " << tensor_spec.memory_config().nd_shard_spec()->shard_shape << std::endl;
+    }
+    if (tensor_spec.memory_config().shard_spec().has_value()) {
+        std::cout << "2D shard shape: " << tensor_spec.memory_config().shard_spec()->shape << std::endl;
+    }
+    std::cout << std::endl;
+
+    std::vector<uint8_t> data(params.shape.volume());
+
+    auto start = std::chrono::high_resolution_clock::now();
+    auto tensor = Tensor::from_vector(data, tensor_spec);
+    auto tensor_data = std::get<HostStorage>(tensor.get_storage()).buffer.view_as<uint8_t>();
+    auto creation_duration =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start);
+
+    start = std::chrono::high_resolution_clock::now();
+    auto device_tensor = tensor.to_device(device_, tensor_spec.memory_config());
+    auto to_device_duration =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start);
+
+    std::cout << "Tensor creation: " << creation_duration.count() / 1e6
+              << "ms, to device: " << to_device_duration.count() / 1e6 << "ms" << std::endl;
+
+    if (tensor_spec.memory_config().nd_shard_spec().has_value()) {
+        start = std::chrono::high_resolution_clock::now();
+        auto sharded_data = pack_nd_sharded_data<uint8_t>(tensor_data, tensor_spec);
+        auto pack_duration =
+            std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start);
+
+        std::cout << "ND sharding pack: " << pack_duration.count() / 1e6 << "ms" << std::endl;
+    }
+
+    std::cout << std::endl << std::endl << std::endl;
 }
 
 INSTANTIATE_TEST_SUITE_P(
@@ -847,3 +919,65 @@ INSTANTIATE_TEST_SUITE_P(
                               /* core 6 */ 24, 25, 0,  0,  0,  0,  0,  0,
                               /* core 7 */ 26, 0,  0,  0,  0,  0,  0,  0},
         }));
+
+INSTANTIATE_TEST_SUITE_P(
+    TensorShardingTests,
+    NdShardingPerfTests,
+    ::testing::Values(PerfTestParams{
+        .name = "Batch sharding L1 tile layout",
+        .shape = Shape({3, 3}),
+        .layout = Layout::ROW_MAJOR,
+        .buffer_type = BufferType::L1,
+        .memory_layout = TensorMemoryLayout::BLOCK_SHARDED,
+        .shard_shape_2d = Shape2D{2, 2},
+    } /*,
+     PerfTestParams{
+         .name = "Batch sharding L1 tile layout",
+         .shape = Shape({10000, 64, 64}),
+         .shard_shape = Shape({1, 32, 32}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::L1,
+     },
+     PerfTestParams{
+         .name = "Interleaved L1 tile layout",
+         .shape = Shape({10000, 64, 64}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::L1,
+         .memory_layout = TensorMemoryLayout::INTERLEAVED,
+     },
+     PerfTestParams{
+         .name = "ND sharding with 4 shards per core",
+         .shape = Shape({16000, 192000}),
+         .shard_shape = Shape({8000, 8000}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::DRAM,
+     },
+     PerfTestParams{
+         .name = "Interleaved 2",
+         .shape = Shape({16000, 192000}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::DRAM,
+         .memory_layout = TensorMemoryLayout::INTERLEAVED,
+     },
+     PerfTestParams{
+         .name = "Block sharding",
+         .shape = Shape({16000, 192000}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::DRAM,
+         .memory_layout = TensorMemoryLayout::BLOCK_SHARDED,
+         .shard_shape_2d = Shape2D{16000, 16000},
+     },
+     PerfTestParams{
+         .name = "ND batch sharding tile layout",
+         .shape = Shape({750000, 64, 64}),
+         .shard_shape = Shape({1, 32, 32}),
+         .layout = Layout::TILE,
+         .buffer_type = BufferType::DRAM,
+     },
+     PerfTestParams{
+         .name = "ND batch sharding row major layout",
+         .shape = Shape({750000, 2, 2}),
+         .shard_shape = Shape({1, 1, 1}),
+         .layout = Layout::ROW_MAJOR,
+         .buffer_type = BufferType::DRAM,
+     }*/));

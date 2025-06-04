@@ -129,6 +129,7 @@ DistributionSpec DistributionSpec::from_shard_shape(
 
 std::vector<DistributionSpec::TargetData> DistributionSpec::compute_metadata_for_targets(
     const MappingMode mapping_mode) const {
+    auto start = std::chrono::high_resolution_clock::now();
     // Compute mapping algorithm treats the last dim of the shard as contiguous
     // To handle the two cases of MappingMode:
     // - MappingMode::NONCOALESCED:
@@ -256,6 +257,10 @@ std::vector<DistributionSpec::TargetData> DistributionSpec::compute_metadata_for
     tt::tt_metal::Shape actual_shard_shape(shard_shape);
     size_t shard_id = 0;
     iterate_over_shards(metadata_for_targets, actual_shard_shape, shard_id, 0, 0);
+
+    auto duration =
+        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now() - start);
+    std::cout << "DistributionSpec::compute_metadata_for_targets: " << duration.count() / 1e6 << "ms" << std::endl;
 
     return metadata_for_targets;
 }

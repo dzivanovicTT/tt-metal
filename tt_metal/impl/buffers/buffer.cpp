@@ -282,7 +282,7 @@ Buffer::Buffer(
     DeviceAddr page_size,
     const BufferType buffer_type,
     const TensorMemoryLayout buffer_layout,
-    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameters,
+    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameters,
     const std::optional<bool> bottom_up,
     const std::optional<SubDeviceId> sub_device_id,
     const bool owns_data,
@@ -302,6 +302,9 @@ Buffer::Buffer(
                 [this](const ShardSpecBuffer& shard_spec_buffer) { this->shard_parameters_ = shard_spec_buffer; },
                 [this](const BufferDistributionSpec& buffer_distribution_spec) {
                     this->buffer_distribution_spec_ = buffer_distribution_spec;
+                },
+                [this](const NdShardSpecBuffer& nd_shard_spec_buffer) {
+                    this->nd_shard_parameters_ = nd_shard_spec_buffer;
                 }},
             shard_parameters.value());
     }
@@ -324,7 +327,7 @@ std::shared_ptr<Buffer> Buffer::create(
     DeviceAddr page_size,
     const BufferType buffer_type,
     const TensorMemoryLayout buffer_layout,
-    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameters,
+    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameters,
     const std::optional<bool> bottom_up,
     const std::optional<SubDeviceId> sub_device_id) {
     LIGHT_METAL_TRACE_FUNCTION_ENTRY();
@@ -371,7 +374,7 @@ std::shared_ptr<Buffer> Buffer::create(
     DeviceAddr page_size,
     const BufferType buffer_type,
     const TensorMemoryLayout buffer_layout,
-    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec>>& shard_parameters,
+    const std::optional<std::variant<ShardSpecBuffer, BufferDistributionSpec, NdShardSpecBuffer>>& shard_parameters,
     const std::optional<bool> bottom_up,
     const std::optional<SubDeviceId> sub_device_id) {
     LIGHT_METAL_TRACE_FUNCTION_ENTRY();
@@ -620,10 +623,7 @@ const std::shared_ptr<const BufferPageMapping>& Buffer::get_buffer_page_mapping(
 }
 
 bool Buffer::is_nd_sharded() const {
-    if (this->buffer_distribution_spec_.has_value()) {
-        TT_FATAL(
-            this->buffer_layout_ == TensorMemoryLayout::BLOCK_SHARDED,
-            "Buffer with BufferDistributionSpec must have BLOCK_SHARDED layout!");
+    if (this->buffer_distribution_spec_.has_value() || this->nd_shard_parameters_.has_value()) {
         return true;
     }
     return false;
@@ -675,6 +675,14 @@ DeviceAddr ShardSpecBuffer::num_pages() const {
     auto shape_in_pages_ = this->shape_in_pages();
     return shape_in_pages_[0] * shape_in_pages_[1];
 }
+
+std::array<uint32_t, 2> NdShardSpecBuffer::tensor_2d_shape_in_pages() const {
+    return {tensor_shape_in_pages.volume() / tensor_shape_in_pages[-1], tensor_shape_in_pages[-1]};
+}
+std::array<uint32_t, 2> NdShardSpecBuffer::shard_2d_shape_in_pages() const {
+    return {shard_shape_in_pages.volume() / shard_shape_in_pages[-1], shard_shape_in_pages[-1]};
+}
+uint64_t NdShardSpecBuffer::num_pages() const { return tensor_shape_in_pages.volume(); }
 
 }  // namespace tt::tt_metal
 
