@@ -185,7 +185,13 @@ def create_tt_model(
 )
 @pytest.mark.parametrize(
     "device_params",
-    [{"trace_region_size": 25663488, "num_command_queues": 1, "physical_device_ids": [0]}],
+    [
+        {
+            "trace_region_size": 25663488,
+            "num_command_queues": 2,
+            # "physical_device_ids": [0],
+        }
+    ],
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -319,7 +325,7 @@ def test_demo(
     from transformers import logging as transformers_logging
 
     # Set logging level to ERROR to suppress warnings about unexpected keys
-    ref_model_name = "Qwen/" + model_args.model_name  # Qwen2.5-VL reference models expects "Qwen/" prefix
+    ref_model_name = model_args.model_name  # Qwen2.5-VL reference models expects "Qwen/" prefix
     transformers_logging.set_verbosity_error()
     config = Qwen2_5_VLForConditionalGeneration.config_class.from_pretrained(ref_model_name)
     if ci_only:
@@ -331,6 +337,7 @@ def test_demo(
         # Create the TorchVisionTransformer wrapper using the original vision model as reference
         vision_model_args = VisionModelArgs(
             mesh_device.create_submesh(ttnn.MeshShape(1, 1), offset=None),
+            # mesh_device,
             max_batch_size=batch_size,
             max_seq_len=max_seq_len,
         )
