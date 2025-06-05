@@ -80,7 +80,7 @@ run_tg_demo_tests() {
   # else
   #   echo "LOG_METAL: Unknown model type: $1"
   #   return 1
-  fi
+  # fi
 
 }
 
