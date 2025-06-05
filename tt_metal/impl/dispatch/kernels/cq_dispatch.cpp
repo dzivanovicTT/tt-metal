@@ -175,6 +175,7 @@ void notify_host_of_completion_queue_write_pointer() {
         cq_write_interface.completion_fifo_wr_ptr | (cq_write_interface.completion_fifo_wr_toggle << 31);
     volatile tt_l1_ptr uint32_t* completion_wr_ptr_addr = get_cq_completion_write_ptr();
     completion_wr_ptr_addr[0] = completion_wr_ptr_and_toggle;
+    noc_async_read_barrier();
     cq_noc_async_write_with_state<CQ_NOC_SnDL>(dev_completion_q_wr_ptr, completion_queue_write_ptr_addr, 4);
 }
 
@@ -190,6 +191,8 @@ void completion_queue_push_back(uint32_t num_pages) {
         // Flip the toggle
         cq_write_interface.completion_fifo_wr_toggle = not cq_write_interface.completion_fifo_wr_toggle;
     }
+
+
 
     // Notify host of updated completion wr ptr
     notify_host_of_completion_queue_write_pointer();
@@ -249,6 +252,9 @@ void process_write_host_h(uint32_t& block_noc_writes_to_clear, uint32_t block_ne
         }
         cq_noc_async_write_with_state_any_len(data_ptr, completion_queue_write_addr, xfer_size);
 
+        noc_async_write_barrier();
+        // Read written data to ensure it has reached the host.
+        noc_async_read(NOC_XY_ADDR2(pcie_noc_xy, completion_queue_write_addr + xfer_size - PCIE_ALIGNMENT), cmd_ptr, PCIE_ALIGNMENT);
         // This will update the write ptr on device and host
         // We flush to ensure the ptr has been read out of l1 before we update it again
         completion_queue_push_back(npages);
