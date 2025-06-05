@@ -45,7 +45,11 @@ void kernel_main() {
     uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
 
-    // TODO: use rt args
+    uint32_t pages_in_row_offset = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t row_offset = get_arg_val<uint32_t>(arg_idx++);
+
+    uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
 
     OpSignaler op_signaler;
     if constexpr (fuse_op) {
@@ -99,8 +103,8 @@ void kernel_main() {
             sender_chip_id = my_chip_id - slices_received;
             actual_sender_chip_id = (sender_chip_id < 0) ? ring_size + sender_chip_id : sender_chip_id;
         }
-        uint32_t pages_read_in_row = input_tile_id_start % input_tensor_Wt;
-        uint32_t row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
+        uint32_t pages_read_in_row = pages_in_row_offset;
+        uint32_t rows = row_offset;
         uint32_t tiles_read = input_tile_id_start;
         uint32_t tile_id_start = actual_sender_chip_id * input_tensor_Wt;
         uint32_t tiles_to_read = input_tile_id_end;
@@ -112,11 +116,11 @@ void kernel_main() {
             for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                 uint32_t actual_num_pages = min(num_pages_to_read - j, contig_pages_advanced);
                 for (uint32_t i = 0; i < actual_num_pages; i++) {
-                    uint32_t tile_id = tile_id_start + row_offset + pages_read_in_row;
+                    uint32_t tile_id = tile_id_start + rows + pages_read_in_row;
                     noc_async_write_tile(tile_id, output_tensor_addrgen, l1_read_addr);
                     pages_read_in_row += 1;
                     if (pages_read_in_row >= input_tensor_Wt) {
-                        row_offset += output_tensor_Wt;
+                        rows += output_tensor_Wt;
                         pages_read_in_row = 0;
                     }
                     l1_read_addr += output_tensor_page_size;

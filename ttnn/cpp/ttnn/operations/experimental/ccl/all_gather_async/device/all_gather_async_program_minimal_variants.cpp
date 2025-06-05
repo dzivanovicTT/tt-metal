@@ -642,7 +642,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             receiver_worker_cores_noc.at(1).y,         // forward receiver core y
             receiver_worker_cores_noc.at(0).x,         // backward receiver core x
             receiver_worker_cores_noc.at(0).y,         // backward receiver core y
-            packet_id,
             intermediate_packet_offset_x,
             intermediate_packet_offset_y};
         tt::tt_metal::SetRuntimeArgs(program, worker_sender_reader_kernel_id, {core}, reader_rt_args);
@@ -665,7 +664,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             semaphore.at(1).address(),  // out_ready_semaphore_backward
             pages_read_in_row,
             row_offset,
-            packet_id,
             intermediate_packet_offset_x,
             intermediate_packet_offset_y
 
@@ -693,7 +691,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             input_tile_id_end,                        // slice_num_pages
             ring_size,                                // ring_size
             sender_to_forward_receiver_semaphore_id,  // signal_receiver_sem_forward
-        };
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         tt::tt_metal::SetRuntimeArgs(
             program,
             worker_forward_receiver_reader_kernel_id,
@@ -705,7 +704,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             input_tile_id_end,                         // slice_num_pages
             ring_size,                                 // ring_size
             sender_to_backward_receiver_semaphore_id,  // signal_receiver_sem_backward
-        };
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         tt::tt_metal::SetRuntimeArgs(
             program,
             worker_backward_receiver_reader_kernel_id,
@@ -720,7 +720,10 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             input_tile_id_start,                // slice_num_pages start
             input_tile_id_end,                  // slice_num_pages
             ring_size,                          // ring_size
-        };
+            pages_read_in_row,
+            row_offset,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         if (fuse_op) {
             fused_op_signaler_forward->push_all_gather_fused_op_rt_args(forward_receiver_writer_rt_args, 1, 0, 1);
         }
@@ -736,7 +739,10 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             input_tile_id_start,                // slice_num_pages start
             input_tile_id_end,                  // slice_num_pages
             ring_size,                          // ring_size
-        };
+            pages_read_in_row,
+            row_offset,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         if (fuse_op) {
             fused_op_signaler_backward->push_all_gather_fused_op_rt_args(backward_receiver_writer_rt_args, 1, 0, 0);
         }

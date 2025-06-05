@@ -58,42 +58,14 @@ void kernel_main() {
     size_t out_ready_sem_forward = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem_backward = get_arg_val<uint32_t>(arg_idx++);
 
-    uint32_t pages_read_in_row = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t pages_in_row_offset = get_arg_val<uint32_t>(arg_idx++);
     uint32_t row_offset = get_arg_val<uint32_t>(arg_idx++);
-    pages_read_in_row = input_tile_id_start % input_tensor_Wt;
-    row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
 
-    uint32_t initial_packet_id = get_arg_val<uint32_t>(arg_idx++);
     uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
     uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
-    initial_packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
-    uint32_t intermediate_packet_offset = initial_packet_id * ring_size;
-    intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
-    intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
 
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
-
-    DPRINT << "Writer: " << "intermediate_address: " << (uint32_t)intermediate_address << "\n";
-    DPRINT << "Writer: " << "output_address: " << (uint32_t)output_address << "\n";
-    DPRINT << "Writer: " << "input_tensor_Wt: " << (uint32_t)input_tensor_Wt << "\n";
-    DPRINT << "Writer: " << "output_tensor_Wt: " << (uint32_t)output_tensor_Wt << "\n";
-    DPRINT << "Writer: " << "input_tile_id_start: " << (uint32_t)input_tile_id_start << "\n";
-    DPRINT << "Writer: " << "input_tile_id_end: " << (uint32_t)input_tile_id_end << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_forward: " << (uint32_t)out_ready_sem_forward << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_backward: " << (uint32_t)out_ready_sem_backward << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_noc0_x: " << (uint32_t)out_ready_sem_noc0_x << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_noc0_y: " << (uint32_t)out_ready_sem_noc0_y << "\n";
-
-    // compile time
-    DPRINT << "Writer: " << "my_chip_id: " << (uint32_t)my_chip_id << "\n";
-    DPRINT << "Writer: " << "cb_forward_id: " << (uint32_t)cb_forward_id << "\n";
-    DPRINT << "Writer: " << "cb_backward_id: " << (uint32_t)cb_backward_id << "\n";
-    DPRINT << "Writer: " << "packet_size_in_pages: " << (uint32_t)packet_size_in_pages << "\n";
-    DPRINT << "Writer: " << "intermediate_page_size: " << (uint32_t)intermediate_page_size << "\n";
-    DPRINT << "Writer: " << "num_targets_forward_direction: " << (uint32_t)num_targets_forward_direction << "\n";
-    DPRINT << "Writer: " << "num_targets_backward_direction: " << (uint32_t)num_targets_backward_direction << "\n";
-    DPRINT << "Writer: " << "contig_pages_advanced: " << (uint32_t)contig_pages_advanced << "\n";
 
     /* Args for overlapped all gather */
     OpSignaler op_signaler_sender;
@@ -159,8 +131,8 @@ void kernel_main() {
     uint32_t tiles_read = input_tile_id_start;
     uint32_t tiles_to_read = input_tile_id_end;
     uint32_t tile_id_start = my_chip_id * input_tensor_Wt;
-    uint32_t packet_id = initial_packet_id;
-
+    uint32_t pages_read_in_row = pages_in_row_offset;
+    uint32_t rows = row_offset;
     DPRINT << "WRITER: Reading tiles...\n";
     while (tiles_read < tiles_to_read) {
         uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
@@ -170,22 +142,21 @@ void kernel_main() {
         for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
             const uint32_t actual_num_pages = min(num_pages_to_read - j, contig_pages_advanced);
             for (uint32_t i = 0; i < actual_num_pages; i++) {
-                uint64_t noc0_dest_noc_addr = get_noc_addr(
-                    tile_id_start + row_offset + pages_read_in_row, output_addrgen, 0 /*offset*/, 0 /*noc_id*/);
+                uint64_t noc0_dest_noc_addr =
+                    get_noc_addr(tile_id_start + rows + pages_read_in_row, output_addrgen, 0 /*offset*/, 0 /*noc_id*/);
                 noc_async_write_tile(
-                    tile_id_start + row_offset + pages_read_in_row,
+                    tile_id_start + rows + pages_read_in_row,
                     output_addrgen,
                     l1_read_addr + i * intermediate_page_size);
 
                 pages_read_in_row += 1;
                 if (pages_read_in_row >= input_tensor_Wt) {
-                    row_offset += output_tensor_Wt;
+                    rows += output_tensor_Wt;
                     pages_read_in_row = 0;
                 }
             }
 
             const uint32_t payload_size_bytes = intermediate_page_size * actual_num_pages;
-            // uint32_t intermediate_packet_id = my_chip_id + packet_id * ring_size;
             uint32_t intermediate_packet_first_tile_id =
                 intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
 
@@ -200,7 +171,6 @@ void kernel_main() {
                 l1_read_addr,
                 payload_size_bytes);
             tiles_read += actual_num_pages;
-            packet_id++;
 
             intermediate_packet_id_x += ring_size;
             if (intermediate_packet_id_x >= N_DRAM_BANKS) {
@@ -270,9 +240,7 @@ void kernel_main() {
         // In the linear case, I expect num_targets_backward_direction slices from the left, and check if I have a
         // neighbor to the right
         // In the ring case, I expect to write to the right num_forward_target times
-        DPRINT << "WRITER: backward_writes: " << backward_writes
-               << " backward_writes_expected: " << backward_writes_expected << " forward_writes: " << forward_writes
-               << " forward_writes_expected: " << forward_writes_expected << "\n";
+
         if ((forward_writes < forward_writes_expected) && fabric_connection.has_forward_connection()) {
             tiles_read = input_tile_id_start;
             int slice_chip_id = my_chip_id - forward_writes - 1;
@@ -281,9 +249,6 @@ void kernel_main() {
 
             actual_forward_slice_id_x =
                 (actual_forward_slice_id_x == 0) ? ring_size - 1 : actual_forward_slice_id_x - 1;
-
-            // TODO: get from rt args
-            packet_id = initial_packet_id;
 
             intermediate_packet_id_x = actual_forward_slice_id_x + intermediate_packet_offset_x;
             intermediate_packet_id_y = actual_forward_slice_id_y + intermediate_packet_offset_y;
@@ -299,7 +264,6 @@ void kernel_main() {
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     const uint32_t payload_size_bytes =
                         intermediate_page_size * min(num_pages_to_read - j, contig_pages_advanced);
-                    // uint32_t intermediate_packet_id = actual_slice_chip_id + packet_id * ring_size;
 
                     uint32_t intermediate_packet_first_tile_id =
                         intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
@@ -314,7 +278,6 @@ void kernel_main() {
                         payload_size_bytes);
 
                     tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
-                    packet_id++;
 
                     intermediate_packet_id_x += ring_size;
                     if (intermediate_packet_id_x >= N_DRAM_BANKS) {
@@ -354,7 +317,7 @@ void kernel_main() {
                 intermediate_packet_id_x -= N_DRAM_BANKS;
                 intermediate_packet_id_y++;
             }
-            packet_id = initial_packet_id;
+
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                 cb_wait_front(cb_backward_id, num_pages_to_read);
@@ -362,7 +325,6 @@ void kernel_main() {
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     const uint32_t payload_size_bytes =
                         intermediate_page_size * min(num_pages_to_read - j, contig_pages_advanced);
-                    // uint32_t intermediate_packet_id = actual_slice_chip_id + packet_id * ring_size;
                     uint32_t intermediate_packet_first_tile_id =
                         intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
                     uint64_t remote_noc0_dest_noc_addr = get_noc_addr(
@@ -376,7 +338,7 @@ void kernel_main() {
                         payload_size_bytes);
 
                     tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
-                    packet_id++;
+
                     intermediate_packet_id_x += ring_size;
                     if (intermediate_packet_id_x >= N_DRAM_BANKS) {
                         intermediate_packet_id_x -= N_DRAM_BANKS;

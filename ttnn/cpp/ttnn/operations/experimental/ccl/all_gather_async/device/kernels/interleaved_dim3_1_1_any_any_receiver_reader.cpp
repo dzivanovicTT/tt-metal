@@ -43,6 +43,8 @@ void kernel_main() {
     uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_semaphore(get_arg_val<uint32_t>(arg_idx++));
+    uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
 
     constexpr bool intermediate_tensor_is_dram = intermediate_buffer_type == tt::tt_metal::BufferType::DRAM;
     auto intermediate_tensor_addrgen = InterleavedAddrGenFast<intermediate_tensor_is_dram>{
@@ -65,11 +67,6 @@ void kernel_main() {
             slices_expected = num_targets_forward_direction;
         }
     }
-    uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
-    uint32_t intermediate_packet_offset = packet_id * ring_size;
-    uint32_t intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
-    uint32_t intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
-    // end of rt args
 
     volatile tt_l1_ptr uint32_t* out_ready_sem_addr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem);
     uint32_t actual_sender_chip_id_x = my_chip_id_x;
@@ -112,7 +109,6 @@ void kernel_main() {
             for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                 const uint32_t payload_size_bytes =
                     input_tensor_page_size * min(num_pages_to_read - j, contig_pages_advanced);
-                uint32_t intermediate_packet_id = actual_sender_chip_id + packet_id * ring_size;
                 uint32_t intermediate_packet_first_tile_id =
                     intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
                 uint64_t packet_addr = get_noc_addr(
@@ -121,7 +117,6 @@ void kernel_main() {
                 noc_async_read(packet_addr, l1_write_addr, payload_size_bytes);
                 l1_write_addr += payload_size_bytes;
                 tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
-                packet_id++;
 
                 intermediate_packet_id_x += ring_size;
                 if (intermediate_packet_id_x >= N_DRAM_BANKS) {
