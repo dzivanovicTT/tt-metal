@@ -350,6 +350,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
     // 1 sender (reader + writer), and 2 receivers (forward/backward, each with a reader/writer)
     uint32_t num_senders_per_link = 1;
     uint32_t num_receivers_per_link = 2;
+    const uint32_t N_DRAM_BANKS = 12;
+
     const auto [sender_worker_core_range, sender_worker_cores] = choose_worker_cores(
         num_links, num_senders_per_link, enable_persistent_fabric_mode, mesh_device, sub_device_id, core_grid_offset);
     const auto [total_worker_core_range, total_worker_cores] = choose_worker_cores(
@@ -595,12 +597,18 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         uint32_t remainder = input_tensor_num_pages % num_links;
         uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
         uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
+        uint32_t packet_id = (input_tile_id_start + tiles_to_write_per_packet - 1) / tiles_to_write_per_packet;
+        uint32_t intermediate_packet_offset = packet_id * ring_size;
+        uint32_t intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
+        uint32_t intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
 
         TT_ASSERT(!(input_tensor_shape[3] % TILE_WIDTH));
         TT_ASSERT(!(output_tensor_shape[3] % TILE_WIDTH));
         uint32_t TILE_WIDTH = 32;
         uint32_t input_tensor_Wt = input_tensor_shape[3] / TILE_WIDTH;
         uint32_t output_tensor_Wt = output_tensor_shape[3] / TILE_WIDTH;
+        uint32_t pages_read_in_row = input_tile_id_start % input_tensor_Wt;
+        uint32_t row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
 
         std::set<CoreRange> receiver_forward_semaphore_core_ranges;
         receiver_forward_semaphore_core_ranges.insert(CoreRange(receiver_worker_cores[link * 2 + 1]));
@@ -634,7 +642,9 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             receiver_worker_cores_noc.at(1).y,         // forward receiver core y
             receiver_worker_cores_noc.at(0).x,         // backward receiver core x
             receiver_worker_cores_noc.at(0).y,         // backward receiver core y
-        };
+            packet_id,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         tt::tt_metal::SetRuntimeArgs(program, worker_sender_reader_kernel_id, {core}, reader_rt_args);
 
         // Set Sender Writer runtime args
@@ -652,7 +662,13 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             drain_sync_core.y,          // out_ready_sem_noc0_y
             ring_size,                  // ring_size
             semaphore.at(0).address(),  // out_ready_semaphore_forward
-            semaphore.at(1).address()   // out_ready_semaphore_backward
+            semaphore.at(1).address(),  // out_ready_semaphore_backward
+            pages_read_in_row,
+            row_offset,
+            packet_id,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y
+
         };
         writer_rt_args.push_back(forward_device.has_value());
         if (forward_device.has_value()) {

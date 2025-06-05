@@ -29,6 +29,8 @@ constexpr bool direction = get_compile_time_arg_val(8);
 constexpr uint32_t contig_pages_advanced = get_compile_time_arg_val(9);
 
 constexpr uint32_t N_DRAM_BANKS = 12;
+constexpr uint32_t my_chip_id_x = my_chip_id % N_DRAM_BANKS;
+constexpr uint32_t my_chip_id_y = my_chip_id / N_DRAM_BANKS;
 
 void kernel_main() {
     ///////////////////////////////////////////////////
@@ -63,8 +65,15 @@ void kernel_main() {
             slices_expected = num_targets_forward_direction;
         }
     }
+    uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+    uint32_t intermediate_packet_offset = packet_id * ring_size;
+    uint32_t intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
+    uint32_t intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
+    // end of rt args
 
     volatile tt_l1_ptr uint32_t* out_ready_sem_addr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem);
+    uint32_t actual_sender_chip_id_x = my_chip_id_x;
+    uint32_t actual_sender_chip_id_y = my_chip_id_y;
     while (slices_received < slices_expected) {
         // Do i expect more?
         // If direction == backward, do I expect more from the left?
@@ -81,17 +90,21 @@ void kernel_main() {
         int sender_chip_id;
         uint32_t actual_sender_chip_id;
         if (direction == 1) {
-            sender_chip_id = my_chip_id + slices_received;
-            actual_sender_chip_id = (sender_chip_id >= (int)ring_size) ? sender_chip_id - ring_size : sender_chip_id;
+            actual_sender_chip_id_x = (actual_sender_chip_id_x == ring_size - 1) ? 0 : actual_sender_chip_id_x + 1;
         } else {
-            sender_chip_id = my_chip_id - slices_received;
-            actual_sender_chip_id = (sender_chip_id < 0) ? ring_size + sender_chip_id : sender_chip_id;
+            actual_sender_chip_id_x = (actual_sender_chip_id_x == 0) ? ring_size - 1 : actual_sender_chip_id_x - 1;
         }
 
         uint32_t tiles_read = input_tile_id_start;
         uint32_t tiles_to_read = input_tile_id_end;
 
-        uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+        uint32_t intermediate_packet_id_x = actual_sender_chip_id_x + intermediate_packet_offset_x;
+        uint32_t intermediate_packet_id_y = actual_sender_chip_id_y + intermediate_packet_offset_y;
+        if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+            intermediate_packet_id_x -= N_DRAM_BANKS;
+            intermediate_packet_id_y++;
+        }
+
         while (tiles_read < tiles_to_read) {
             uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
             cb_reserve_back(cb_intermediate_id, num_pages_to_read);
@@ -101,8 +114,7 @@ void kernel_main() {
                     input_tensor_page_size * min(num_pages_to_read - j, contig_pages_advanced);
                 uint32_t intermediate_packet_id = actual_sender_chip_id + packet_id * ring_size;
                 uint32_t intermediate_packet_first_tile_id =
-                    (intermediate_packet_id % N_DRAM_BANKS) +
-                    contig_pages_advanced * N_DRAM_BANKS * (intermediate_packet_id / N_DRAM_BANKS);
+                    intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
                 uint64_t packet_addr = get_noc_addr(
                     intermediate_packet_first_tile_id, intermediate_tensor_addrgen, 0 /*offset*/, 0 /*noc_id*/);
 
@@ -110,6 +122,12 @@ void kernel_main() {
                 l1_write_addr += payload_size_bytes;
                 tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
                 packet_id++;
+
+                intermediate_packet_id_x += ring_size;
+                if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+                    intermediate_packet_id_x -= N_DRAM_BANKS;
+                    intermediate_packet_id_y++;
+                }
             }
             noc_async_read_barrier();
             cb_push_back(cb_intermediate_id, num_pages_to_read);

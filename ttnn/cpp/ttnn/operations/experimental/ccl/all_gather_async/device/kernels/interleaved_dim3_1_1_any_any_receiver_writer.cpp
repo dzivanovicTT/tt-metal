@@ -45,6 +45,8 @@ void kernel_main() {
     uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
 
+    // TODO: use rt args
+
     OpSignaler op_signaler;
     if constexpr (fuse_op) {
         op_signaler = OpSignaler(arg_idx);
@@ -97,12 +99,12 @@ void kernel_main() {
             sender_chip_id = my_chip_id - slices_received;
             actual_sender_chip_id = (sender_chip_id < 0) ? ring_size + sender_chip_id : sender_chip_id;
         }
-
         uint32_t pages_read_in_row = input_tile_id_start % input_tensor_Wt;
         uint32_t row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
         uint32_t tiles_read = input_tile_id_start;
         uint32_t tile_id_start = actual_sender_chip_id * input_tensor_Wt;
         uint32_t tiles_to_read = input_tile_id_end;
+
         while (tiles_read < tiles_to_read) {
             uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
             cb_wait_front(cb_intermediate_id, num_pages_to_read);

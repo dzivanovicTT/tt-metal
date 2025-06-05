@@ -30,6 +30,8 @@ constexpr Topology topology = static_cast<Topology>(get_compile_time_arg_val(9))
 constexpr uint32_t contig_pages_advanced = get_compile_time_arg_val(10);  // 2
 
 constexpr uint32_t N_DRAM_BANKS = 12;
+constexpr uint32_t my_chip_id_x = my_chip_id % N_DRAM_BANKS;
+constexpr uint32_t my_chip_id_y = my_chip_id / N_DRAM_BANKS;
 
 void kernel_main() {
     ///////////////////////////////////////////////////
@@ -52,6 +54,15 @@ void kernel_main() {
     const uint8_t signal_receiver_sem_forward_noc0_y = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t signal_receiver_sem_backward_noc0_x = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t signal_receiver_sem_backward_noc0_y = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t packet_id = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
+
+    packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+    uint32_t intermediate_packet_offset = packet_id * ring_size;
+    intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
+    intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
+    // end of rt args
 
     // all args, we can only print uint32_t
     DPRINT << "Reader: " << "input_tensor_address: " << (uint32_t)input_tensor_address << "\n";
@@ -130,6 +141,11 @@ void kernel_main() {
     uint64_t backward_receiver_semaphore_addr = get_noc_addr(
         signal_receiver_sem_backward_noc0_x, signal_receiver_sem_backward_noc0_y, signal_receiver_sem_backward);
 
+    uint32_t actual_backward_chip_id_x = my_chip_id_x;
+    uint32_t actual_backward_chip_id_y = my_chip_id_y;
+    uint32_t actual_forward_chip_id_x = my_chip_id_x;
+    uint32_t actual_forward_chip_id_y = my_chip_id_y;
+
     while (forward_slices_received < forward_slices_expected || backward_slices_received < backward_slices_expected) {
         DPRINT << "READER: " << forward_slices_received << " ex " << forward_slices_expected << " ; "
                << backward_slices_received << " ; " << backward_slices_expected << "\n";
@@ -147,6 +163,8 @@ void kernel_main() {
 
             int backward_chip_id = my_chip_id - backward_slices_received;
             uint32_t actual_backward_chip_id = (backward_chip_id < 0) ? ring_size + backward_chip_id : backward_chip_id;
+            actual_backward_chip_id_x =
+                (actual_backward_chip_id_x == 0) ? ring_size - 1 : actual_backward_chip_id_x - 1;
             // Should I forward what I got from the left to my right?
             // In the linear case, if I have any targets to my right, always forward
             // In the ring case, if I have received on the left less than my targets on the right, forward
@@ -157,7 +175,16 @@ void kernel_main() {
                 tiles_read = input_tile_id_start;
                 tiles_to_read = input_tile_id_end;
 
-                uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+                // use runtime arg
+                packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+
+                uint32_t intermediate_packet_id_x = actual_backward_chip_id_x + intermediate_packet_offset_x;
+                uint32_t intermediate_packet_id_y = actual_backward_chip_id_y + intermediate_packet_offset_y;
+                if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+                    intermediate_packet_id_x -= N_DRAM_BANKS;
+                    intermediate_packet_id_y++;
+                }
+
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);  // 2
                     cb_reserve_back(cb_forward_id, num_pages_to_read);
@@ -166,10 +193,9 @@ void kernel_main() {
                         const uint32_t payload_size_bytes =
                             input_tensor_page_size *
                             min(num_pages_to_read - j, contig_pages_advanced);  // done only once ?
-                        uint32_t intermediate_packet_id = actual_backward_chip_id + packet_id * ring_size;
+                        // uint32_t intermediate_packet_id = actual_backward_chip_id + packet_id * ring_size;
                         uint32_t intermediate_packet_first_tile_id =
-                            (intermediate_packet_id % N_DRAM_BANKS) +
-                            contig_pages_advanced * N_DRAM_BANKS * (intermediate_packet_id / N_DRAM_BANKS);
+                            intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
                         uint64_t packet_addr = get_noc_addr(
                             intermediate_packet_first_tile_id, intermediate_tensor_addrgen, 0 /*offset*/, 0 /*noc_id*/);
 
@@ -177,6 +203,12 @@ void kernel_main() {
                         l1_write_addr += payload_size_bytes;
                         tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
                         packet_id++;
+
+                        intermediate_packet_id_x += ring_size;
+                        if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+                            intermediate_packet_id_x -= N_DRAM_BANKS;
+                            intermediate_packet_id_y++;
+                        }
                     }
                     noc_async_read_barrier();
                     cb_push_back(cb_forward_id, num_pages_to_read);
@@ -188,6 +220,7 @@ void kernel_main() {
         // In the linear case, I expect num_targets_forward_direction slices from the right
         // In the ring case, I expect num_targets_forward_direction slices from the right (keep in mind this differs for
         // odd/even chips)
+
         if (forward_slices_received < forward_slices_expected) {
             DPRINT << "Reader: forward sem wait.\n";
             while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_forward) <= forward_slices_received);
@@ -208,7 +241,17 @@ void kernel_main() {
                 tiles_read = input_tile_id_start;
                 tiles_to_read = input_tile_id_end;
 
-                uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+                actual_forward_chip_id_x =
+                    (actual_forward_chip_id_x == ring_size - 1) ? 0 : actual_forward_chip_id_x + 1;
+
+                // TODO: use rt args
+                packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+                uint32_t intermediate_packet_id_x = actual_forward_chip_id_x + intermediate_packet_offset_x;
+                uint32_t intermediate_packet_id_y = actual_forward_chip_id_x + intermediate_packet_offset_y;
+                if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+                    intermediate_packet_id_x -= N_DRAM_BANKS;
+                    intermediate_packet_id_y++;
+                }
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                     cb_reserve_back(cb_backward_id, num_pages_to_read);
@@ -216,10 +259,9 @@ void kernel_main() {
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                         const uint32_t payload_size_bytes =
                             input_tensor_page_size * min(num_pages_to_read - j, contig_pages_advanced);
-                        uint32_t intermediate_packet_id = actual_forward_chip_id + packet_id * ring_size;
+                        // uint32_t intermediate_packet_id = actual_forward_chip_id + packet_id * ring_size;
                         uint32_t intermediate_packet_first_tile_id =
-                            (intermediate_packet_id % N_DRAM_BANKS) +
-                            contig_pages_advanced * N_DRAM_BANKS * (intermediate_packet_id / N_DRAM_BANKS);
+                            intermediate_packet_id_x + contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_y;
                         uint64_t packet_addr = get_noc_addr(
                             intermediate_packet_first_tile_id, intermediate_tensor_addrgen, 0 /*offset*/, 0 /*noc_id*/);
 
@@ -227,6 +269,12 @@ void kernel_main() {
                         l1_write_addr += payload_size_bytes;
                         tiles_read += min(num_pages_to_read - j, contig_pages_advanced);
                         packet_id++;
+
+                        intermediate_packet_id_x += ring_size;
+                        if (intermediate_packet_id_x >= N_DRAM_BANKS) {
+                            intermediate_packet_id_x -= N_DRAM_BANKS;
+                            intermediate_packet_id_y++;
+                        }
                     }
                     noc_async_read_barrier();
                     cb_push_back(cb_backward_id, num_pages_to_read);
