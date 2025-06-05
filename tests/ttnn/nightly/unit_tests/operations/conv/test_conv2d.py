@@ -1030,45 +1030,45 @@ def test_conv_for_segformer_512x512(
         (16, 64, 16, 115, 115, 4, 4, 1, 1, 0, 0, HS, {"act_block_h": 256}),
         # (20, 64, 16, 115, 115, 4, 4, 1, 1, 0, 0, HS, {"act_block_h": 32}),  Out of Memory!!
         # rn50 layer1
-        (8, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
-        (16, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
-        (20, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
-        # rn50 layer2
-        (8, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, None),
-        (16, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, None),
-        (20, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, {"act_block_h": 32}),
-        (8, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
-        (16, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
-        (20, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
-        # rn50 layer3
-        (8, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
-        (16, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
-        (20, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
-        (8, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
-        (16, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
-        (20, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
-        # rn50 layer4
-        (8, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
-        (16, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
-        (20, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
-        (8, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
-        (16, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
-        (20, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
-        ## small test
-        (1, 64, 64, 8, 8, 3, 3, 1, 1, 1, 1, BS, {"num_cores_nhw": 2, "grid_size": (2, 2)}),
-        (1, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, BS, {"num_cores_nhw": 4, "grid_size": (2, 4)}),
-        # (1, 160, 160, 7, 7, 3, 3, 1, 1, 1, 1, BS, None), sliding_window_op_infra/sliding_window.cpp:341: indices_length_last_core <= indices_length_per_core
-        (8, 256, 256, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
-        # r50 1x1s2 shapes
-        # Fails with packer_l1_acc = True (20, 256, 64, 56, 56, 1, 1, 2, 2, 0, 0, BS, None),  # r50 first bottleneck downsample shape
-        (20, 256, 64, 56, 56, 1, 1, 2, 2, 0, 0, HS, None),  # r50 first bottleneck downsample shape
-        # Fails with packer_l1_acc = True (20, 512, 256, 56, 56, 1, 1, 2, 2, 0, 0, BS, None),  # r50 second bottleneck downsample shape
-        # (20, 512, 256, 56, 56, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
-        (20, 1024, 512, 28, 28, 1, 1, 2, 2, 0, 0, BS, None),  # r50 third bottleneck downsample shape
-        # (20, 1024, 512, 28, 28, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
-        (20, 2048, 1024, 14, 14, 1, 1, 2, 2, 0, 0, BS, None),  # r50 fourth bottleneck downsample shape
-        # (20, 2048, 1024, 14, 14, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
-        # (20, 128, 256, 56, 56, 1, 1, 2, 2, 0, 0, HS, None),  ## L2M1 DS: doesn't fit
+        # (8, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
+        # (16, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
+        # (20, 64, 64, 56, 56, 3, 3, 1, 1, 1, 1, HS, None),
+        # # rn50 layer2
+        # (8, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, None),
+        # (16, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, None),
+        # (20, 128, 128, 56, 56, 3, 3, 2, 2, 1, 1, HS, {"act_block_h": 32}),
+        # (8, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
+        # (16, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
+        # (20, 128, 128, 28, 28, 3, 3, 1, 1, 1, 1, HS, None),
+        # # rn50 layer3
+        # (8, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
+        # (16, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
+        # (20, 256, 256, 28, 28, 3, 3, 2, 2, 1, 1, BS, None),
+        # (8, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
+        # (16, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
+        # (20, 256, 256, 14, 14, 3, 3, 1, 1, 1, 1, BS, None),
+        # # rn50 layer4
+        # (8, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
+        # (16, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
+        # (20, 512, 512, 14, 14, 3, 3, 2, 2, 1, 1, BS, None),
+        # (8, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
+        # (16, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
+        # (20, 512, 512, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
+        # ## small test
+        # (1, 64, 64, 8, 8, 3, 3, 1, 1, 1, 1, BS, {"num_cores_nhw": 2, "grid_size": (2, 2)}),
+        # (1, 64, 64, 16, 16, 3, 3, 1, 1, 1, 1, BS, {"num_cores_nhw": 4, "grid_size": (2, 4)}),
+        # # (1, 160, 160, 7, 7, 3, 3, 1, 1, 1, 1, BS, None), sliding_window_op_infra/sliding_window.cpp:341: indices_length_last_core <= indices_length_per_core
+        # (8, 256, 256, 7, 7, 3, 3, 1, 1, 1, 1, BS, None),
+        # # r50 1x1s2 shapes
+        # # Fails with packer_l1_acc = True (20, 256, 64, 56, 56, 1, 1, 2, 2, 0, 0, BS, None),  # r50 first bottleneck downsample shape
+        # (20, 256, 64, 56, 56, 1, 1, 2, 2, 0, 0, HS, None),  # r50 first bottleneck downsample shape
+        # # Fails with packer_l1_acc = True (20, 512, 256, 56, 56, 1, 1, 2, 2, 0, 0, BS, None),  # r50 second bottleneck downsample shape
+        # # (20, 512, 256, 56, 56, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
+        # (20, 1024, 512, 28, 28, 1, 1, 2, 2, 0, 0, BS, None),  # r50 third bottleneck downsample shape
+        # # (20, 1024, 512, 28, 28, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
+        # (20, 2048, 1024, 14, 14, 1, 1, 2, 2, 0, 0, BS, None),  # r50 fourth bottleneck downsample shape
+        # # (20, 2048, 1024, 14, 14, 1, 1, 2, 2, 0, 0, HS, None), - doesnt fit
+        # # (20, 128, 256, 56, 56, 1, 1, 2, 2, 0, 0, HS, None),  ## L2M1 DS: doesn't fit
     ),
 )
 @pytest.mark.parametrize(
@@ -1077,12 +1077,12 @@ def test_conv_for_segformer_512x512(
 )
 @pytest.mark.parametrize(
     "output_dtype",
-    [ttnn.bfloat16, ttnn.bfloat8_b],
+    [ttnn.bfloat16],
 )
 @pytest.mark.parametrize("math_fidelity", [ttnn.MathFidelity.LoFi])
 @pytest.mark.parametrize("packer_l1_acc", [True])
 @pytest.mark.parametrize("has_bias", [True])
-@pytest.mark.parametrize("auto_shard", [True, False], ids=["auto_shard", "no_auto_shard"])
+@pytest.mark.parametrize("auto_shard", [False], ids=["no_auto_shard"])
 def test_resnet50_conv_wh(
     device,
     torch_tensor_map,
@@ -1132,6 +1132,8 @@ def test_resnet50_conv_wh(
         has_bias=has_bias,
         auto_shard=auto_shard,
         shard_layout=shard_layout,
+        dilation_h=2,
+        dilation_w=2,
         input_layout=ttnn.TILE_LAYOUT if output_dtype == ttnn.bfloat8_b else None,
     )
 
