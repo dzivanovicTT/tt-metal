@@ -6,6 +6,11 @@
 #include "height_sharded_reader_common.hpp"
 #include "debug/dprint_pages.h"
 
+FORCE_INLINE void update_local_cb_wr_ptr(uint32_t cb_id, uint32_t val) {
+    LocalCBInterface& local_cb = get_local_cb_interface(cb_id);
+    local_cb.fifo_wr_ptr = val;
+}
+
 void kernel_main() {
     constexpr uint32_t dilation_h = get_compile_time_arg_val(0);
     constexpr uint32_t dilation_w = get_compile_time_arg_val(1);
@@ -72,12 +77,31 @@ void kernel_main() {
     // set_state uses just x/y from the get_noc_addr, addr is ignored
     noc_async_read_one_packet_set_state(get_noc_addr(act_l1_read_addr), coalesced_read_bytes);
 
+    DPRINT << "conv_act_c_read_bytes " << conv_act_c_read_bytes << ENDL();
+
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
     uint32_t start_reader_idx = 0;
+    uint32_t cb_start_addr, cb_current_start_addr, cb_end_addr;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
         uint32_t reader_offset = act_l1_read_addr;
         cb_reserve_back(cb_id_act, act_block_num_tiles);
+
+        if (bh == 0) {
+            cb_start_addr = get_write_ptr(cb_id_act);
+            cb_current_start_addr = cb_start_addr;
+            cb_end_addr = cb_start_addr + act_block_num_tiles * 2048;
+        } else {
+            cb_current_start_addr = cb_current_start_addr + (bh - 1) * window_inner * conv_act_c_read_bytes;
+
+            if (cb_current_start_addr == cb_end_addr) {
+                cb_current_start_addr = cb_start_addr;
+            }
+
+            update_local_cb_wr_ptr(cb_id_act, cb_start_addr);
+        }
+
         uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
+
         // Reset reader_idx to finish act_block_h_datums
         reader_idx = start_reader_idx;
 
@@ -92,7 +116,14 @@ void kernel_main() {
             stride_w_bytes,
             window_outer_offset,
             weight_size_w>(
-            act_block_h_datums_read_curr, packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx);
+            act_block_h_datums_read_curr,
+            packed_reader_indices_ptr,
+            reader_offset,
+            l1_write_addr_act,
+            reader_idx,
+            bh == 0,
+            cb_start_addr,
+            cb_end_addr);
 
         noc_async_read_barrier();
 
