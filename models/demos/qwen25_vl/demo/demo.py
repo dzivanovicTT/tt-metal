@@ -171,7 +171,7 @@ def create_tt_model(
         "batch-1",  # latency
         "batch-4",  # multi-user
         "batch-32",  # 32 users (special because it fills tile size)
-        "ci-only",  # ci_only batch-2 for faster testing coverage in CI pipelines
+        "ci-only-two-users",  # ci_only batch-2 for faster testing coverage in CI pipelines
         "ci-only-repeated-batch",  # ci_only repeated batch for faster testing coverage in CI pipelines
     ],
 )
