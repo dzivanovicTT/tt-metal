@@ -127,7 +127,7 @@ def run_all_gather_on_TG(
     warmup_iters: int = 0,
     cluster_axis: int = 0,
     tile=(32, 32),
-    trace_mode=True,
+    trace_mode=False,
     debug=False,
     profiler=BenchmarkProfiler(),
 ):
