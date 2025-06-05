@@ -668,6 +668,21 @@ class ModelArgs:
                 n=self.hidden_dim // self.cluster_shape[1],
                 grid_size=mlp1_3_grid(seq_len),
             )
+            self.model_config[
+                "PREFILL_MIXTRAL_MLP_W1_W3_PRG_CONFIG"
+            ] = lambda seq_len: ttnn.MatmulMultiCoreReuseMultiCastProgramConfig(
+                compute_with_storage_grid_size=(8, 8),
+                in0_block_w=int(4096 / 32 / 8 / 8),  # K / TILE_WIDTH / GRID_SIZE how much inner dim you take each time
+                out_subblock_h=1,  # Must be divisible by per_core_M
+                out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
+                per_core_M=int(
+                    min(seq_len, self.prefill_len_cutoff) / 32 / 8
+                ),  # 32, #16,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
+                per_core_N=int(14336 / 32 / 8),  # N / TILE_WIDTH / Grid_Size
+                transpose_mcast=False,
+                fused_activation=ttnn.UnaryOpType.SILU,
+                fuse_batch=False,
+            )
             self.model_config["PREFILL_MLP_W2_PRG_CONFIG"] = lambda seq_len: self.matmul_config(
                 m=min(seq_len, self.prefill_len_cutoff),  # 512 if BH, 1024 if WH
                 k=self.hidden_dim // (self.cluster_shape[1] if self.is_galaxy else 1),
@@ -1521,7 +1536,7 @@ class ModelArgs:
 
         self.model_config["PREFILL_MLP_W2_PRG_CONFIG_128"] = ttnn.MatmulMultiCoreReuseMultiCastProgramConfig(
             compute_with_storage_grid_size=(8, 8),
-            in0_block_w=1,  # how much inner dim you take each time
+            in0_block_w=1,  # K /  TILE_WIDTH / Grid Size
             out_subblock_h=1,  # Must be divisible by per_core_M
             out_subblock_w=1,  # Must be divisible by per_core_N, out_subblock_w * out_subblock_h <= 4
             per_core_M=1,  # M / TILE_HEIGHT / Grid_Size (dynamic based on seqlen)
