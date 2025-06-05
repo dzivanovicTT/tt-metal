@@ -42,12 +42,9 @@ class TtMixtralMLP(LightweightModule):
             # cache_file_name=cache_name(name),
         )
 
-        w1_w3_dims = (-2, -1)
-        w2_dims = (-1, 0)
-
-        self.w1 = as_tensor("w1", w1_w3_dims)
-        self.w2 = as_tensor("w2", w2_dims)
-        self.w3 = as_tensor("w3", w1_w3_dims)
+        self.w1 = as_tensor("w1")
+        self.w2 = as_tensor("w2")
+        self.w3 = as_tensor("w3")
 
         self.prefill_mlp_config = self.model_config["PREFILL_MLP_COMPUTE_CONFIG"]
 
@@ -112,8 +109,6 @@ class TtMixtralMLP(LightweightModule):
 
             ttnn.deallocate(w3_out)
             ttnn.deallocate(w1_out)
-
-            breakpoint()
 
             w2_out = ttnn.linear(
                 w2_in,
