@@ -87,19 +87,31 @@ RUN git clone --branch ${OMPI_TAG} --depth 1 https://github.com/open-mpi/ompi.gi
     cd .. && \
     rm -rf ompi-src
 
-COPY tt_metal/sfpi-version.sh /tmp/sfpi-version.sh
 
-# Clone SFPI repo recursively from the specified branch
+# Set working directory
 WORKDIR /tmp
-RUN source /tmp/sfpi-version.sh && \
-    git clone --recurse-submodules -b ${sfpi_version} https://github.com/tenstorrent/sfpi.git && \
-    cd sfpi && \
-    ./scripts/build.sh && \
-    tar cf - include | tar xf - -C build/sfpi && \
-    mkdir -p /opt/tenstorrent/sfpi && \
-    cp -a build/sfpi/* /opt/tenstorrent/sfpi/ && \
-    cd .. && \
-    rm -rf sfpi
+
+# Download the RPM
+ADD https://bashupload.com/PmLie/1uk9B.rpm sfpi-x86_64_Linux.rpm
+
+# Install the RPM
+RUN dnf install -y ./sfpi-x86_64_Linux.rpm && \
+    rm -f ./sfpi-x86_64_Linux.rpm && \
+    dnf clean all
+
+#COPY tt_metal/sfpi-version.sh /tmp/sfpi-version.sh
+#
+## Clone SFPI repo recursively from the specified branch
+#WORKDIR /tmp
+#RUN source /tmp/sfpi-version.sh && \
+#    git clone --recurse-submodules -b ${sfpi_version} https://github.com/tenstorrent/sfpi.git && \
+#    cd sfpi && \
+#    ./scripts/build.sh && \
+#    tar cf - include | tar xf - -C build/sfpi && \
+#    mkdir -p /opt/tenstorrent/sfpi && \
+#    cp -a build/sfpi/* /opt/tenstorrent/sfpi/ && \
+#    cd .. && \
+#    rm -rf sfpi
 
 # ENV needed
 ENV PATH=${OMPI_PREFIX}/bin:$PATH
