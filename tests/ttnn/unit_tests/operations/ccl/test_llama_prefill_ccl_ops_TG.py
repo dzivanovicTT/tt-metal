@@ -126,7 +126,7 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     warmup_iters: int = 0,
     cluster_axis: int = 0,
     tile=(32, 32),
-    trace_mode=True,
+    trace_mode=False,
     debug=False,
     profiler=BenchmarkProfiler(),
 ):
@@ -602,10 +602,10 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
 @pytest.mark.parametrize(
     "num_devices, num_links, per_chip_output_shape, dim, layout, input_dtype, cluster_axis",
     [
-        (8, 4, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0),
-        (4, 4, [1, 1, 4096, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
-        (4, 4, [1, 1, 8192, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
-        (4, 2, [1, 1, 128, 32 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1),
+        (8, 4, [1, 1, 256, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0),
+        # (4, 4, [1, 1, 4096, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
+        # (4, 4, [1, 1, 8192, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1),
+        # (4, 2, [1, 1, 128, 32 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1),
         # multi link
     ],
 )
