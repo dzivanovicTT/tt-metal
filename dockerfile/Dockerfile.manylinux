@@ -92,7 +92,7 @@ RUN git clone --branch ${OMPI_TAG} --depth 1 https://github.com/open-mpi/ompi.gi
 WORKDIR /tmp
 
 # Download the RPM
-ADD https://bashupload.com/PmLie/1uk9B.rpm sfpi-x86_64_Linux.rpm
+ADD https://github.com/blozano-tt/sfpi-temp/releases/download/v0.1/sfpi-x86_64_Linux.rpm
 
 # Install the RPM
 RUN dnf install -y ./sfpi-x86_64_Linux.rpm && \
