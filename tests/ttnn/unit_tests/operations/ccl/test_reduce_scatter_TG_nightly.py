@@ -243,33 +243,6 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
                 memory_config=output_mem_config,
                 mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
             ),
-            # ttnn.from_torch(
-            #     torch.zeros(per_chip_input_shape),
-            #     tile=ttnn.Tile(tile),
-            #     dtype=input_dtype,
-            #     device=mesh_device,
-            #     layout=layout,
-            #     memory_config=output_mem_config,
-            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-            # ),
-            # ttnn.from_torch(
-            #     torch.zeros(per_chip_output_shape),
-            #     tile=ttnn.Tile(tile),
-            #     dtype=input_dtype,
-            #     device=mesh_device,
-            #     layout=layout,
-            #     memory_config=output_mem_config,
-            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-            # ),
-            # ttnn.from_torch(
-            #     torch.zeros(per_chip_output_shape),
-            #     tile=ttnn.Tile(tile),
-            #     dtype=input_dtype,
-            #     device=mesh_device,
-            #     layout=layout,
-            #     memory_config=output_mem_config,
-            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-            # ),
         ]
 
     if trace_mode:
