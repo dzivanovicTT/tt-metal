@@ -225,6 +225,7 @@ def run_demo_inference(device, reset_seeds, input_path, num_prompts, num_inferen
     ttnn.copy_host_to_device_tensor(encoder_hidden_states_rand, ttnn_text_embeddings_device, cq_id=1)
     write_event = ttnn.record_event(device, 1)
     ttnn.wait_for_event(0, write_event)
+    op_event = ttnn.record_event(device, 0)
     output = ttnn.from_device(
         run(
             device,
@@ -246,6 +247,7 @@ def run_demo_inference(device, reset_seeds, input_path, num_prompts, num_inferen
     ttnn.copy_host_to_device_tensor(encoder_hidden_states_rand, ttnn_text_embeddings_device, cq_id=1)
     write_event = ttnn.record_event(device, 1)
     ttnn.wait_for_event(0, write_event)
+    op_event = ttnn.record_event(device, 0)
     output.deallocate(True)
     tid = ttnn.begin_trace_capture(device, cq_id=0)
     output = run(
@@ -302,6 +304,7 @@ def run_demo_inference(device, reset_seeds, input_path, num_prompts, num_inferen
         ttnn.copy_host_to_device_tensor(ttnn_text_embeddings, ttnn_text_embeddings_device, cq_id=1)
         write_event = ttnn.record_event(device, 1)
         ttnn.wait_for_event(0, write_event)
+        op_event = ttnn.record_event(device, 0)
         ttnn.execute_trace(device, tid, cq_id=0, blocking=False)
         image = ttnn.to_torch(output.cpu(blocking=True))
         ttnn.synchronize_device(device)
