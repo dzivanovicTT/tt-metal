@@ -856,6 +856,7 @@ def test_conv_ws(
 
     tt_input_tensor = ttnn.reshape(tt_input_tensor, [1, 1, input_height * input_width * batch_size, input_channels])
     if tilized_input:
+        tt_input_tensor = ttnn.to_device(tt_input_tensor, device)
         tt_input_tensor = ttnn.to_layout(tt_input_tensor, ttnn.TILE_LAYOUT)
 
     if auto_shard and (device.compute_with_storage_grid_size().x, device.compute_with_storage_grid_size().y) == (8, 7):
