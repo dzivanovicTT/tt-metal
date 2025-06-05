@@ -132,9 +132,11 @@ void kernel_main() {
                 uint32_t packet_id = (tiles_read + contig_pages_advanced - 1) / contig_pages_advanced;
                 while (tiles_read < tiles_to_read) {
                     // Alternate writes in forward and backward direction
-                    cb_wait_front(cb_output_id, tile_granularity);
-                    size_t l1_read_addr = get_read_ptr(cb_output_id);
+
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
+
+                    cb_wait_front(cb_output_id, num_pages_to_read);
+                    size_t l1_read_addr = get_read_ptr(cb_output_id);
 
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                         uint32_t payload_size_bytes =
@@ -184,7 +186,7 @@ void kernel_main() {
                         tiles_read += contig_pages_advanced;
                     }
 
-                    cb_pop_front(cb_output_id, tile_granularity);
+                    cb_pop_front(cb_output_id, num_pages_to_read);
                     write_forward = !write_forward;
                 }
 
@@ -226,20 +228,18 @@ void kernel_main() {
                 uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
                 uint32_t tile_id_start = batch_offset;
                 while (tiles_read < tiles_to_read) {
-                    cb_wait_front(cb_output_id, tile_granularity);
-                    size_t l1_read_addr = get_read_ptr(cb_output_id);
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
+                    cb_wait_front(cb_output_id, num_pages_to_read);
+                    size_t l1_read_addr = get_read_ptr(cb_output_id);
 
-                    for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
-                        for (uint32_t t = 0; t < contig_pages_advanced; t++) {
-                            noc_async_write_tile(tile_id_start + tiles_read, output_addrgen, l1_read_addr);
-                            l1_read_addr += intermediate_page_size;
-                            tiles_read++;
-                        }
+                    for (uint32_t j = 0; j < num_pages_to_read; j++) {
+                        noc_async_write_tile(tile_id_start + tiles_read, output_addrgen, l1_read_addr);
+                        l1_read_addr += intermediate_page_size;
+                        tiles_read++;
                     }
 
                     noc_async_writes_flushed();
-                    cb_pop_front(cb_output_id, tile_granularity);
+                    cb_pop_front(cb_output_id, num_pages_to_read);
                 }
                 noc_async_write_barrier();
 
