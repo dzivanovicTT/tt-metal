@@ -149,13 +149,13 @@ def create_tt_model(
 def create_tt_page_table(global_batch_size, data_parallel, page_params, use_paged_kv_cache):
     page_table = None
 
-    if paged_attention_config:
+    if page_params:
         # Implied shuffling of blocks
-        permutation = torch.randperm(paged_attention_config.max_num_blocks)
+        permutation = torch.randperm(page_params.max_num_blocks)
         # Page table which maps virtual blocks to physical
         reverse_permutation = torch.argsort(permutation).repeat(data_parallel)
         page_table = reverse_permutation.reshape(
-            global_batch_size, paged_attention_config.max_num_blocks // (global_batch_size // data_parallel)
+            global_batch_size, page_params.max_num_blocks // (global_batch_size // data_parallel)
         )
     return page_table
 
@@ -195,7 +195,7 @@ def prepare_generator_args(
             max_batch_size=global_batch_size // data_parallel,
             optimizations=optimizations,
             max_seq_len=max_seq_len,
-            paged_attention_config=paged_attention_config,
+            page_params=paged_attention_config,
             dtype=ttnn.bfloat8_b,
             state_dict=state_dict,
         )
@@ -206,7 +206,7 @@ def prepare_generator_args(
     page_table = create_tt_page_table(
         global_batch_size=global_batch_size,
         data_parallel=data_parallel,
-        paged_attention_config=paged_attention_config,
+        page_params=paged_attention_config,
     )
     # Host code, safe to reuse tokenizer from the 1st model
     tokenizer = model_args[
@@ -676,7 +676,7 @@ def test_demo_text(
         logger.info("Starting prefill warmup...")
         profiler.start(f"compile_prefill", iteration=batch_idx)
         # TODO #21234 - Fix the prefill warmup for batch size > 1
-        
+
         logits = generator.prefill_forward_text(
             input_tokens_prefill_pt[::batch_size, :],  # Warmup prefill for each device
             page_table=page_table,
