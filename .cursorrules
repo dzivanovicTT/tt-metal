@@ -1,0 +1,120 @@
+# Mesh-Related Commits Summary
+## Diff between origin/qwen25-vl-rebase-main and origin/qwen25-vl-vllm
+
+This document contains a summary of commits related to "Mesh" or "mesh" functionality that are present in `origin/qwen25-vl-rebase-main` but not in `origin/qwen25-vl-vllm`.
+
+### Key Mesh Infrastructure Commits
+
+#### 1. Intermesh Routing and Fabric Support (#22238, #22095, #22065, #22021)
+- **#22238**: Add support for fabric to launch kernels for intermesh routing
+  - Fixed control plane bugs for intermesh connections
+  - Added router support for intermesh routing capabilities
+
+- **#22095**: Add new mesh descriptor and tests for splitting a 4x2 mesh into two 2x2 meshes
+  - New mesh graph descriptor to interpret 4x2 machine as two 2x2 meshes
+  - Added tests for intermesh routing between the two through control plane
+
+- **#22065**: Optimize intermesh routing to the next mesh
+  - Improved exit node selection for mesh-to-mesh routing
+  - Reduced extra hops and balanced traffic between exit nodes
+
+- **#22021**: Fix West router edge ports for intermesh routing
+  - Corrected west router determination logic
+
+#### 2. ND Sharding and Buffer Management (#21962, #21859)
+- **#21962**: Add ND sharding support for mesh device/buffer
+  - Updated MeshBuffer and Mesh CQ APIs for ND sharding
+  - Added BufferDistributionSpec support to DeviceLocalBufferConfig
+  - Ported single-device ND sharding tests to use mesh device/buffer
+
+- **#21859**: `DistributedHostBuffer` implementation
+  - Support for multi-host meshes with distributed data buffers
+  - Global view over data while materializing only local data
+  - Integration with `MeshCommandQueue`
+
+#### 3. Core TT-Mesh Integration (#18067)
+- **#18067**: TTNN x TT-Mesh Integration: Exposing a Native MultiDevice Backend
+  - Major integration of TT-Mesh as main backend for TTNN
+  - Exposed native multi-device host dispatch within TT-Metal layer
+  - New data structures: `MeshCommandQueue`, `MeshAllocator`, `MeshWorkload`, `MeshBuffer`, `MeshTrace`, `MeshEvents`
+  - Complete removal of Async Mode from TTNN
+  - Modified all CCLs and multi-device ops to use TT-Mesh
+
+#### 4. Mesh Device Management and Configuration
+- **#21900**: Fix disabling program cache on MeshDevice
+- **#21873**: Make FDMeshCommandQueue::in_use_ thread safe
+- **#21787**: Replicate `tt_attention_mask` in mesh device
+- **#21578**: Fix MeshDevice visualization using device_id
+- **#21571**: Supply offset in `MeshDeviceView::get_line_coordinates`
+- **#22007**: Implement PIMPL idiom for MeshWorkload
+
+#### 5. Testing and Utilities
+- **#21804**: Added generic virtual core read/write API for HWCommandQueue and FDMeshCommandQueue
+- **#21477**: Update 4xP150 mesh graph desc to specify valid N/E/S/W eth ports
+- **#21336**: Clean up utility mesh APIs for checking Tensor storage type
+- **#21250**: Fix Host Side Performance Modelling for Ops with TT-Mesh
+- **#21180**: Use device fixture instead of MeshDevice for test_matmul_1d_ring_llama_perf
+
+#### 6. Multi-Device and 6U Support
+- **#21037**: Add 6u specific full mesh bandwidth tests
+- **#21118**: Add support for 2D torus at device init for 6u
+- **#19096**: TT-NN MeshDevice Support for 6U
+- **#19373**: 6U control plane + system mesh changes
+
+#### 7. Fabric and CCL Optimizations
+- **#20971**: Resnet imagenet change device to mesh_device
+- **#19688**: Meshdevice reshape fix
+- **#20383**: Changes supporting TTNN mesh dispatch infra
+- **#20130**: Finish current subdevice in blocking enqueue_mesh_workload
+- **#19951**: Minor improvements to `MeshCoordinate` infra
+
+#### 8. Legacy API Cleanup
+- **#21602**: Delete `AnyDevice` (no longer needed with MeshDevice)
+- **#21344**: Remove single-device pybinds (transition to MeshDevice only)
+- **#21165**: Get rid of unused `MULTI_DEVICE` storage type enum
+- **#21094**: Remove legacy Async Mode APIs
+
+### Summary
+The commits primarily focus on enhancing mesh device functionality, intermesh routing capabilities, distributed buffer management, and the complete integration of TT-Mesh as the primary backend for TTNN operations. The changes represent a significant architectural shift toward native multi-device support with improved performance and simplified APIs.
+
+---
+
+## Chronological Order of Mesh-Related Commits
+
+The following is a chronological list of all mesh-related commits (oldest to newest):
+
+1. **2025-03-12 01:15:06** - `cd5cf40` - #0: Bringup TT-Mesh support on TG and add Tests (#18921) → *Category 3: Core TT-Mesh Integration*
+2. **2025-03-13 00:09:17** - `e7affc7` - Unify GlobalSemaphore and GlobalCircularBuffer MeshDevice support (#19019) → *Category 4: Mesh Device Management*
+3. **2025-03-17 11:20:11** - `1c70fa6` - Re-enable RandomizedMeshWorkload test (#19194) → *Category 5: Testing and Utilities*
+4. **2025-03-17 19:31:40** - `bcfc2c1` - Llama3 hybrid implementation using submeshes (#18777) → *Category 6: Multi-Device and 6U Support*
+5. **2025-03-18 13:03:02** - `25e8a86` - TT-NN MeshDevice Support for 6U (#19096) → *Category 6: Multi-Device and 6U Support*
+6. **2025-03-18 17:55:57** - `8ae5816` - Simplify interaction with `MeshDeviceConfig` and `SystemMesh` (#19208) → *Category 4: Mesh Device Management*
+7. **2025-03-18 19:51:03** - `505bc19` - #0: Resolve hang with RandomizedMeshWorkload on N150 (#19248) → *Category 5: Testing and Utilities*
+8. **2025-03-19 07:31:07** - `01fb236` - Revert 6U Mesh changes because it broke a bunch of N150 tests (#19339) → *Category 6: Multi-Device and 6U Support*
+9. **2025-03-21 11:05:46** - `11be612` - Resubmit 6U control plane + system mesh changes (#19373) → *Category 6: Multi-Device and 6U Support*
+10. **2025-03-22 14:56:07** - `8e40194` - [skip ci] Add cstdint header missing in mesh_trace_id.hpp (#19518) → *Category 5: Testing and Utilities*
+11. **2025-03-25 11:12:55** - `5b293cd` - Update p150 mesh graph desc with valid num eth ports (#19598) → *Category 5: Testing and Utilities*
+12. **2025-03-27 09:41:48** - `ec08bd4` - #19751: Skip MeshEventsTestSuite tests in blackhole post-commit runs (#19761) → *Category 5: Testing and Utilities*
+13. **2025-04-01 13:03:27** - `8c1650f` - #0: Minor improvements to `MeshCoordinate` infra (#19951) → *Category 7: Fabric and CCL Optimizations*
+14. **2025-04-04 11:26:29** - `50531b9` - #0: Finish current subdevice in blocking enqueue_mesh_workload (#20130) → *Category 7: Fabric and CCL Optimizations*
+15. **2025-04-09 12:43:04** - `786f29e` - #18572: Changes supporting TTNN mesh dispatch infra (#20383) → *Category 7: Fabric and CCL Optimizations*
+16. **2025-04-10 23:27:30** - `bf1b594` - Meshdevice reshape fix (#19688) → *Category 7: Fabric and CCL Optimizations*
+17. **2025-04-22 14:05:02** - `d143a30` - Resnet imagenet change device to mesh_device (#20971) → *Category 7: Fabric and CCL Optimizations*
+18. **2025-04-22 18:59:52** - `3623ec5` - TTNN x TT-Mesh Integration: Exposing a Native MultiDevice Backend to TTNN (#18067) → *Category 3: Core TT-Mesh Integration*
+19. **2025-04-23 13:10:10** - `5615d3d` - add 6u specific full mesh bandwidth tests (#21037) → *Category 6: Multi-Device and 6U Support*
+20. **2025-04-25 09:01:52** - `dff4a8a` - Use device fixture instead of MeshDevice for test_matmul_1d_ring_llama_perf (#21180) → *Category 5: Testing and Utilities*
+21. **2025-04-29 20:27:12** - `5d881d5` - Fix Host Side Performance Modelling for Ops with TT-Mesh (#21250) → *Category 5: Testing and Utilities*
+22. **2025-05-01 11:53:56** - `baa1db9` - #19177: Clean up utility mesh APIs for checking Tensor storage type (#21336) → *Category 5: Testing and Utilities*
+23. **2025-05-01 09:30:09** - `87f7666` - Update 4xP150 mesh graph desc to specify valid N/E/S/W eth ports (#21477) → *Category 5: Testing and Utilities*
+24. **2025-05-02 15:19:58** - `bd6134c` - #21544: Fix MeshDevice visualization by using device_id instead of de… (#21578) → *Category 4: Mesh Device Management*
+25. **2025-05-06 13:22:16** - `0828453` - #21500: Supply offset in `MeshDeviceView::get_line_coordinates` (#21571) → *Category 4: Mesh Device Management*
+26. **2025-05-07 13:59:36** - `6cf6c75` - #0: Replicate `tt_attention_mask` in mesh device (#21787) → *Category 4: Mesh Device Management*
+27. **2025-05-09 00:03:07** - `1864525` - Added generic virtual core read/write API for HWCommandQueue and FDMeshCommandQueue (#21804) → *Category 5: Testing and Utilities*
+28. **2025-05-09 11:39:07** - `e9d7c12` - Make FDMeshCommandQueue::in_use_ thread safe to suppress Tsan warnings (#21873) → *Category 4: Mesh Device Management*
+29. **2025-05-12 09:15:14** - `ac75a92` - #0: Fix disabling program cache on MeshDevice (#21900) → *Category 4: Mesh Device Management*
+30. **2025-05-13 09:53:58** - `db38b65` - Implement PIMPL idiom for MeshWorkload (#22007) → *Category 4: Mesh Device Management*
+31. **2025-05-13 13:54:12** - `b6600c9` - #0: Fix West router edge ports for intermesh routing (#22021) → *Category 1: Intermesh Routing and Fabric Support*
+32. **2025-05-13 21:18:27** - `7084bab` - #0: Add ND sharding support for mesh device/buffer (#21962) → *Category 2: ND Sharding and Buffer Management*
+33. **2025-05-14 02:53:00** - `12f7b2f` - #0: Optimize intermesh routing to the next mesh (#22065) → *Category 1: Intermesh Routing and Fabric Support*
+34. **2025-05-15 12:17:55** - `ab38b0c` - #0: Add new mesh descriptor and tests for splitting a 4x2 mesh into two 2x2 meshes (#22095) → *Category 1: Intermesh Routing and Fabric Support*
+35. **2025-05-16 19:54:56** - `fd34864` - #21161: Add support for fabric to launch kernels for intermesh routing (#22238) → *Category 1: Intermesh Routing and Fabric Support*

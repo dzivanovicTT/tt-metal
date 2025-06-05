@@ -161,10 +161,10 @@ void Cluster::generate_cluster_descriptor() {
 
         if (all_same_board) {
             if (board_type == BoardType::N300) {
-                if (this->cluster_desc_->get_all_chips().size() == 2) {
-                    this->cluster_type_ = ClusterType::N300;
-                } else if (this->cluster_desc_->get_all_chips().size() == 8) {
+                if (this->cluster_desc_->get_all_chips().size() == 8) {
                     this->cluster_type_ = ClusterType::T3K;
+                } else {
+                    this->cluster_type_ = ClusterType::N300;
                 }
             } else if (board_type == BoardType::N150) {
                 if (this->cluster_desc_->get_all_chips().size() == 1) {
@@ -1302,7 +1302,10 @@ void Cluster::initialize_control_plane() {
         case tt::ClusterType::P150: mesh_graph_descriptor = "p150_mesh_graph_descriptor.yaml"; break;
         case tt::ClusterType::P150_X2: mesh_graph_descriptor = "p150_x2_mesh_graph_descriptor.yaml"; break;
         case tt::ClusterType::P150_X4: mesh_graph_descriptor = "p150_x4_mesh_graph_descriptor.yaml"; break;
-        default: TT_THROW("Unknown cluster type"); // TODO: we could expose this as a custom mesh graph option
+        default:
+            TT_THROW(
+                "Unknown cluster type: {}",
+                this->cluster_type_);  // TODO: we could expose this as a custom mesh graph option
     }
     const std::filesystem::path mesh_graph_desc_path = std::filesystem::path(rtoptions_.get_root_dir()) /
                                                        "tt_metal/fabric/mesh_graph_descriptors" / mesh_graph_descriptor;
