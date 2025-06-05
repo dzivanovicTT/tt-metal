@@ -429,4 +429,5 @@ def test_reduce_scatter_TG(
         num_reduce_scatter_instances=replication_factor,
         cluster_axis=cluster_axis,
         use_reduce_scatter_async=True,
+        # trace_mode=True,
     )

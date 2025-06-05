@@ -56,6 +56,9 @@ def run_with_trace(
     n_worker=None,
     n_buffer=None,
     num_iter=20,
+    worker_sub_device_id=None,
+    from_remote_semaphore_handles=None,
+    persistent_buffers=None,
 ):
     # Compile Run
     logger.info("Compiling model")
@@ -75,15 +78,17 @@ def run_with_trace(
     logger.info("Capturing trace")
     trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
     for i in range(num_iter):
-        tt_out_tensor = ttnn.reduce_scatter(
+        ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor,
             dim=dim,
-            cluster_axis=cluster_axis,
-            mesh_device=mesh_device,
-            math_op=math_op,
+            persistent_intermediate_buffer=persistent_buffers[1],
+            persistent_output_buffer=persistent_buffers[0],
+            multi_device_global_semaphore=from_remote_semaphore_handles,
             num_links=num_links,
             memory_config=output_mem_config,
-            topology=ttnn.Topology.Linear,
+            topology=ttnn.Topology.Ring,
+            subdevice_id=worker_sub_device_id,
+            cluster_axis=cluster_axis,
         )
     ttnn.end_trace_capture(mesh_device, trace_id, cq_id=0)
     ttnn.synchronize_device(mesh_device)
@@ -214,6 +219,59 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     )
     ttnn_tensor = ttnn.to_device(ttnn_tensor, mesh_device)
 
+    persistent_buffers = None
+    if use_persistent_output:
+        tile = (32, 32)
+        padded_per_chip_input_shape = list(per_chip_input_shape)
+        padded_per_chip_input_shape[0] += 2
+        persistent_buffers = [
+            ttnn.from_torch(
+                torch.zeros(per_chip_output_shape),
+                tile=ttnn.Tile(tile),
+                dtype=input_dtype,
+                device=mesh_device,
+                layout=layout,
+                memory_config=output_mem_config,
+                mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
+            ),
+            ttnn.from_torch(
+                torch.zeros(padded_per_chip_input_shape),
+                tile=ttnn.Tile(tile),
+                dtype=input_dtype,
+                device=mesh_device,
+                layout=layout,
+                memory_config=output_mem_config,
+                mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
+            ),
+            # ttnn.from_torch(
+            #     torch.zeros(per_chip_input_shape),
+            #     tile=ttnn.Tile(tile),
+            #     dtype=input_dtype,
+            #     device=mesh_device,
+            #     layout=layout,
+            #     memory_config=output_mem_config,
+            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
+            # ),
+            # ttnn.from_torch(
+            #     torch.zeros(per_chip_output_shape),
+            #     tile=ttnn.Tile(tile),
+            #     dtype=input_dtype,
+            #     device=mesh_device,
+            #     layout=layout,
+            #     memory_config=output_mem_config,
+            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
+            # ),
+            # ttnn.from_torch(
+            #     torch.zeros(per_chip_output_shape),
+            #     tile=ttnn.Tile(tile),
+            #     dtype=input_dtype,
+            #     device=mesh_device,
+            #     layout=layout,
+            #     memory_config=output_mem_config,
+            #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
+            # ),
+        ]
+
     if trace_mode:
         ttnn_tensor_out = run_with_trace(
             input_tensor=ttnn_tensor,
@@ -225,61 +283,12 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
             all_gather_topology=ttnn.Topology.Linear,
             num_links=num_links,
             num_iter=num_iters,
+            worker_sub_device_id=worker_sub_device_id,
+            from_remote_semaphore_handles=from_remote_semaphore_handles,
+            persistent_buffers=persistent_buffers,
         )
     else:
         logger.info(f"Running {num_iters} iterations of reduce scatter")
-        persistent_buffers = None
-        if use_persistent_output:
-            tile = (32, 32)
-            padded_per_chip_input_shape = list(per_chip_input_shape)
-            padded_per_chip_input_shape[0] += 2
-            persistent_buffers = [
-                ttnn.from_torch(
-                    torch.zeros(per_chip_output_shape),
-                    tile=ttnn.Tile(tile),
-                    dtype=input_dtype,
-                    device=mesh_device,
-                    layout=layout,
-                    memory_config=output_mem_config,
-                    mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-                ),
-                ttnn.from_torch(
-                    torch.zeros(padded_per_chip_input_shape),
-                    tile=ttnn.Tile(tile),
-                    dtype=input_dtype,
-                    device=mesh_device,
-                    layout=layout,
-                    memory_config=output_mem_config,
-                    mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-                ),
-                # ttnn.from_torch(
-                #     torch.zeros(per_chip_input_shape),
-                #     tile=ttnn.Tile(tile),
-                #     dtype=input_dtype,
-                #     device=mesh_device,
-                #     layout=layout,
-                #     memory_config=output_mem_config,
-                #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-                # ),
-                # ttnn.from_torch(
-                #     torch.zeros(per_chip_output_shape),
-                #     tile=ttnn.Tile(tile),
-                #     dtype=input_dtype,
-                #     device=mesh_device,
-                #     layout=layout,
-                #     memory_config=output_mem_config,
-                #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-                # ),
-                # ttnn.from_torch(
-                #     torch.zeros(per_chip_output_shape),
-                #     tile=ttnn.Tile(tile),
-                #     dtype=input_dtype,
-                #     device=mesh_device,
-                #     layout=layout,
-                #     memory_config=output_mem_config,
-                #     mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-                # ),
-            ]
         for _ in range(num_iters):
             if use_reduce_scatter_async:
                 ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
