@@ -9,6 +9,8 @@
 #include "compute_kernel_api/tile_move_copy.h"
 #include "compute_kernel_api/reconfig_data_format.h"
 #include "compute_kernel_api/pack.h"
+#include "dprint_tensix.h"
+#include "debug/dprint_tile.h"
 
 namespace NAMESPACE {
 
@@ -120,6 +122,35 @@ void MAIN {
             acquire_dst();
 
             read_cb_and_transpose(input_val_cb_index, 0, (2 == input_take));
+
+            // Print the contents of the CB which is read and transposed
+            for (uint8_t i = 0; i < 32; ++i) {
+                UNPACK({
+                    DPRINT << "count: " << ((uint)count) << ":: "
+                           << TileSlice(
+                                  input_ind_cb_index,
+                                  0,
+                                  SliceRange{
+                                      .h0 = i, .h1 = static_cast<uint8_t>(i + 1), .hs = 1, .w0 = 0, .w1 = 32, .ws = 1})
+                           << ENDL();
+                });
+            }
+            // In the very first iteration, we read 2 tiles, so we need to print the second tile in the CB as well if
+            // needed
+            if (count == 1) {
+                for (uint8_t i = 0; i < 32; ++i) {
+                    UNPACK({
+                        DPRINT
+                            << "count: " << ((uint)count) << ":: "
+                            << TileSlice(
+                                   input_ind_cb_index,
+                                   1,
+                                   SliceRange{
+                                       .h0 = i, .h1 = static_cast<uint8_t>(i + 1), .hs = 1, .w0 = 0, .w1 = 32, .ws = 1})
+                            << ENDL();
+                    });
+                }
+            }
             read_cb_and_transpose(input_ind_cb_index, 2, (2 == input_take));
             pack_reconfig_data_format(transposed_val_cb_index);
             pack_tile(0, transposed_val_cb_index);
@@ -131,6 +162,15 @@ void MAIN {
             pack_tile(2, transposed_ind_cb_index);
             if (input_take == 2) {
                 pack_tile(3, transposed_ind_cb_index);
+            }
+
+            // Print the contents of the DEST register (2) after packing transposed index tile
+            MATH({ DPRINT << "ht: " << ht << " count: " << count << ENDL(); });
+            dprint_tensix_dest_reg(2);
+            // In the very first iteration, we read 2 tiles, so we need to print the second tile in the DEST register
+            // (3) as well if needed
+            if (input_take == 2) {
+                dprint_tensix_dest_reg(3);
             }
 
             release_dst();
