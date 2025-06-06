@@ -753,6 +753,14 @@ def test_llama_TG_perf_device_non_overlapped_dispatch(
     dispatch_duration_per_instance_min_dict = min_per_instance_dict(dispatch_duration_per_instance_dict)
     dispatch_duration_per_instance_max_dict = max_per_instance_dict(dispatch_duration_per_instance_dict)
 
+    for op_code_with_id in dispatch_duration_per_instance_averaged_dict:
+        time = dispatch_duration_per_instance_averaged_dict[op_code_with_id]
+        for c, op in enumerate(dispatch_duration_per_instance_dict[op_code_with_id]):
+            if op > time * 2.0:
+                print(
+                    f"Warning: {op_code_with_id} instance {c} has a dispatch time of {op} ns, which is more than double the average {time} ns. This may indicate an issue with the dispatch time calculation."
+                )
+
     print(f"dispatch_duration_per_instance_averaged_dict: {dispatch_duration_per_instance_averaged_dict}")
 
     # Build dicts of op_code to list of durations
