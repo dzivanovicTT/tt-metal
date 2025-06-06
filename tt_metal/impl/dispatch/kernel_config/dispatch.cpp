@@ -196,8 +196,8 @@ void DispatchKernel::GenerateStaticConfigs() {
     } else {
         TT_FATAL(false, "DispatchKernel must be one of (or both) H and D variants");
     }
-        static_config_.scratch_buffer = 
-            my_dispatch_constants.get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
+    static_config_.scratch_buffer =
+        my_dispatch_constants.get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
 }
 
 void DispatchKernel::GenerateDependentConfigs() {
