@@ -2318,6 +2318,9 @@ void configure_for_single_chip(
         MetalContext::instance()
             .dispatch_mem_map(DISPATCH_CORE_TYPE)
             .get_device_command_queue_addr(CommandQueueDeviceAddrType::COMPLETION_Q_RD);
+    const uint32_t scratch_buffer_ptr = MetalContext::instance()
+                                                .dispatch_mem_map(DISPATCH_CORE_TYPE)
+                                                .get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
 
     std::vector<uint32_t> dispatch_compile_args = {
         dispatch_buffer_base,
@@ -2362,6 +2365,7 @@ void configure_for_single_chip(
         0,  // unused for single device - used to "virtualize" the number of eth cores across devices
         0,  // unused for single device - used to "virtualize" the number of eth cores across devices
         0,  // unused for single device - used to "virtualize" the number of eth cores across devices
+        scratch_buffer_ptr,
     };
 
     CoreCoord phys_upstream_from_dispatch_core = split_prefetcher_g ? phys_prefetch_d_core : phys_prefetch_core_g;
@@ -3205,6 +3209,9 @@ void configure_for_multi_chip(
         MetalContext::instance()
             .dispatch_mem_map(DISPATCH_CORE_TYPE)
             .get_device_command_queue_addr(CommandQueueDeviceAddrType::COMPLETION_Q_RD);
+    const uint32_t scratch_buffer_ptr = MetalContext::instance()
+                                                .dispatch_mem_map(DISPATCH_CORE_TYPE)
+                                                .get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
     std::vector<uint32_t> dispatch_compile_args = {
         dispatch_buffer_base,
         DispatchSettings::DISPATCH_BUFFER_LOG_PAGE_SIZE,
@@ -3235,7 +3242,20 @@ void configure_for_multi_chip(
         0,
         host_completion_queue_wr_ptr,
         dev_completion_queue_wr_ptr,
-        dev_completion_queue_rd_ptr};
+        dev_completion_queue_rd_ptr,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        MetalContext::instance().dispatch_mem_map(DISPATCH_CORE_TYPE).get_dispatch_stream_index(0),
+        0,  // unused for single device - used to "virtualize" the number of eth cores across devices
+        0,  // unused for single device - used to "virtualize" the number of eth cores across devices
+        0,  // unused for single device - used to "virtualize" the number of eth cores across devices
+        scratch_buffer_ptr,
+    };
 
     CoreCoord phys_upstream_from_dispatch_core = split_prefetcher_g ? phys_prefetch_d_core : phys_prefetch_core_g;
     if (split_dispatcher_g) {

@@ -47,6 +47,8 @@ struct dispatch_static_config_t {
     std::optional<uint32_t> dev_completion_q_wr_ptr;
     std::optional<uint32_t> dev_completion_q_rd_ptr;
 
+    std::optional<uint32_t> scratch_buffer;
+
     std::optional<bool> is_d_variant;
     std::optional<bool> is_h_variant;
 

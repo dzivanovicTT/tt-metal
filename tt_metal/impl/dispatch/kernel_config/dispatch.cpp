@@ -196,6 +196,8 @@ void DispatchKernel::GenerateStaticConfigs() {
     } else {
         TT_FATAL(false, "DispatchKernel must be one of (or both) H and D variants");
     }
+        static_config_.scratch_buffer = 
+            my_dispatch_constants.get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
 }
 
 void DispatchKernel::GenerateDependentConfigs() {
@@ -414,10 +416,12 @@ void DispatchKernel::CreateKernel() {
         num_virtual_active_eth_cores,
         num_physical_active_eth_cores,
 
+        static_config_.scratch_buffer.value(),
+
         static_config_.is_d_variant.value(),
         static_config_.is_h_variant.value(),
     };
-    TT_ASSERT(compile_args.size() == 42);
+    TT_ASSERT(compile_args.size() == 43);
     auto my_virtual_core = get_virtual_core_coord(logical_core_, GetCoreType());
     auto upstream_virtual_core = get_virtual_core_coord(dependent_config_.upstream_logical_core.value(), GetCoreType());
     auto downstream_virtual_core =

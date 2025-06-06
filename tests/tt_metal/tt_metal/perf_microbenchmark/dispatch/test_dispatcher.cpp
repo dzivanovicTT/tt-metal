@@ -565,6 +565,10 @@ int main(int argc, char** argv) {
             MetalContext::instance()
                 .dispatch_mem_map(CoreType::WORKER)
                 .get_device_command_queue_addr(CommandQueueDeviceAddrType::COMPLETION_Q_RD);
+        const uint32_t scratch_buffer_ptr =
+            MetalContext::instance()
+                .dispatch_mem_map(CoreType::WORKER)
+                .get_device_command_queue_addr(CommandQueueDeviceAddrType::SCRATCH_BUFFER);
 
         std::vector<uint32_t> dispatch_compile_args = {
             l1_buf_base,
@@ -608,6 +612,7 @@ int main(int argc, char** argv) {
             0,     // unused for single device - used to "virtualize" the number of eth cores across devices
             0,     // unused for single device - used to "virtualize" the number of eth cores across devices
             0,     // unused for single device - used to "virtualize" the number of eth cores across devices
+            scratch_buffer_ptr,
             true,  // is_dram_variant
             true,  // is_host_variant
         };
