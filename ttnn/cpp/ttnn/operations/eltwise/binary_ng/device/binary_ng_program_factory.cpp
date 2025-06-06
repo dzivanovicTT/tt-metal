@@ -609,7 +609,9 @@ BinaryNgDeviceOperation::ProgramFactory::cached_program_t BinaryNgDeviceOperatio
     auto writer_defines = make_dataflow_defines(b_dtype, is_sfpu_op);
     writer_defines["SRC_SHARDED"] = b_sharded ? "1" : "0";
     writer_defines["DST_SHARDED"] = c_sharded ? "1" : "0";
-
+    for (const auto& [key, value] : writer_defines) {
+        std::cout << "writer_defines[" << key << "] = " << value << std::endl;
+    }
     // overwrite reader and write kernel names for the following specific case
     // so that reader reads of both and b and writer does not read b
     if (b.has_value() && operation_attributes.subtile_broadcast_type == SubtileBroadcastType::NONE) {

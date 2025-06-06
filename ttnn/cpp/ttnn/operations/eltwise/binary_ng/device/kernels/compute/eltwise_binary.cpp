@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
+// SPDX-FileCopyrightText: © 2024 Tenstorrent AI ULC
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -36,6 +36,8 @@ ALWI void process_tile(
 
     PREPROCESS(BCAST_OP, CB_PRE_BCAST, CB_POST_BCAST, cb_out, num_tiles_per_cycle);
     cb_wait_front(CB_POST_BCAST, num_tiles_per_cycle);
+    DPRINT << "comppute bcast" << ENDL();
+    DPRINT << TSLICE(tt::CBIndex::c_1, 0, SliceRange::h0_w0_32()) << ENDL();
 
     for (uint32_t j = tile_start; j < freq; ++j) {
         PREPROCESS(OTHER_OP, CB_PRE_OTHER, CB_POST_OTHER, cb_out, num_tiles_per_cycle);
