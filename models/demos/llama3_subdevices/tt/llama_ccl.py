@@ -52,7 +52,7 @@ class TT_CCL:
                             [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(2)]
                         )
                         self.reduce_semaphore_handles[i].append(
-                            [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(3)]
+                            [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(12)]
                         )
 
                     else:
@@ -626,13 +626,18 @@ class TT_CCL:
         seqlen = input_tensor_mesh.shape[-2]
         persistent_buffers = self.persistent_buffers[seqlen].get(buffer_key, None)
         print("RING REDUCE SCATTER: ", input_tensor_mesh.shape)
+        if seqlen == 128:
+            num_links = 1
+        num_semaphores = 3 * num_links
         ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor=input_tensor_mesh,
             persistent_intermediate_buffer=persistent_buffers[1],
             persistent_output_buffer=persistent_buffers[2],
             dim=dim,
-            multi_device_global_semaphore=self.reduce_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]],
-            num_links=1,
+            multi_device_global_semaphore=self.reduce_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]][
+                :num_semaphores
+            ],
+            num_links=num_links,
             memory_config=memory_config,
             topology=ttnn.Topology.Ring,
             subdevice_id=self.worker_sub_device_id,
@@ -721,13 +726,15 @@ class TT_CCL:
 
         # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         print("RING ALL GATHER: ", input_tensor_mesh.shape)
+        if seqlen == 128:
+            num_links = 1
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor=input_tensor_mesh,
             persistent_intermediate_buffer=persistent_buffers["intermediate"],
             persistent_output_buffer=persistent_buffers["output"],
             dim=dim,
             multi_device_global_semaphore=self.gather_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]],
-            num_links=1,
+            num_links=num_links,
             memory_config=memory_config,
             topology=ttnn.Topology.Ring,
             subdevice_id=self.worker_sub_device_id,
