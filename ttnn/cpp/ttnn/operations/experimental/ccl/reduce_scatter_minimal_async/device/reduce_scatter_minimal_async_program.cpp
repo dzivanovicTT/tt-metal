@@ -294,7 +294,13 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
             semaphore.at(1 + link * 3).address(),     // out_ready_bwd_semaphore
             semaphore.at(2 + link * 3).address(),     // batch_ready_semaphore
             link,
-            num_links};
+            num_links,
+            pages_read_in_row,
+            row_offset,
+            tiles_read,
+            tiles_to_read,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         writer_rt_args.push_back(forward_device.has_value());
         if (forward_device.has_value()) {
             tt::tt_fabric::append_fabric_connection_rt_args(

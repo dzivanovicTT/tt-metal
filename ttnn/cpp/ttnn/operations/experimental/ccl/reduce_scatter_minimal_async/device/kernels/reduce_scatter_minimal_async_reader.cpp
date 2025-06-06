@@ -31,6 +31,9 @@ constexpr uint32_t num_batches = get_compile_time_arg_val(11);
 constexpr uint32_t fuse_op = get_compile_time_arg_val(12);
 constexpr uint32_t contig_pages_advanced = get_compile_time_arg_val(13);
 
+constexpr uint32_t stride_Wt = input_tensor_Wt;
+constexpr uint32_t slice_Wt = input_tensor_Wt / ring_size;
+
 constexpr uint32_t N_DRAM_BANKS = 12;
 constexpr uint32_t my_chip_id_x = my_chip_id % N_DRAM_BANKS;
 constexpr uint32_t my_chip_id_y = my_chip_id / N_DRAM_BANKS;
@@ -53,8 +56,6 @@ void kernel_main() {
     // uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
     // uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
 
-    constexpr uint32_t stride_Wt = input_tensor_Wt;
-    constexpr uint32_t slice_Wt = input_tensor_Wt / ring_size;
     uint32_t pages_read_in_row_0 = get_arg_val<uint32_t>(arg_idx++);
     uint32_t row_offset_0 = get_arg_val<uint32_t>(arg_idx++);
     uint32_t tiles_read_0 = get_arg_val<uint32_t>(arg_idx++);
@@ -113,8 +114,6 @@ void kernel_main() {
             const bool do_reduce = i != 0;
             uint32_t cb_in0 = do_reduce ? cb_input_id : cb_reader_output_id;
 
-            uint32_t actual_fwd_slice_id = (fwd_slice_id + ring_size) % ring_size;
-            uint32_t actual_bwd_slice_id = bwd_slice_id % ring_size;
             actual_fwd_slice_id_x = (actual_fwd_slice_id_x == 0) ? ring_size - 1 : actual_fwd_slice_id_x - 1;
             actual_bwd_slice_id_x = (actual_bwd_slice_id_x == ring_size - 1) ? 0 : actual_bwd_slice_id_x + 1;
 
@@ -132,10 +131,8 @@ void kernel_main() {
                 intermediate_packet_id_bwd_y++;
             }
 
-            uint32_t fwd_input_tile_id_start = actual_fwd_slice_id * slice_Wt + batch_offset;
-            uint32_t fwd_intermediate_tile_id_start = actual_fwd_slice_id * slice_Wt;
-            uint32_t bwd_input_tile_id_start = actual_bwd_slice_id * slice_Wt + batch_offset;
-            uint32_t bwd_intermediate_tile_id_start = actual_bwd_slice_id * slice_Wt;
+            uint32_t fwd_input_tile_id_start = actual_fwd_slice_id_x * slice_Wt + batch_offset;
+            uint32_t bwd_input_tile_id_start = actual_bwd_slice_id_x * slice_Wt + batch_offset;
 
             uint32_t pages_read_in_row = pages_read_in_row_0;
             uint32_t row_offset = row_offset_0;
@@ -205,7 +202,6 @@ void kernel_main() {
                         noc_async_read(packet_addr, intermediate_l1_write_addr, payload_size_bytes);
                         intermediate_l1_write_addr += payload_size_bytes;
 
-                        // TODO: this is not ok
                         intermediate_packet_id_fwd_x += ring_size;
                         intermediate_packet_id_bwd_x += ring_size;
                         if (intermediate_packet_id_fwd_x >= N_DRAM_BANKS) {
