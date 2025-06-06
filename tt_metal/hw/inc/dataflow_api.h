@@ -1209,6 +1209,33 @@ inline void noc_async_write_multicast(
     }
 }
 
+template <uint32_t max_page_size = NOC_MAX_BURST_SIZE + 1>
+inline void noc_async_write_multicast_posted(
+    std::uint32_t src_local_l1_addr,
+    std::uint64_t dst_noc_addr_multicast,
+    std::uint32_t size,
+    std::uint32_t num_dests,
+    bool linked = false,
+    uint8_t noc = noc_index) {
+    constexpr bool multicast_path_reserve = true;
+    WAYPOINT("NMWW");
+    DEBUG_SANITIZE_NOC_MULTI_WRITE_TRANSACTION(noc, dst_noc_addr_multicast, src_local_l1_addr, size);
+    RECORD_NOC_EVENT_WITH_ADDR(NocEventType::WRITE_MULTICAST, dst_noc_addr_multicast, size, NOC_MULTICAST_WRITE_VC);
+    ncrisc_noc_fast_write_any_len<noc_mode>(
+        noc,
+        write_cmd_buf,
+        src_local_l1_addr,
+        dst_noc_addr_multicast,
+        size,
+        NOC_MULTICAST_WRITE_VC,
+        true,
+        linked,
+        num_dests,
+        multicast_path_reserve,
+        true);  // posted flag
+    WAYPOINT("NMWD");
+}
+
 // clang-format off
 /**
  * Initiates an asynchronous write from a source address in L1 memory on the
