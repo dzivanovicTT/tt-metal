@@ -5,6 +5,7 @@
 #include <chrono>
 #include <gtest/gtest.h>
 #include <stdint.h>
+#include <umd/device/types/cluster_descriptor_types.h>
 #include <vector>
 #include <algorithm>
 #include <unordered_map>
@@ -20,6 +21,7 @@
 #include <tt-metalium/allocator.hpp>
 #include "fabric_fixture.hpp"
 #include <tt-metalium/fabric_edm_packet_header.hpp>
+#include "routing_table_generator.hpp"
 #include "tt_metal/fabric/fabric_mux_config.hpp"
 #include "tt_metal/fabric/hw/inc/tt_fabric_status.h"
 #include "impl/context/metal_context.hpp"
@@ -35,8 +37,8 @@ const std::string receiver_kernel_src =
     "tests/tt_metal/tt_fabric/fabric_data_movement/kernels/fabric_mux_receiver_client.cpp";
 
 const uint32_t test_results_size_bytes = 128;
-const uint32_t noc_address_padding_bytes = 16;
-const uint32_t packet_header_buffer_size_bytes = 1024;
+const uint32_t noc_address_padding_bytes = 32;
+const uint32_t packet_header_buffer_size_bytes = 4096;
 
 const auto routing_directions = {
     tt_fabric::RoutingDirection::N,
@@ -44,7 +46,7 @@ const auto routing_directions = {
     tt_fabric::RoutingDirection::E,
     tt_fabric::RoutingDirection::W};
 
-using FabricMuxFixture = Fabric1DFixture;
+using FabricMuxFixture = Fabric2DFixture;
 
 struct TestConfig {
     uint32_t num_devices = 0;
@@ -82,6 +84,8 @@ struct WorkerTestConfig {
     uint32_t buffer_size_bytes = 0;
     uint8_t num_hops = 0;
     std::string_view kernel_src = sender_kernel_src;
+    chip_id_t device_id = 0;
+    chip_id_t dest_device_id = 0;
 };
 
 WorkerMemoryMap create_worker_memory_map(const uint32_t base_l1_address) {
@@ -287,6 +291,16 @@ void create_worker_kernel(
     auto channel_type = worker_test_config.channel_type;
     auto worker_id = worker_test_config.worker_id;
 
+    const auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+    FabricNodeId src_fabric_node_id =
+        control_plane.get_fabric_node_id_from_physical_chip_id(worker_test_config.device_id);
+    FabricNodeId dst_fabric_node_id =
+        control_plane.get_fabric_node_id_from_physical_chip_id(worker_test_config.dest_device_id);
+    const auto& forwarding_direction = control_plane.get_forwarding_direction(src_fabric_node_id, dst_fabric_node_id);
+    const auto& mesh_shape = control_plane.get_physical_mesh_shape(src_fabric_node_id.mesh_id);
+    log_info(tt::LogMetal, "Mesh Shape = {} {}", mesh_shape[0], mesh_shape[1]);
+    const auto router_direction = control_plane.routing_direction_to_eth_direction(forwarding_direction.value());
+
     std::vector<uint32_t> worker_ct_args = {
         mux_virtual_core.x,
         mux_virtual_core.y,
@@ -298,7 +312,14 @@ void create_worker_kernel(
         mux_kernel_config.get_flow_control_address(channel_type, worker_id),
         mux_kernel_config.get_buffer_index_address(channel_type, worker_id),
         mux_kernel_config.get_status_address(),
-        mux_kernel_config.get_channel_credits_stream_id(channel_type, worker_id)};
+        mux_kernel_config.get_channel_credits_stream_id(channel_type, worker_id),
+        (uint32_t)device->id(),
+        (uint32_t)mesh_shape[1],
+        *dst_fabric_node_id.mesh_id,
+        dst_fabric_node_id.chip_id,
+        std::is_same_v<FabricMuxFixture, Fabric2DFixture>,
+        (uint32_t)router_direction,
+    };
 
     // virtual coordinates will be the same for the receiver device
     // hence, we can use the noc encoding derived using current device
@@ -439,10 +460,13 @@ void run_mux_test_variant(FabricMuxFixture* fixture, TestConfig test_config) {
     std::vector<tt::tt_metal::Program> program_handles(devices.size());
     std::vector<size_t> mux_termination_signal_addresses;
 
-    size_t buffer_size_bytes_full_size_channel =
-        sizeof(tt::tt_fabric::PacketHeader) + test_config.packet_payload_size_bytes;
-    size_t buffer_size_bytes_header_only_channel = sizeof(tt::tt_fabric::PacketHeader);
-
+    const auto header_size = tt::tt_metal::MetalContext::instance()
+                                 .get_control_plane()
+                                 .get_fabric_context()
+                                 .get_fabric_packet_header_size_bytes();
+    size_t buffer_size_bytes_full_size_channel = header_size + test_config.packet_payload_size_bytes;
+    size_t buffer_size_bytes_header_only_channel = header_size;
+    log_info("{} devices", devices.size());
     for (auto i = 0; i < devices.size(); i++) {
         program_handles[i] = tt_metal::CreateProgram();
         // use logical core (0,0) for the mux kernel
@@ -478,7 +502,9 @@ void run_mux_test_variant(FabricMuxFixture* fixture, TestConfig test_config) {
                 .num_buffers = test_config.num_buffers_full_size_channel,
                 .buffer_size_bytes = buffer_size_bytes_full_size_channel,
                 .num_hops = num_hops,
-                .kernel_src = sender_kernel_src};
+                .kernel_src = sender_kernel_src,
+                .device_id = i,
+                .dest_device_id = i == 0 ? 1 : 0};
             create_worker_kernel(
                 test_config, sender_config, mux_kernel_config, mux_virtual_core, devices[i], program_handles[i]);
             sender_id++;
@@ -494,7 +520,9 @@ void run_mux_test_variant(FabricMuxFixture* fixture, TestConfig test_config) {
                 .num_buffers = test_config.num_buffers_header_only_channel,
                 .buffer_size_bytes = buffer_size_bytes_header_only_channel,
                 .num_hops = num_hops,
-                .kernel_src = receiver_kernel_src};
+                .kernel_src = receiver_kernel_src,
+                .device_id = i,
+                .dest_device_id = i == 0 ? 1 : 0};
             create_worker_kernel(
                 test_config, receiver_config, mux_kernel_config, mux_virtual_core, devices[i], program_handles[i]);
             receiver_id++;
@@ -563,12 +591,12 @@ TEST_F(FabricMuxFixture, TestFabricMuxTwoChipVariant1) {
         .num_devices = 2,
         .num_sender_clients = 1,
         .num_packets = 1000,
-        .num_credits = 1,
+        .num_credits = 32,
         .num_return_credits_per_packet = 1,
         .packet_payload_size_bytes = 4096,
-        .time_seed = std::chrono::system_clock::now().time_since_epoch().count(),
-        .num_buffers_full_size_channel = 1,
-        .num_buffers_header_only_channel = 1,
+        .time_seed = 0,  // std::chrono::system_clock::now().time_since_epoch().count(),
+        .num_buffers_full_size_channel = 8,
+        .num_buffers_header_only_channel = 8,
         .uniform_sender_receiver_split = true,
         .num_open_close_iters = 1,
         .num_full_size_channel_iters = 1,

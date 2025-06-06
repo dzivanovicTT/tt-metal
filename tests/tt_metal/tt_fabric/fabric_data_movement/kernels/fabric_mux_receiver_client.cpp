@@ -8,6 +8,7 @@
 #include "debug/dprint.h"
 #include "tt_metal/api/tt-metalium/fabric_edm_packet_header.hpp"
 #include "tt_metal/fabric/hw/inc/tt_fabric.h" // zero_l1_buf
+#include "tt_metal/fabric/hw/inc/tt_fabric_api.h" // zero_l1_buf
 #include "tests/tt_metal/tt_metal/perf_microbenchmark/routing/kernels/tt_fabric_traffic_gen.hpp"
 #include "tt_metal/fabric/hw/inc/tt_fabric_status.h"
 #include "tt_metal/fabric/hw/inc/tt_fabric_mux_interface.hpp"
@@ -24,6 +25,12 @@ constexpr size_t fabric_mux_flow_control_address = get_compile_time_arg_val(7);
 constexpr size_t fabric_mux_buffer_index_address = get_compile_time_arg_val(8);
 constexpr size_t fabric_mux_status_address = get_compile_time_arg_val(9);
 constexpr uint8_t fabric_mux_channel_id = get_compile_time_arg_val(10);
+constexpr uint8_t my_dev_id = get_compile_time_arg_val(11);
+constexpr uint8_t ew_dim = get_compile_time_arg_val(12);
+constexpr uint8_t to_mesh_id = get_compile_time_arg_val(13);
+constexpr uint8_t to_dev_id = get_compile_time_arg_val(14);
+constexpr bool is_2d_fabric = static_cast<bool>(get_compile_time_arg_val(15));
+constexpr uint32_t direction = get_compile_time_arg_val(16);
 
 void kernel_main() {
     uint32_t rt_args_idx = 0;
@@ -64,11 +71,25 @@ void kernel_main() {
         fabric_mux_buffer_index_address,
         local_flow_control_address,
         local_teardown_address,
-        local_buffer_index_address);
+        local_buffer_index_address,
+        direction);
 
     uint64_t noc_dest_addr = get_noc_addr_helper(sender_noc_xy_encoding, credit_handshake_address);
     auto packet_header = reinterpret_cast<volatile tt_l1_ptr PACKET_HEADER_TYPE*>(packet_header_buffer_address);
-    packet_header->to_chip_unicast(static_cast<uint8_t>(num_hops));
+    if constexpr (is_2d_fabric) {
+        tt::tt_fabric::fabric_set_unicast_route(
+            (tt::tt_fabric::LowLatencyMeshPacketHeader*)packet_header_buffer_address,
+            (eth_chan_directions)mux_connection_handle.direction,
+            my_dev_id,
+            to_dev_id,
+            to_mesh_id,
+            ew_dim);
+        DPRINT << "Receiver My Device " << (uint32_t)my_dev_id << " Destination Dev " << (uint32_t)to_dev_id << " Mesh "
+               << (uint32_t)to_mesh_id << " ew_dim " << (uint32_t)ew_dim << " direction " << (uint32_t)direction
+               << ENDL();
+    } else {
+        packet_header->to_chip_unicast(static_cast<uint8_t>(num_hops));
+    }
 
     auto base_payload_start_ptr = reinterpret_cast<tt_l1_ptr uint32_t*>(base_l1_target_address);
     auto base_poll_ptr =

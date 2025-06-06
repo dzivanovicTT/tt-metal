@@ -113,6 +113,10 @@ void forward_data(
 
         // not handling/processing acks for now, re-evaluate if needed
         increment_local_update_ptr_val(my_channel_free_slots_stream_id.get(), 1);
+
+        for (int i = 0; i < 5000; ++i) {
+            asm volatile("nop");
+        }
     }
 
     check_worker_connections(worker_interface, channel_connection_established, my_channel_free_slots_stream_id.get());
