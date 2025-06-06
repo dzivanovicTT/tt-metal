@@ -34,7 +34,6 @@ void kernel_main() {
     ///////////////////////////////////////////////////
     // ARGS
     ///////////////////////////////////////////////////
-    DPRINT << "HELLO READER : in op\n";
     uint32_t arg_idx = 0;
     // Load the input tensor spec
     address_t input_tensor_address = get_arg_val<address_t>(arg_idx++);
@@ -46,22 +45,22 @@ void kernel_main() {
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_arg_val<uint32_t>(arg_idx++);
 
-    // all args, we can only print uint32_t
-    DPRINT << "Reader: " << "input_tensor_address: " << (uint32_t)input_tensor_address << "\n";
-    DPRINT << "Reader: " << "input_tensor_Wt: " << (uint32_t)input_tensor_Wt << "\n";
-    DPRINT << "Reader: " << "input_tile_id_start: " << (uint32_t)input_tile_id_start << "\n";
-    DPRINT << "Reader: " << "input_tile_id_end: " << (uint32_t)input_tile_id_end << "\n";
-    DPRINT << "Reader: " << "ring_size: " << (uint32_t)ring_size << "\n";
-    DPRINT << "Reader: " << "out_ready_sem: " << (uint32_t)out_ready_sem << "\n";
+    // // all args, we can only print uint32_t
+    // DPRINT << "Reader: " << "input_tensor_address: " << (uint32_t)input_tensor_address << "\n";
+    // DPRINT << "Reader: " << "input_tensor_Wt: " << (uint32_t)input_tensor_Wt << "\n";
+    // DPRINT << "Reader: " << "input_tile_id_start: " << (uint32_t)input_tile_id_start << "\n";
+    // DPRINT << "Reader: " << "input_tile_id_end: " << (uint32_t)input_tile_id_end << "\n";
+    // DPRINT << "Reader: " << "ring_size: " << (uint32_t)ring_size << "\n";
+    // DPRINT << "Reader: " << "out_ready_sem: " << (uint32_t)out_ready_sem << "\n";
 
-    // // compile time
-    DPRINT << "Reader: " << "my_chip_id: " << (uint32_t)my_chip_id << "\n";
-    DPRINT << "Reader: " << "cb_output_id: " << (uint32_t)cb_output_id << "\n";
-    DPRINT << "Reader: " << "packet_size_in_pages: " << (uint32_t)packet_size_in_pages << "\n";
-    DPRINT << "Reader: " << "input_tensor_page_size: " << (uint32_t)input_tensor_page_size << "\n";
-    DPRINT << "Reader: " << "num_targets_forward_direction: " << (uint32_t)num_targets_forward_direction << "\n";
-    DPRINT << "Reader: " << "num_targets_backward_direction: " << (uint32_t)num_targets_backward_direction << "\n";
-    DPRINT << "Reader: " << "contig_pages_advanced: " << (uint32_t)contig_pages_advanced << "\n";
+    // // // compile time
+    // DPRINT << "Reader: " << "my_chip_id: " << (uint32_t)my_chip_id << "\n";
+    // DPRINT << "Reader: " << "cb_output_id: " << (uint32_t)cb_output_id << "\n";
+    // DPRINT << "Reader: " << "packet_size_in_pages: " << (uint32_t)packet_size_in_pages << "\n";
+    // DPRINT << "Reader: " << "input_tensor_page_size: " << (uint32_t)input_tensor_page_size << "\n";
+    // DPRINT << "Reader: " << "num_targets_forward_direction: " << (uint32_t)num_targets_forward_direction << "\n";
+    // DPRINT << "Reader: " << "num_targets_backward_direction: " << (uint32_t)num_targets_backward_direction << "\n";
+    // DPRINT << "Reader: " << "contig_pages_advanced: " << (uint32_t)contig_pages_advanced << "\n";
 
     OpSignaler op_signaler;
     if constexpr (fuse_op) {
@@ -91,7 +90,6 @@ void kernel_main() {
         noc_async_read_barrier();
         cb_push_back(cb_output_id, num_pages_to_read);
     }
-    DPRINT << "READER: Direction: " << (uint32_t)direction << " " << " , done with local slice.\n";
     constexpr bool output_tensor_is_dram = output_buffer_type == tt::tt_metal::BufferType::DRAM;
     auto output_tensor_addrgen = InterleavedAddrGenFast<output_tensor_is_dram>{
         .bank_base_address = output_tensor_address,
@@ -185,7 +183,6 @@ void kernel_main() {
                 cb_push_back(cb_output_id, num_pages_to_read);
             }
         }
-        DPRINT << "READER: Direction: " << (uint32_t)direction << " " << "done with slice.\n";
     }
 
     const uint64_t dest_noc_addr = get_noc_addr(my_x[0], my_y[0], out_ready_sem);

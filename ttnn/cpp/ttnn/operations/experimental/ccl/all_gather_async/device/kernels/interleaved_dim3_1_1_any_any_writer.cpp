@@ -39,7 +39,6 @@ void kernel_main() {
     ///////////////////////////////////////////////////
     // ARGS
     ///////////////////////////////////////////////////
-
     uint32_t arg_idx = 0;
     address_t output_address = get_arg_val<address_t>(arg_idx++);
     uint32_t input_tensor_Wt = get_arg_val<uint32_t>(arg_idx++);
@@ -50,27 +49,24 @@ void kernel_main() {
     const uint8_t out_ready_sem_noc0_y = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t num_links = get_arg_val<uint32_t>(arg_idx++);
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
+    // DPRINT << "Writer: " << "output_address: " << (uint32_t)output_address << "\n";
+    // DPRINT << "Writer: " << "input_tensor_Wt: " << (uint32_t)input_tensor_Wt << "\n";
+    // DPRINT << "Writer: " << "output_tensor_Wt: " << (uint32_t)output_tensor_Wt << "\n";
+    // DPRINT << "Writer: " << "input_tile_id_start: " << (uint32_t)input_tile_id_start << "\n";
+    // DPRINT << "Writer: " << "input_tile_id_end: " << (uint32_t)input_tile_id_end << "\n";
+    // DPRINT << "Writer: " << "out_ready_sem: " << (uint32_t)out_ready_sem << "\n";
+    // DPRINT << "Writer: " << "out_ready_sem_noc0_x: " << (uint32_t)out_ready_sem_noc0_x << "\n";
+    // DPRINT << "Writer: " << "out_ready_sem_noc0_y: " << (uint32_t)out_ready_sem_noc0_y << "\n";
 
-    DPRINT << "Writer: " << "output_address: " << (uint32_t)output_address << "\n";
-    DPRINT << "Writer: " << "input_tensor_Wt: " << (uint32_t)input_tensor_Wt << "\n";
-    DPRINT << "Writer: " << "output_tensor_Wt: " << (uint32_t)output_tensor_Wt << "\n";
-    DPRINT << "Writer: " << "input_tile_id_start: " << (uint32_t)input_tile_id_start << "\n";
-    DPRINT << "Writer: " << "input_tile_id_end: " << (uint32_t)input_tile_id_end << "\n";
-    DPRINT << "Writer: " << "out_ready_sem: " << (uint32_t)out_ready_sem << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_noc0_x: " << (uint32_t)out_ready_sem_noc0_x << "\n";
-    DPRINT << "Writer: " << "out_ready_sem_noc0_y: " << (uint32_t)out_ready_sem_noc0_y << "\n";
-
-    // compile time
-    DPRINT << "Writer: " << "my_chip_id: " << (uint32_t)my_chip_id << "\n";
-    DPRINT << "Writer: " << "cb_output_id: " << (uint32_t)cb_output_id << "\n";
-    DPRINT << "Writer: " << "packet_size_in_pages: " << (uint32_t)packet_size_in_pages << "\n";
-    DPRINT << "Writer: " << "num_targets_forward_direction: " << (uint32_t)num_targets_forward_direction << "\n";
-    DPRINT << "Writer: " << "num_targets_backward_direction: " << (uint32_t)num_targets_backward_direction << "\n";
-    DPRINT << "Writer: " << "contig_pages_advanced: " << (uint32_t)contig_pages_advanced << "\n";
+    // // compile time
+    // DPRINT << "Writer: " << "my_chip_id: " << (uint32_t)my_chip_id << "\n";
+    // DPRINT << "Writer: " << "cb_output_id: " << (uint32_t)cb_output_id << "\n";
+    // DPRINT << "Writer: " << "packet_size_in_pages: " << (uint32_t)packet_size_in_pages << "\n";
+    // DPRINT << "Writer: " << "num_targets_forward_direction: " << (uint32_t)num_targets_forward_direction << "\n";
+    // DPRINT << "Writer: " << "num_targets_backward_direction: " << (uint32_t)num_targets_backward_direction << "\n";
+    // DPRINT << "Writer: " << "contig_pages_advanced: " << (uint32_t)contig_pages_advanced << "\n";
 
     /* Args for overlapped all gather */
     OpSignaler op_signaler_sender;
@@ -79,7 +75,6 @@ void kernel_main() {
         arg_idx = arg_for_fab;
         op_signaler_sender = OpSignaler(arg_idx);
     }
-
     // packet header cb
     cb_reserve_back(reserved_packet_header_cb_id, 1);
     auto packet_header_buffer_addr = get_write_ptr(reserved_packet_header_cb_id);
@@ -87,7 +82,6 @@ void kernel_main() {
     cb_reserve_back(reserved_packet_header_cb_id, 1);
     auto packet_header_buffer_seminc = get_write_ptr(reserved_packet_header_cb_id);
     cb_push_back(reserved_packet_header_cb_id, 1);
-
     // pre-populate packet headers
     volatile PACKET_HEADER_TYPE* pkt_hdr = reinterpret_cast<volatile PACKET_HEADER_TYPE*>(packet_header_buffer_addr);
     pkt_hdr->to_chip_unicast(1);
@@ -101,7 +95,6 @@ void kernel_main() {
     fabric_connection.open();
 
     uint32_t slice_writes = 0;
-
     // Write out the local slice to both DRAM and forward and backward
     uint32_t pages_read_in_row = input_tile_id_start % input_tensor_Wt;
     uint32_t row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
@@ -149,8 +142,6 @@ void kernel_main() {
         }
         cb_pop_front(cb_output_id, num_pages_to_read);
     }
-    DPRINT << "WRITER: Direction: " << (uint32_t)direction << ", link " << (uint32_t)link
-           << " , done with local slice.\n";
 
     // 2. unicast output ready semaphore
     uint64_t out_ready_sem_noc_addr_in_pkt =
@@ -220,7 +211,7 @@ void kernel_main() {
         }
         uint32_t tiles_read = input_tile_id_start;
         uint32_t tiles_to_read = input_tile_id_end;
-        uint32_t tile_id_start = actual_slice_chip_id * input_tensor_Wt + link * input_tensor_Wt / num_links;
+        uint32_t tile_id_start = actual_slice_chip_id * input_tensor_Wt;
         uint32_t row_offset = (input_tile_id_start / input_tensor_Wt) * output_tensor_Wt;
         uint32_t pages_read_in_row = (input_tile_id_start % input_tensor_Wt);
         uint32_t slice_Wt = input_tensor_Wt;
@@ -271,12 +262,9 @@ void kernel_main() {
                 packet_header_buffer_seminc, sizeof(PACKET_HEADER_TYPE));
         }
         slice_writes++;
-        DPRINT << "WRITER: Direction: " << (uint32_t)direction << ", link " << (uint32_t)link
-               << " , done with slice.\n";
     }
 
     fabric_connection.close();
 
     noc_async_write_barrier();
-    DPRINT << "Done WRITER.\n";
 }
