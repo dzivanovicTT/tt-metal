@@ -222,7 +222,9 @@ def test_2d_topk(device, dim1, dim2, dim, k, largest, dtype):
     torch_dtype = torch.bfloat16
 
     input = torch.randn(shape, dtype=torch_dtype) * 0.9
-
+    # Make every 256th element as 10,000
+    for i in range(256, input.numel(), 256):
+        input[0][i] = 10000
     pyt_topk_values, pyt_topk_indices = torch.topk(input, k, dim=dim, largest=largest, sorted=True)
 
     ttnn_input = ttnn.from_torch(input, dtype, layout=ttnn.Layout.TILE, device=device)
