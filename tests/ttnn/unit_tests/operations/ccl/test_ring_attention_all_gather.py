@@ -91,20 +91,6 @@ def run_ring_attention_all_gather_impl(
 
     ### Create persistent output buffers
     logger.info("Creating persistent buffers")
-    persistent_intermediate_buffers = [
-        create_persistent_buffers(
-            ag_output_shape,
-            ag_num_inputs,
-            mesh_device,
-            ag_input_dtype,
-            mem_config_ag,
-            rp_dim,
-            rp_axis,
-            rp_factor,
-            up_factor,
-        )
-        for _ in range(num_iters)
-    ]
     persistent_output_buffers = [
         create_persistent_buffers(
             ag_output_shape,
@@ -156,7 +142,6 @@ def run_ring_attention_all_gather_impl(
     def run_op(i):
         tt_all_gather_out_tensors = ttnn.experimental.ring_attention_all_gather_async(
             ag_input_tensor_mesh_list[i],
-            persistent_intermediate_buffer=persistent_intermediate_buffers[i],
             persistent_output_buffer=persistent_output_buffers[i],
             dim=rp_dim,
             multi_device_global_semaphore=ccl_semaphore_handles[i],
@@ -173,22 +158,22 @@ def run_ring_attention_all_gather_impl(
     if enable_trace:
         # Compile the op
         tt_all_gather_out_tensors = run_op(0)
+        ttnn.synchronize_device(mesh_device, sub_device_ids=sub_device_stall_group)
         logger.info(f"Done compiling Op")
 
         # Capture the trace
         trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
         tt_all_gather_out_tensors = run_op(0)
         ttnn.end_trace_capture(mesh_device, trace_id, cq_id=0)
+        ttnn.synchronize_device(mesh_device, sub_device_ids=sub_device_stall_group)
         logger.info(f"Done capturing trace")
 
         # Execute trace
-        ttnn.execute_trace(mesh_device, trace_id, cq_id=0, blocking=False)
+        for i in range(num_iters):
+            ttnn.execute_trace(mesh_device, trace_id, cq_id=0, blocking=False)
+            ttnn.synchronize_device(mesh_device, sub_device_ids=sub_device_stall_group)
+            tt_all_gather_out_tensor_list.append(tt_all_gather_out_tensors)
         logger.info(f"Done executing trace")
-
-        # Synchronize the devices
-        ttnn.synchronize_device(mesh_device, sub_device_ids=sub_device_stall_group)
-
-        tt_all_gather_out_tensor_list.append(tt_all_gather_out_tensors)
     else:
         for i in range(num_iters):
             tt_all_gather_out_tensors = run_op(i)
@@ -205,7 +190,7 @@ def run_ring_attention_all_gather_impl(
     output_dims[1 - rp_axis] = (3 - rp_dim) + 2
     for i in range(num_iters):
         tt_ag_out_tensors = tt_all_gather_out_tensor_list[i]
-        torch_ag_out_tensors = ag_output_tensor_list[i]
+        torch_ag_out_tensors = ag_output_tensor_list[i if not enable_trace else 0]
 
         for j in range(ag_num_inputs):
             tt_ag_out = ttnn.to_torch(
@@ -220,9 +205,6 @@ def run_ring_attention_all_gather_impl(
             eq, output = comp_pcc(tt_ag_out, torch_ag_out_tensors[j])
             logger.info(f"{output}, iteration {i}, tensor {j}")
             assert eq, f"{i}{j} FAILED ag: {output}"
-
-            # print(f"AG TORCH TENSOR {torch_ag_out_tensors[j]}")
-            # print(f"AG TT TENSOR {tt_ag_out}")
 
     mesh_device.reset_sub_device_stall_group()
     mesh_device.clear_loaded_sub_device_manager()
@@ -253,10 +235,10 @@ def run_ring_attention_all_gather_impl(
         "dim3_1input",
         "dim3_2input",
         "dim2_1input",
-        "dim3_1input_batches",
-        "dim2_1input_batches",
-        "dim2_2input_batches",
-        "dim2_2input_batches_yaxis",
+        "dim31input_batches",
+        "dim21input_batches",
+        "dim2_2input_batches_rp2",
+        "dim2_2input_batches_rp4_yaxis",
     ],
 )
 @pytest.mark.parametrize(
@@ -328,3 +310,116 @@ def test_ring_attention_all_gather(
         enable_trace=enable_trace,
         num_iters=num_iters,
     )
+
+    # ttnn.close_mesh_device(submesh_device)
+
+
+@pytest.mark.parametrize(
+    "mesh_device",
+    [
+        {"N150": (1, 1), "N300": (1, 2), "T3K": (2, 4), "TG": (8, 4)}.get(
+            os.environ.get("FAKE_DEVICE"), len(ttnn.get_device_ids())
+        )
+    ],
+    indirect=True,
+)
+@skip_for_grayskull("Requires eth connected devices to run")
+@pytest.mark.parametrize(
+    "num_devices, num_links, ag_output_shape, ag_num_inputs, rp_dim, rp_axis, rp_factor, up_factor, layout, ag_input_dtype",
+    [
+        (8, 1, [1, 5, 4096, 64], 2, 2, 1, 4, 1, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        (8, 1, [1, 5, 4096, 64], 2, 2, 0, 2, 1, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+    ],
+    ids=[
+        "dim2_2input_batches",
+        "dim2_2input_batches_yaxis",
+    ],
+)
+@pytest.mark.parametrize(
+    "mem_config_input, mem_config_ag",
+    [
+        (
+            ttnn.MemoryConfig(ttnn.TensorMemoryLayout.INTERLEAVED, ttnn.BufferType.DRAM),
+            ttnn.MemoryConfig(ttnn.TensorMemoryLayout.INTERLEAVED, ttnn.BufferType.DRAM),
+        )
+    ],
+)
+@pytest.mark.parametrize(
+    "enable_trace, num_iters",
+    [
+        (False, 1),
+    ],
+    ids=["check"],
+)
+@pytest.mark.parametrize(
+    "device_params, all_gather_topology",
+    [
+        # ({"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING, "trace_region_size": 90112}, ttnn.Topology.Ring),
+        ({"fabric_config": ttnn.FabricConfig.FABRIC_1D, "trace_region_size": 90112}, ttnn.Topology.Linear),
+    ],
+    ids=[
+        # "ring ",
+        "line",
+    ],
+    indirect=["device_params"],
+)
+def test_ring_attention_all_gather_program_cache(
+    mesh_device,
+    num_devices,
+    ag_output_shape,
+    ag_num_inputs,
+    rp_dim,
+    rp_axis,
+    rp_factor,
+    up_factor,
+    num_links,
+    ag_input_dtype,
+    layout,
+    mem_config_input,
+    mem_config_ag,
+    enable_trace,
+    num_iters,
+    use_program_cache,
+    all_gather_topology,
+):
+    submesh_shape = [0, 0]
+    submesh_shape[rp_axis] = rp_factor
+    submesh_shape[1 - rp_axis] = up_factor
+    submesh_device = mesh_device.create_submesh(ttnn.MeshShape(submesh_shape[0], submesh_shape[1]))
+
+    dummy_tensors = []
+    for i in range(3):
+        dummy_tensors.append(
+            ttnn.from_torch(
+                torch.rand(ag_output_shape),
+                device=submesh_device,
+                layout=layout,
+                dtype=ag_input_dtype,
+                mesh_mapper=ttnn.ShardTensor2dMesh(
+                    submesh_device, mesh_shape=tuple(submesh_device.shape), dims=[None, None]
+                ),
+            )
+        )
+        run_ring_attention_all_gather_impl(
+            submesh_device,
+            num_devices,
+            ag_output_shape,
+            ag_num_inputs,
+            rp_dim,
+            rp_axis,
+            rp_factor,
+            up_factor,
+            num_links,
+            ag_input_dtype,
+            layout,
+            mem_config_input,
+            mem_config_ag,
+            use_program_cache=use_program_cache,
+            all_gather_topology=all_gather_topology,
+            enable_trace=enable_trace,
+            num_iters=num_iters,
+        )
+        ttnn.synchronize_device(submesh_device)
+
+    assert submesh_device.num_program_cache_entries() == 1
+    ttnn.close_mesh_device(submesh_device)
