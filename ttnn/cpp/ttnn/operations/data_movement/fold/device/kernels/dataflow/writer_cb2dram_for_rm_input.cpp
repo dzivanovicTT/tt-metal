@@ -16,8 +16,9 @@ void kernel_main() {
     constexpr uint32_t pad_width = get_compile_time_arg_val(6);
     constexpr uint32_t stick_nbytes = get_compile_time_arg_val(7);
     constexpr uint32_t cb_id_in0 = get_compile_time_arg_val(8);
-    constexpr bool dst_stick_size_is_power_of_two = get_compile_time_arg_val(9) == 1;
-    constexpr uint32_t dst_log2_stick_size = get_compile_time_arg_val(10);
+    constexpr uint32_t config_cb_id = get_compile_time_arg_val(9);
+    constexpr bool dst_stick_size_is_power_of_two = get_compile_time_arg_val(10) == 1;
+    constexpr uint32_t dst_log2_stick_size = get_compile_time_arg_val(11);
 
     uint32_t dst_addr = get_arg_val<uint32_t>(0);
     uint32_t start_input_work = get_arg_val<uint32_t>(1);
@@ -31,6 +32,18 @@ void kernel_main() {
     constexpr uint32_t patch_size = stride_height * stride_width;
     constexpr uint32_t input_hw = input_height * input_width;
 
+    uint32_t config_l1_addr = get_read_ptr(config_cb_id);
+    volatile tt_l1_ptr uint32_t* config_data = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(config_l1_addr);
+    // for(uint32_t i = 0; i < end_input_work - start_input_work; i++) {
+    //     int dst_entry = config_data[i];
+    //     DPRINT << "dst_entry: " << dst_entry << ENDL();
+    //     cb_wait_front(cb_id_in0, 1);
+    //     uint32_t l1_addr = get_read_ptr(cb_id_in0);
+    //     uint64_t dst_noc_addr = get_noc_addr(dst_entry, s_out);
+    //     noc_async_write(l1_addr, dst_noc_addr, 1);
+    //     noc_async_write_barrier();
+    //     cb_pop_front(cb_id_in0, 1);
+    // }
     for (uint32_t input_idx = start_input_work; input_idx < end_input_work; input_idx++) {
         const uint32_t b = input_idx / input_hw;
         const uint32_t hw = input_idx % input_hw;
@@ -45,6 +58,9 @@ void kernel_main() {
         int dst_row = (b * Oh + oh) * Ow + ow;
         int dst_col = (kh * stride_width + kw);
         int dst_index = dst_row * patch_size + dst_col;
+        DPRINT << "dst_index: " << dst_index << " " << (uint16_t)config_data[(input_idx - start_input_work) * 2]
+               << ENDL();
+        dst_index = static_cast<int32_t>(config_data[(input_idx - start_input_work)]);
         cb_wait_front(cb_id_in0, 1);
         uint32_t l1_addr = get_read_ptr(cb_id_in0);
         uint64_t dst_noc_addr = get_noc_addr(dst_index, s_out);

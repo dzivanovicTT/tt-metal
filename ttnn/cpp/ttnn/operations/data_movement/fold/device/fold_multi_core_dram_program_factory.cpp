@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <vector>
 #include "hostdevcommon/kernel_structs.h"
 #include "ttnn/common/constants.hpp"
 #include "ttnn/tensor/enum_types.hpp"
@@ -20,10 +20,60 @@
 #include "ttnn/types.hpp"
 #include <tt-metalium/tt_align.hpp>
 #include "fold_device_op.hpp"
+#include "ttnn/operations/cb_utils.hpp"
 namespace ttnn::operations::data_movement {
 
 using namespace tt::constants;
 using namespace tt::tt_metal;
+
+// Helper function to create the mapping table
+static Tensor create_fold_mapping_table(
+    const uint32_t batch_size,
+    const uint32_t input_height,
+    const uint32_t input_width,
+    const uint32_t stride_h,
+    const uint32_t stride_w,
+    const uint32_t pad_h,
+    const uint32_t pad_w,
+    const uint32_t total_entries,
+    const uint32_t elems_per_core) {
+    // Calculate output dimensions
+    const uint32_t oh_size = (input_height + pad_h) / stride_h;
+    const uint32_t ow_size = (input_width + pad_w) / stride_w;
+    const uint32_t patch_size = stride_h * stride_w;
+    const uint32_t input_hw = input_height * input_width;
+
+    // Calculate total entries needed (each entry has dst_index and is_padding)
+    std::vector<uint32_t> config_vector = std::vector<uint32_t>(total_entries, 0);
+
+    // Populate entries organized by source (input) index order
+    for (uint32_t b = 0; b < batch_size; b++) {
+        for (uint32_t h = 0; h < input_height; h++) {
+            for (uint32_t w = 0; w < input_width; w++) {
+                // Calculate source index (in row-major order)
+                uint32_t src_index = b * input_hw + h * input_width + w;
+
+                // Calculate corresponding output position
+                int oh = h / stride_h;
+                int ow = w / stride_w;
+                int kh = h % stride_h;
+                int kw = w % stride_w;
+
+                // Calculate destination index
+                uint32_t dst_row = (b * oh_size + oh) * ow_size + ow;
+                uint32_t dst_col = kh * stride_w + kw;
+                uint32_t dst_index = dst_row * patch_size + dst_col;
+
+                // Add mapping entry (dst_index, is_padding=false)
+                config_vector[src_index] = dst_index;
+            }
+        }
+    }
+
+    ttnn::Shape config_shape({tt::div_up(config_vector.size(), elems_per_core), elems_per_core});
+    auto config_buffer = HostBuffer(std::move(config_vector));
+    return Tensor(std::move(config_buffer), config_shape, DataType::UINT32, Layout::ROW_MAJOR);
+}
 
 Fold::MultiCoreDRAMFold::cached_program_t fold_multi_core_tiled_interleaved(
     const Tensor& input_tensor,
@@ -300,6 +350,31 @@ Fold::MultiCoreDRAMFold::cached_program_t fold_multi_core_row_major_interleaved(
                              .set_page_size(cb_src0_index, aligned_stick_nbytes);
     auto cb_src0 = CreateCircularBuffer(program, all_cores, src_cb_config);
 
+    Tensor config_tensor = create_fold_mapping_table(
+        batch_size,
+        input_height,
+        input_width,
+        stride_h,
+        stride_w,
+        pad_h,
+        pad_w,
+        work_per_core * num_cores_total,
+        work_per_core);
+
+    auto shard_shape = std::array<uint32_t, 2>({1, (uint32_t)config_tensor.get_logical_shape()[-1]});
+    auto config_tensor_shard_orientation = ShardOrientation::ROW_MAJOR;
+    ShardSpec config_shard_spec(all_cores, shard_shape, config_tensor_shard_orientation);
+    MemoryConfig memory_config{TensorMemoryLayout::HEIGHT_SHARDED, BufferType::L1, config_shard_spec};
+    auto config_tensor_device = config_tensor.to_device(device, memory_config);
+
+    tt::DataFormat config_df = tt::DataFormat::RawUInt32;
+    auto config_storage = config_tensor_device.device_storage();
+    auto config_buffer = config_storage.get_buffer();
+    auto config_buffer_page_size = config_buffer->page_size();
+
+    auto [config_cb_id, config_cb] = tt::tt_metal::create_cb(
+        tt::CBIndex::c_1, program, all_cores, config_buffer_page_size, 1, config_df, &*config_buffer);
+
     bool src_stick_size_is_power_of_two = is_power_of_two_at_least_32(stick_nbytes);
     uint32_t src_log2_stick_size = src_stick_size_is_power_of_two ? (std::uint32_t)std::log2(stick_nbytes) : 0;
     // Create reader kernel
@@ -324,6 +399,7 @@ Fold::MultiCoreDRAMFold::cached_program_t fold_multi_core_row_major_interleaved(
              pad_w,
              stick_nbytes,
              cb_src0_index,
+             config_cb_id,
              src_stick_size_is_power_of_two,
              src_log2_stick_size}));
 
