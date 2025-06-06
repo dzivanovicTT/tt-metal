@@ -536,8 +536,11 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         }
 
         // Set Sender Reader runtime args
-        uint32_t base_pages_per_worker = input_tensor_num_pages / num_links;
-        uint32_t remainder = input_tensor_num_pages % num_links;
+        uint32_t batch_head_size = input_tensor_shape[0] * input_tensor_shape[1];
+
+        uint32_t single_batch_head_num_pages = input_tensor_num_pages / batch_head_size;
+        uint32_t base_pages_per_worker = single_batch_head_num_pages / num_links;
+        uint32_t remainder = single_batch_head_num_pages % num_links;
         uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
         uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
 
@@ -545,13 +548,19 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         TT_ASSERT(!(output_tensor_shape[3] % TILE_WIDTH));
         uint32_t TILE_WIDTH = 32;
         uint32_t input_tensor_Wt = input_tensor_shape[3] / TILE_WIDTH;
+        uint32_t input_tensor_Ht = input_tensor_shape[2] / TILE_WIDTH;
         uint32_t output_tensor_Wt = output_tensor_shape[3] / TILE_WIDTH;
+        uint32_t output_tensor_Ht = output_tensor_shape[2] / TILE_WIDTH;
 
         std::vector<uint32_t> reader_forward_rt_args = {
             input_tensor.buffer()->address(),   // input_tensor_address
             output_tensor.buffer()->address(),  // output_tensor_address
             input_tensor_Wt,                    // width in tiles of the output shard
+            input_tensor_Ht,                    // height in tiles of the output shard
             output_tensor_Wt,                   // width in tiles of entire output
+            output_tensor_Ht,                   // height in tiles of entire output
+            dim,                                // dim to gather on
+            batch_head_size,                    // product of the first two dims
             input_tile_id_start,                //
             input_tile_id_end,                  //
             ring_size,                          // ring_size
@@ -567,7 +576,11 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             input_tensor.buffer()->address(),   // input_tensor_address
             output_tensor.buffer()->address(),  // output_tensor_address
             input_tensor_Wt,                    // width in tiles of the output shard
+            input_tensor_Ht,                    // height in tiles of the output shard
             output_tensor_Wt,                   // width in tiles of entire output
+            output_tensor_Ht,                   // height in tiles of entire output
+            dim,                                // dim to gather on
+            batch_head_size,                    // product of the first two dims
             input_tile_id_start,                // slice_num_pages
             input_tile_id_end,                  // slice_num_pages
             ring_size,                          // ring_size
@@ -585,7 +598,11 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         std::vector<uint32_t> writer_forward_rt_args = {
             output_tensor.buffer()->address(),  // output_tensor_address
             input_tensor_Wt,                    // width in tiles of the output shard
+            input_tensor_Ht,                    // height in tiles of the output shard
             output_tensor_Wt,                   // width in tiles of entire output
+            output_tensor_Ht,                   // height in tiles of entire output
+            dim,                                // dim to gather on
+            batch_head_size,                    // product of the first two dims
             input_tile_id_start,                //
             input_tile_id_end,                  //
             sender_forward_worker_core.x,       // out_ready_sem_noc0_x
@@ -613,7 +630,11 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         std::vector<uint32_t> writer_backward_rt_args = {
             output_tensor.buffer()->address(),  // output_tensor_address
             input_tensor_Wt,                    // width in tiles of the output shard
+            input_tensor_Ht,                    // height in tiles of the output shard
             output_tensor_Wt,                   // width in tiles of entire output
+            output_tensor_Ht,                   // height in tiles of entire output
+            dim,                                // dim to gather on
+            batch_head_size,                    // product of the first two dims
             input_tile_id_start,                //
             input_tile_id_end,                  //
             sender_backward_worker_core.x,      // out_ready_sem_noc0_x
