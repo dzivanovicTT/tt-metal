@@ -19,6 +19,20 @@ def create_global_semaphores(mesh_device, num_devices, cores, initial_value):
     return ccl_semaphore_handles
 
 
+def padded_shape(output_shape, tile):
+    output_tiles_shape = (math.ceil(output_shape[2] / tile[0]), math.ceil(output_shape[3] / tile[1]))
+    output_tile_num = output_tiles_shape[0] * output_tiles_shape[1]
+    padded_output_tile_num = math.ceil(output_tile_num / 48) * 48
+
+    padded_shape = [
+        output_shape[0],
+        output_shape[1],
+        output_shape[2],
+        math.ceil(padded_output_tile_num / output_tiles_shape[0]) * tile[1],
+    ]
+    return padded_shape
+
+
 def run_all_gather_impl(
     t3k_mesh_device,
     num_devices,
@@ -70,7 +84,7 @@ def run_all_gather_impl(
     logger.info("Creating persistent buffers")
     persistent_intermediate_buffers = [
         ttnn.from_torch(
-            torch.zeros(ag_output_shape),
+            torch.zeros(padded_shape(ag_output_shape)),
             device=t3k_mesh_device,
             layout=ttnn.TILE_LAYOUT,
             dtype=ag_input_dtype,
