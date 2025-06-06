@@ -251,6 +251,16 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         CoreCoord core = sender_worker_cores[link];
         drain_sync_core = mesh_device->worker_core_from_logical_core(core);
 
+        uint32_t stride_Wt = input_tensor_Wt;
+        uint32_t slice_Wt = input_tensor_Wt / ring_size;
+        uint32_t pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
+        uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
+        uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
+        uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
+        uint32_t packet_id = (tiles_read + num_pages_per_packet - 1) / num_pages_per_packet;
+        uint32_t intermediate_packet_offset_x = (packet_id * ring_size) % 12;
+        uint32_t intermediate_packet_offset_y = (packet_id * ring_size) / 12;
+
         if (fuse_op) {
             auto sender_workers = corerange_to_cores(sender_worker_core_range, std::nullopt, true);
             fused_op_signaler->init_reduce_scatter(program, mesh_device, sender_worker_core_range);
@@ -263,7 +273,13 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
             semaphore.at(1 + link * 3).address(),     // out_ready_bwd_semaphore
             semaphore.at(2 + link * 3).address(),     // batch_ready_semaphore
             link,
-            num_links};
+            num_links,
+            pages_read_in_row,
+            row_offset,
+            tiles_read,
+            tiles_to_read,
+            intermediate_packet_offset_x,
+            intermediate_packet_offset_y};
         if (fuse_op) {
             fused_op_signaler->push_reduce_scatter_fused_op_rt_args(reader_rt_args);
         }

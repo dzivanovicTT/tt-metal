@@ -32,6 +32,8 @@ constexpr uint32_t fuse_op = get_compile_time_arg_val(12);
 constexpr uint32_t contig_pages_advanced = get_compile_time_arg_val(13);
 
 constexpr uint32_t N_DRAM_BANKS = 12;
+constexpr uint32_t my_chip_id_x = my_chip_id % N_DRAM_BANKS;
+constexpr uint32_t my_chip_id_y = my_chip_id / N_DRAM_BANKS;
 
 void kernel_main() {
     ///////////////////////////////////////////////////
@@ -48,6 +50,17 @@ void kernel_main() {
     uint32_t link = get_arg_val<uint32_t>(arg_idx++);
     uint32_t num_links = get_arg_val<uint32_t>(arg_idx++);
 
+    // uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
+    // uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
+
+    constexpr uint32_t stride_Wt = input_tensor_Wt;
+    constexpr uint32_t slice_Wt = input_tensor_Wt / ring_size;
+    uint32_t pages_read_in_row_0 = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t row_offset_0 = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t tiles_read_0 = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t tiles_to_read_0 = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_x = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t intermediate_packet_offset_y = get_arg_val<uint32_t>(arg_idx++);
     // DPRINT all uint32_t args
     DPRINT << "my_chip_id: " << my_chip_id << "\n";
     DPRINT << "tile_granularity: " << tile_granularity << "\n";
@@ -63,8 +76,6 @@ void kernel_main() {
     if constexpr (fuse_op) {
         matmul_receiver = ReduceScatterOpReceiver(arg_idx);
     }
-
-    constexpr uint32_t slice_Wt = input_tensor_Wt / ring_size;
 
     constexpr uint32_t batch_num_pages = batch_slice_num_pages * ring_size;
 
@@ -83,9 +94,14 @@ void kernel_main() {
         if (fuse_op) {
             matmul_receiver.wait_for_matmul_batch(b);
         }
-        int fwd_slice_idx = my_chip_id - 1;
-        int bwd_slice_idx = my_chip_id + 1;
+        int fwd_slice_id = my_chip_id - 1;
+        int bwd_slice_id = my_chip_id + 1;
         uint32_t batch_offset = batch_num_pages * b;
+
+        uint32_t actual_fwd_slice_id_x = my_chip_id_x;
+        uint32_t actual_fwd_slice_id_y = my_chip_id_y;
+        uint32_t actual_bwd_slice_id_x = my_chip_id_x;
+        uint32_t actual_bwd_slice_id_y = my_chip_id_y;
 
         // Loop over the slices, starting from the furthest, and working backwards until we get to ourselves
         // Read our local slice at this slice idx into cb_input_id or cb_output_id
@@ -97,18 +113,34 @@ void kernel_main() {
             const bool do_reduce = i != 0;
             uint32_t cb_in0 = do_reduce ? cb_input_id : cb_reader_output_id;
 
-            uint32_t actual_fwd_slice_idx = (fwd_slice_idx + ring_size) % ring_size;
-            uint32_t actual_bwd_slice_idx = bwd_slice_idx % ring_size;
+            uint32_t actual_fwd_slice_id = (fwd_slice_id + ring_size) % ring_size;
+            uint32_t actual_bwd_slice_id = bwd_slice_id % ring_size;
+            actual_fwd_slice_id_x = (actual_fwd_slice_id_x == 0) ? ring_size - 1 : actual_fwd_slice_id_x - 1;
+            actual_bwd_slice_id_x = (actual_bwd_slice_id_x == ring_size - 1) ? 0 : actual_bwd_slice_id_x + 1;
 
-            uint32_t fwd_input_tile_id_start = actual_fwd_slice_idx * slice_Wt + batch_offset;
-            uint32_t fwd_intermediate_tile_id_start = actual_fwd_slice_idx * slice_Wt;
-            uint32_t bwd_input_tile_id_start = actual_bwd_slice_idx * slice_Wt + batch_offset;
-            uint32_t bwd_intermediate_tile_id_start = actual_bwd_slice_idx * slice_Wt;
-            uint32_t stride_Wt = input_tensor_Wt;
-            uint32_t pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
-            uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
-            uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
-            uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
+            uint32_t intermediate_packet_id_fwd_x = actual_fwd_slice_id_x + intermediate_packet_offset_x;
+            uint32_t intermediate_packet_id_fwd_y = actual_fwd_slice_id_y + intermediate_packet_offset_y;
+            if (intermediate_packet_id_fwd_x >= N_DRAM_BANKS) {
+                intermediate_packet_id_fwd_x -= N_DRAM_BANKS;
+                intermediate_packet_id_fwd_y++;
+            }
+
+            uint32_t intermediate_packet_id_bwd_x = actual_bwd_slice_id_x + intermediate_packet_offset_x;
+            uint32_t intermediate_packet_id_bwd_y = actual_bwd_slice_id_y + intermediate_packet_offset_y;
+            if (intermediate_packet_id_bwd_x >= N_DRAM_BANKS) {
+                intermediate_packet_id_bwd_x -= N_DRAM_BANKS;
+                intermediate_packet_id_bwd_y++;
+            }
+
+            uint32_t fwd_input_tile_id_start = actual_fwd_slice_id * slice_Wt + batch_offset;
+            uint32_t fwd_intermediate_tile_id_start = actual_fwd_slice_id * slice_Wt;
+            uint32_t bwd_input_tile_id_start = actual_bwd_slice_id * slice_Wt + batch_offset;
+            uint32_t bwd_intermediate_tile_id_start = actual_bwd_slice_id * slice_Wt;
+
+            uint32_t pages_read_in_row = pages_read_in_row_0;
+            uint32_t row_offset = row_offset_0;
+            uint32_t tiles_read = tiles_read_0;
+            uint32_t tiles_to_read = tiles_to_read_0;
             DPRINT << "READER: for link " << link << ", tiles_read: " << tiles_read
                    << ", tiles_to_read: " << tiles_to_read << ", "
                    << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset
@@ -127,7 +159,6 @@ void kernel_main() {
             }
             DPRINT << "Got semaphore for link " << link << "\n";
             bool read_forward = true;
-            uint32_t packet_id = (tiles_read + contig_pages_advanced - 1) / contig_pages_advanced;
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
 
@@ -161,18 +192,30 @@ void kernel_main() {
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                         uint32_t payload_size_bytes =
                             input_tensor_page_size * std::min(contig_pages_advanced, num_pages_to_read - j);
-                        uint32_t intermediate_packet_id =
-                            (read_forward ? actual_fwd_slice_idx : actual_bwd_slice_idx) + packet_id * ring_size;
 
                         uint32_t intermediate_packet_first_tile_id =
-                            (intermediate_packet_id % N_DRAM_BANKS) +
-                            contig_pages_advanced * N_DRAM_BANKS * (intermediate_packet_id / N_DRAM_BANKS);
+                            read_forward ? (intermediate_packet_id_fwd_x +
+                                            contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_fwd_y)
+                                         : (intermediate_packet_id_bwd_x +
+                                            contig_pages_advanced * N_DRAM_BANKS * intermediate_packet_id_bwd_y);
+
                         uint64_t packet_addr = get_noc_addr(
                             intermediate_packet_first_tile_id, intermediate_tensor_addrgen, 0 /*offset*/, 0 /*noc_id*/);
 
                         noc_async_read(packet_addr, intermediate_l1_write_addr, payload_size_bytes);
                         intermediate_l1_write_addr += payload_size_bytes;
-                        packet_id++;
+
+                        // TODO: this is not ok
+                        intermediate_packet_id_fwd_x += ring_size;
+                        intermediate_packet_id_bwd_x += ring_size;
+                        if (intermediate_packet_id_fwd_x >= N_DRAM_BANKS) {
+                            intermediate_packet_id_fwd_x -= N_DRAM_BANKS;
+                            intermediate_packet_id_fwd_y++;
+                        }
+                        if (intermediate_packet_id_bwd_x >= N_DRAM_BANKS) {
+                            intermediate_packet_id_bwd_x -= N_DRAM_BANKS;
+                            intermediate_packet_id_bwd_y++;
+                        }
                     }
 
                     noc_async_read_barrier();
@@ -184,8 +227,8 @@ void kernel_main() {
             }
 
             // Next slice idx
-            fwd_slice_idx--;
-            bwd_slice_idx++;
+            fwd_slice_id--;
+            bwd_slice_id++;
         }
     }
     DPRINT << "Done Reader\n";
