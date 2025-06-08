@@ -13,6 +13,8 @@ import pytest
 import os
 import ttnn
 
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
+
 from models.demos.llama3_subdevices.tt.generator import Generator, SamplingParams
 from models.demos.llama3_subdevices.tt.model_config import LlamaOptimizations
 from models.tt_transformers.tt.common import (
@@ -119,12 +121,9 @@ def create_tt_model(
         permutation = torch.randperm(paged_attention_config.max_num_blocks)
         # Page table which maps virtual blocks to physical
         reverse_permutation = torch.argsort(permutation)
+
         page_table = reverse_permutation.reshape(
             tt_model_args.max_batch_size, paged_attention_config.max_num_blocks // tt_model_args.max_batch_size
-        )
-        paged_attention_config = PagedAttentionConfig(
-            block_size=page_params["page_block_size"],
-            max_num_blocks=page_params["page_max_num_blocks"],
         )
 
     model = TtTransformer(
@@ -236,7 +235,7 @@ def create_tt_model(
             "num_command_queues": 1,
             "dispatch_core_axis": ttnn.DispatchCoreAxis.COL,
             "worker_l1_size": 1344544,
-            "fabric_config": ttnn.FabricConfig.FABRIC_1D,
+            "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING if is_RING_6U else ttnn.FabricConfig.FABRIC_1D,
         }
     ],
     indirect=True,
@@ -552,6 +551,7 @@ def test_demo_text(
                     page_table=page_table,
                     kv_cache=tt_kv_cache,
                     sampling_params=device_sampling_params,
+                    argmax_on_device=argmax_on_device,
                     reset_inputs=iteration == 0 or batch_size > 1,
                 )
             except Exception as e:

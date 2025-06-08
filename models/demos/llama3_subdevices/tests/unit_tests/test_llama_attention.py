@@ -9,10 +9,7 @@ import ttnn
 from models.demos.llama3_subdevices.tt.llama_attention import TtLlamaAttention
 from models.demos.llama3_subdevices.tt.llama_rope import TtLlamaRotarySetup
 from models.demos.llama3_subdevices.tt.model_config import TtModelArgs
-from models.demos.llama3_subdevices.tt.llama_common import (
-    precompute_freqs,
-    PagedAttentionConfig,
-)
+from models.demos.llama3_subdevices.tt.llama_common import precompute_freqs, PagedAttentionConfig, PagedAttention
 from models.demos.t3000.llama2_70b.reference.llama.llama31_8b.model import Attention
 from models.utility_functions import (
     comp_pcc,
@@ -22,12 +19,19 @@ from models.utility_functions import skip_for_grayskull
 from models.demos.llama3_subdevices.tt.prefetcher_common import TtLlamaPrefetcherSetup
 from models.demos.llama3_subdevices.tt.llama_ccl import TT_CCL
 
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
+
 
 @torch.no_grad()
 @skip_for_grayskull("Requires wormhole_b0 to run")
 @pytest.mark.parametrize(
     "device_params",
-    [{"dispatch_core_axis": ttnn.DispatchCoreAxis.COL, "fabric_config": ttnn.FabricConfig.FABRIC_1D}],
+    [
+        {
+            "dispatch_core_axis": ttnn.DispatchCoreAxis.COL,
+            "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING if is_RING_6U else ttnn.FabricConfig.FABRIC_1D,
+        }
+    ],
     indirect=True,
 )
 @pytest.mark.parametrize(
@@ -111,29 +115,19 @@ def test_llama_attention_inference(
     paged_attention_config = None
 
     if paged_attention:
+        mesh_mapper = ttnn.ShardTensor2dMesh(
+            mesh_device,
+            dims=(None, None),
+            mesh_shape=model_args.cluster_shape,
+        )
+
+        paged_attn = PagedAttention(page_params, model_args)
+
+        page_table_tt = paged_attn.create_page_table(mesh_device, mesh_mapper, per_device_group=True)
+
         paged_attention_config = PagedAttentionConfig(
             block_size=page_params["page_block_size"],
             max_num_blocks=page_params["page_max_num_blocks"],
-        )
-
-        # Implied shuffling of blocks
-        permutation = torch.randperm(paged_attention_config.max_num_blocks)
-        # Page table which maps virtual blocks to physical
-        reverse_permutation = torch.argsort(permutation)
-        page_table = reverse_permutation.reshape(
-            model_args.batch_size_per_device_group,
-            paged_attention_config.max_num_blocks // model_args.batch_size_per_device_group,
-        )
-        page_table_tt = ttnn.from_torch(
-            page_table,
-            device=mesh_device,
-            dtype=ttnn.int32,
-            layout=ttnn.ROW_MAJOR_LAYOUT,
-            mesh_mapper=ttnn.ShardTensor2dMesh(
-                mesh_device,
-                dims=(None, None),
-                mesh_shape=model_args.cluster_shape,
-            ),
         )
 
     prefetcher_setup = TtLlamaPrefetcherSetup(
@@ -197,7 +191,7 @@ def test_llama_attention_inference(
         )
 
         # Get cos/sin matrices for the current position of each user
-        rot_mats = rope_setup.get_rot_mats(current_pos)
+        rot_mats = rope_setup.get_rm_rot_mats(current_pos)
 
         ttnn.dram_prefetcher(
             prefetcher_setup.get_input_tensors(),
@@ -236,7 +230,7 @@ def test_llama_attention_inference(
             all_tests_pass = False
 
         # Increment position
-        current_pos = torch.tensor([generation_start_pos + i for _ in range(batch_size)])
+        current_pos = torch.tensor([generation_start_pos + i + 1 for _ in range(batch_size)])
         current_pos_tensor = ttnn.from_torch(
             current_pos,
             device=mesh_device,
@@ -275,7 +269,7 @@ def test_llama_attention_inference(
                             model_args.head_dim,
                         )[
                             : 1 if batch_size == 1 else model_args.num_device_groups,
-                            reverse_permutation,
+                            paged_attn.reverse_permutation,
                             : model_args.n_kv_heads,
                             :,
                             : model_args.head_dim,

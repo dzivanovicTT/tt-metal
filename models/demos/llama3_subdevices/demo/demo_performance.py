@@ -10,9 +10,9 @@ import os
 import ttnn
 import pytest
 
-from models.demos.llama3_subdevices.tt.llama_common import (
-    PagedAttentionConfig,
-)
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
+
+from models.demos.llama3_subdevices.tt.llama_common import PagedAttentionConfig, PagedAttention
 from models.demos.llama3_subdevices.tt.llama_model import TtTransformer
 from models.demos.llama3_subdevices.tt.llama_embedding import TtLlamaEmbedding
 from models.demos.t3000.llama2_70b.reference.llama.llama31_8b.tokenizer import Tokenizer
@@ -32,7 +32,7 @@ def run_llama3_decode_performance(
     batch_size,
     num_batches,
     paged_attention,
-    paged_attention_config,
+    page_params,
     benchmark_token_range,
     warmup_iters,
     inner_iters,
@@ -109,20 +109,21 @@ def run_llama3_decode_performance(
     page_table_tt = None
 
     if paged_attention:
-        # Implied shuffling of blocks
-        permutation = torch.randperm(paged_attention_config.max_num_blocks)
-        # Page table which maps virtual blocks to physical
-        reverse_permutation = torch.argsort(permutation)
-        page_table = reverse_permutation.reshape(
-            model_args.max_batch_size, paged_attention_config.max_num_blocks // model_args.max_batch_size
+        paged_attn = PagedAttention(page_params, model_args)
+
+        mesh_mapper = ttnn.ShardTensor2dMesh(
+            mesh_device,
+            dims=(None, -2) if batch_size > 1 else (None, None),
+            mesh_shape=model_args.cluster_shape,
         )
-        page_table_tt = ttnn.from_torch(
-            page_table,
-            device=mesh_device,
-            dtype=ttnn.int32,
-            layout=ttnn.ROW_MAJOR_LAYOUT,
-            mesh_mapper=ttnn.ShardTensor2dMesh(mesh_device, dims=(None, None), mesh_shape=model_args.cluster_shape),
+
+        page_table_tt = paged_attn.create_page_table(mesh_device, mesh_mapper)
+
+        paged_attention_config = PagedAttentionConfig(
+            block_size=page_params["page_block_size"],
+            max_num_blocks=page_params["page_max_num_blocks"],
         )
+        logger.info("Page table tensor done")
 
     # Load TTNN Llama3.1 model
     logger.info("Loading weights to device...")
@@ -163,22 +164,6 @@ def run_llama3_decode_performance(
 
     logger.info("Starting decode...")
 
-    # Shard the page table for TG decode
-    if paged_attention and model_args.is_galaxy and batch_size > 1:
-        page_table_tt = ttnn.from_torch(
-            page_table,
-            device=mesh_device,
-            dtype=ttnn.int32,
-            layout=ttnn.ROW_MAJOR_LAYOUT,
-            mesh_mapper=ttnn.ShardTensor2dMesh(
-                mesh_device,
-                dims=(None, -2) if batch_size > 1 else (None, None),
-                mesh_shape=model_args.cluster_shape,
-            ),
-        )
-
-        logger.info("Page table tensor done")
-
     # Initial positions
     decoding_pos = [bench_start] * batch_size
     current_pos = torch.tensor(decoding_pos)
@@ -197,7 +182,7 @@ def run_llama3_decode_performance(
     logger.info("Current pos tensor done")
 
     # Get cos/sin matrices for the current position of each user
-    rot_mats, rot_mat_idxs = tt_model.rope_setup.get_rot_mats(current_pos, return_rot_idxs=True)
+    rot_mats, rot_mat_idxs = tt_model.rope_setup.get_rm_rot_mats(current_pos, return_rot_idxs=True)
 
     logger.info("Rot mats done")
 
@@ -260,7 +245,7 @@ def run_llama3_decode_performance(
     trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
 
     # Get cos/sin matrices for the current position of each user
-    rot_mats = tt_model.rope_setup.get_rot_mats(rot_mat_idxs)
+    rot_mats = tt_model.rope_setup.get_rm_rot_mats(rot_mat_idxs)
     tt_decode_input = tt_embd(tt_out_tok)
     tt_out = tt_model(
         tt_decode_input,
@@ -307,7 +292,7 @@ def run_llama3_decode_performance(
     # Reset the current position and output token tensors for the real decode run
     ttnn.copy_host_to_device_tensor(current_pos_reset, current_pos_tensor)
     ttnn.copy_host_to_device_tensor(tt_out_tok_reset, tt_out_tok)
-    rot_mat_idxs_reset = tt_model.rope_setup.get_rot_idxs(current_pos, on_host=True)
+    rot_mat_idxs_reset = tt_model.rope_setup.get_rm_rot_idxs(current_pos, on_host=True)
     ttnn.copy_host_to_device_tensor(rot_mat_idxs_reset, rot_mat_idxs)
 
     profiler.end(f"capture_trace")
@@ -436,7 +421,7 @@ def run_llama3_decode_performance(
         {
             "dispatch_core_axis": ttnn.DispatchCoreAxis.COL,
             "trace_region_size": 23887872,
-            "fabric_config": ttnn.FabricConfig.FABRIC_1D,
+            "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING if is_RING_6U else ttnn.FabricConfig.FABRIC_1D,
         }
     ],
     indirect=True,
@@ -467,14 +452,6 @@ def test_llama_decode_performance(
     if os.environ.get("FAKE_DEVICE") == "TG" and batch_size not in [1, 32]:
         pytest.skip("TG only supports batch 1 and 32")
 
-    if paged_attention:
-        paged_attention_config = PagedAttentionConfig(
-            block_size=page_params["page_block_size"],
-            max_num_blocks=page_params["page_max_num_blocks"],
-        )
-    else:
-        paged_attention_config = None
-
     return run_llama3_decode_performance(
         user_input=input_prompts,
         mesh_device=mesh_device,
@@ -482,7 +459,7 @@ def test_llama_decode_performance(
         batch_size=batch_size,
         num_batches=repeat_batches,
         paged_attention=paged_attention,
-        paged_attention_config=paged_attention_config,
+        page_params=page_params,
         benchmark_token_range=benchmark_token_range,
         warmup_iters=warmup_iters,
         inner_iters=inner_iters,

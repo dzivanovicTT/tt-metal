@@ -6,10 +6,7 @@ import pytest
 from loguru import logger
 import os
 import ttnn
-from models.demos.llama3_subdevices.tt.llama_common import (
-    precompute_freqs,
-    PagedAttentionConfig,
-)
+from models.demos.llama3_subdevices.tt.llama_common import precompute_freqs, PagedAttentionConfig, PagedAttention
 from models.demos.llama3_subdevices.tt.model_config import TtModelArgs
 from models.demos.llama3_subdevices.tt.llama_decoder import TtTransformerBlock
 from models.demos.llama3_subdevices.tt.llama_rope import TtLlamaRotarySetup
@@ -21,6 +18,8 @@ from models.utility_functions import (
 from models.utility_functions import skip_for_grayskull
 from models.demos.llama3_subdevices.tt.prefetcher_common import TtLlamaPrefetcherSetup
 from models.demos.llama3_subdevices.tt.llama_ccl import TT_CCL
+
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
 
 
 @torch.no_grad()
@@ -63,7 +62,7 @@ from models.demos.llama3_subdevices.tt.llama_ccl import TT_CCL
         {
             "dispatch_core_axis": ttnn.DispatchCoreAxis.COL,
             "trace_region_size": 165136000,
-            "fabric_config": ttnn.FabricConfig.FABRIC_1D,
+            "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING if is_RING_6U else ttnn.FabricConfig.FABRIC_1D,
         }
     ],
     indirect=True,
@@ -124,28 +123,19 @@ def test_llama_decoder_inference(
     paged_attention_config = None
 
     if paged_attention:
+        mesh_mapper = ttnn.ShardTensor2dMesh(
+            mesh_device,
+            dims=(None, None),
+            mesh_shape=model_args.cluster_shape,
+        )
+
+        paged_attn = PagedAttention(page_params, model_args)
+
+        page_table_tt = paged_attn.create_page_table(mesh_device, mesh_mapper, per_device_group=True)
+
         paged_attention_config = PagedAttentionConfig(
             block_size=page_params["page_block_size"],
             max_num_blocks=page_params["page_max_num_blocks"],
-        )
-        # Implied shuffling of blocks
-        permutation = torch.randperm(paged_attention_config.max_num_blocks)
-        # Page table which maps virtual blocks to physical
-        reverse_permutation = torch.argsort(permutation)
-        page_table = reverse_permutation.reshape(
-            model_args.batch_size_per_device_group,
-            paged_attention_config.max_num_blocks // model_args.batch_size_per_device_group,
-        )
-        page_table_tt = ttnn.from_torch(
-            page_table,
-            device=mesh_device,
-            dtype=ttnn.int32,
-            layout=ttnn.ROW_MAJOR_LAYOUT,
-            mesh_mapper=ttnn.ShardTensor2dMesh(
-                mesh_device,
-                dims=(None, None),
-                mesh_shape=model_args.cluster_shape,
-            ),
         )
 
     # Initialize TT model
@@ -202,7 +192,7 @@ def test_llama_decoder_inference(
         )
 
         # Get cos/sin matrices for the current position of each user
-        rot_mats = rope_setup.get_rot_mats(current_pos)
+        rot_mats = rope_setup.get_rm_rot_mats(current_pos)
         tt_pf = prefetcher_setup.get_input_tensors()
         ttnn.dram_prefetcher(
             tt_pf,
