@@ -161,6 +161,7 @@ void kernel_main() {
                     conv_act_c_read_bytes,
                     act_block_w_extra_align_bytes,
                     stride_w_bytes,
+                    window_outer_offset,
                     weight_size_w>(
                     act_block_h_datums_read_curr,
                     packed_reader_indices_ptr,

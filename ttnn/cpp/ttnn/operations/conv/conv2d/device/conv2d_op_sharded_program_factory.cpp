@@ -659,7 +659,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
     uint32_t num_blocks_act_h = act_matrix_height_ntiles / act_block_h_ntiles;
     uint32_t num_blocks_out_h = act_matrix_height_ntiles / out_block_h_ntiles;
-    uint32_t num_blocks_act_w = a.memory_config().memory_layout() == TensorMemoryLayout::BLOCK_SHARDED ? 1 : filter_h;
+    uint32_t num_blocks_act_w = 1;
     uint32_t num_blocks_weight_w = weight_matrix_width_ntiles / weight_block_w_ntiles;
 
     // act block info
@@ -1260,7 +1260,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
         } else {
             // Height sharded conv
-            TT_FATAL(act_block_w_datums == round_up(conv_act_size_c * filter_w, TILE_WIDTH), "Error");
+            TT_FATAL(act_block_w_datums == round_up(conv_act_size_c * filter_w * filter_h, TILE_WIDTH), "Error");
 
             reader_kernel =
                 "ttnn/cpp/ttnn/operations/conv/conv2d/device/kernels/"

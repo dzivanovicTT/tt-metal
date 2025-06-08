@@ -966,19 +966,17 @@ std::pair<ttnn::Tensor, std::optional<ttnn::Tensor>> prepare_conv_weights_biases
             std::nullopt);
 
         auto weight_block_h_datums = params.weight_block_h_ntiles * constants::TILE_HEIGHT;
-        if ((weight_block_h_datums > (window_w * in_channels_padded)) &&
+        if ((weight_block_h_datums > (window_w * window_h * in_channels_padded)) &&
             (params.input_parallel_config.shard_scheme == TensorMemoryLayout::HEIGHT_SHARDED)) {
             weight_tensor_ = ttnn::reshape(
-                weight_tensor_, ttnn::Shape({1, window_h, window_w * in_channels_padded, out_channels_padded}));
+                weight_tensor_, ttnn::Shape({1, 1, window_w * window_h * in_channels_padded, out_channels_padded}));
             weight_tensor_ = ttnn::pad(
                 weight_tensor_,
-                tt::tt_metal::Array4D({1, window_h, weight_block_h_datums, out_channels_padded}),
+                tt::tt_metal::Array4D({1, 1, weight_block_h_datums, out_channels_padded}),
                 tt::tt_metal::Array4D({0, 0, 0, 0}),
                 0.0f,
                 true,
                 std::nullopt);
-            weight_tensor_ = ttnn::reshape(
-                weight_tensor_, ttnn::Shape({1, 1, window_h * weight_block_h_datums, out_channels_padded}));
         } else {
             weight_tensor_ = ttnn::reshape(
                 weight_tensor_, ttnn::Shape({1, 1, window_h * window_w * in_channels_padded, out_channels_padded}));

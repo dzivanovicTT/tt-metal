@@ -412,7 +412,7 @@ OptimizedConvBlockConfig determine_per_core_conv_block_config(
     TT_ASSERT(padded_in_channels % act_c_num_blocks == 0);
     uint32_t act_block_w =
         parallel_config.shard_scheme == TensorMemoryLayout::HEIGHT_SHARDED
-            ? round_up(padded_in_channels * window_w, 32)
+            ? round_up(padded_in_channels * window_w * window_h, 32)
             : round_up((padded_in_channels / act_c_num_blocks) * window_h * window_w, tt::constants::TILE_WIDTH);
     if (parallel_config.shard_scheme == TensorMemoryLayout::WIDTH_SHARDED) {
         TT_ASSERT(padded_in_channels % (32 * parallel_config.grid.num_cores() * act_block_w_div) == 0);
@@ -1168,9 +1168,9 @@ conv_op_l1_usage conv2d::calculate_L1_usage(
 
         // WEIGHTS CB
         uint32_t weights_cb_size = weight_block_h_ntiles * weight_block_w_ntiles * weights_tile_size;
-        if (num_blocks_act_h > 1) {
-            weights_cb_size *= kernel_size[0];
-        }
+        // if (num_blocks_act_h > 1) {
+        //     weights_cb_size *= kernel_size[0];
+        // }
         if (num_blocks_act_h <= 1 && conv_config.enable_weights_double_buffer) {
             weights_cb_size *= 2;
         }
