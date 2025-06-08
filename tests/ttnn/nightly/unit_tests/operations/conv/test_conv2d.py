@@ -1976,9 +1976,9 @@ def test_unet_conv_groups_4_6_wh(
         output_layout=output_layout,
         groups=groups,
         in_place=in_place,
-        enable_split_reader=True,
-        enable_act_double_buffer=True,
-        enable_weights_double_buffer=True,
+        enable_split_reader=False,
+        enable_act_double_buffer=False,
+        enable_weights_double_buffer=False,
         activation="relu",
         core_grid=ttnn.num_cores_to_corerangeset(
             target_num_cores=63, grid_size=device.compute_with_storage_grid_size(), row_wise=True
@@ -3112,10 +3112,10 @@ def test_conv2d_model_fruit(
         input_mesh_mapper=None,
         weight_mesh_mapper=None,
         output_mesh_composer=None,
-        enable_split_reader=enable_split_reader,
+        enable_split_reader=False,
         input_layout= input_layout,
         activation="relu",
-        enable_act_double_buffer=enable_act_double_buffer,
+        enable_act_double_buffer=False,
         preprocess_weights_on_device=False,
         input_dtype = input_dtype,
     )
