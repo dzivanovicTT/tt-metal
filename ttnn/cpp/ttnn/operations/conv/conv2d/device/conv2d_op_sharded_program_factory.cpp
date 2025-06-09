@@ -1054,7 +1054,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool read_window_in_inner_loop = false;
     uint32_t num_weight_cb_tiles = weight_block_h_ntiles * weight_block_w_ntiles / conv_act_c_blocks;
     bool fully_buffer_weights = false;
-    uint32_t num_act_cb_tiles = act_block_h_ntiles * act_block_w_ntiles / conv_act_c_blocks;
+    uint32_t num_act_cb_tiles = 1 * act_block_w_ntiles / conv_act_c_blocks;
 
     if (block_sharded) {
         num_act_cb_tiles = act_block_h_ntiles * act_block_w_ntiles;
@@ -1074,7 +1074,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     } else if (num_blocks_act_h_per_core > 1) {
         fully_buffer_weights = true;
     }
-    uint32_t num_cb0_tilized_tiles = num_act_cb_tiles;
+    uint32_t num_cb0_tilized_tiles = act_block_h_ntiles * num_act_cb_tiles;
 
     if (fully_buffer_weights) {
         num_weight_cb_tiles *= window_outer;

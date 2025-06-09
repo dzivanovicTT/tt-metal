@@ -72,28 +72,31 @@ void kernel_main() {
     // set_state uses just x/y from the get_noc_addr, addr is ignored
     noc_async_read_one_packet_set_state(get_noc_addr(act_l1_read_addr), coalesced_read_bytes);
 
+    constexpr uint32_t TILE_HEIGHT = 32;
+    constexpr uint32_t ntile_height = act_block_h_datums / TILE_HEIGHT;
+    constexpr uint32_t block_width = act_block_num_tiles / ntile_height;
+
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
-        cb_reserve_back(cb_id_act, act_block_num_tiles);
-        uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
+        for (uint32_t tile_h_index = 0; tile_h_index < ntile_height; tile_h_index++) {
+            cb_reserve_back(cb_id_act, block_width);
+            uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
 
-        uint32_t act_block_h_datums_read_curr =
-            bh == act_num_blocks_h - 1 ? act_block_h_datums_read_last_block : act_block_h_datums_read;
+            read_sticks<
+                dilation_w,
+                coalesced_read_bytes,
+                conv_act_c_read_bytes,
+                act_block_w_extra_align_bytes,
+                stride_w_bytes,
+                window_outer_offset,
+                weight_size_w,
+                weights_size_h>(
+                TILE_HEIGHT / 2, packed_reader_indices_ptr, act_l1_read_addr, l1_write_addr_act, reader_idx);
 
-        read_sticks<
-            dilation_w,
-            coalesced_read_bytes,
-            conv_act_c_read_bytes,
-            act_block_w_extra_align_bytes,
-            stride_w_bytes,
-            window_outer_offset,
-            weight_size_w,
-            weights_size_h>(
-            act_block_h_datums_read_curr, packed_reader_indices_ptr, act_l1_read_addr, l1_write_addr_act, reader_idx);
+            noc_async_read_barrier();
+            cb_push_back(cb_id_act, block_width);
+        }
 
-        noc_async_read_barrier();
-
-        cb_push_back(cb_id_act, act_block_num_tiles);
 #ifdef SPLIT_READER
         start_reader_idx += act_block_h_datums_second_reader_read;
 #endif
