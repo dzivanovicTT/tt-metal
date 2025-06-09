@@ -14,8 +14,8 @@ THRESHOLD = 0.4
 @pytest.mark.parametrize(
     "ag_type, warmup_iters, perf_target_us",
     [
-        ("sdpa", 15, 1200.9),
-        ("binary_mult", 15, 1200.54),
+        ("sdpa", 15, 12.9),
+        ("binary_mult", 15, 12.54),
         ("layernorm", 15, 5.4),
     ],
 )
