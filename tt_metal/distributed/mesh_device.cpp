@@ -800,12 +800,20 @@ bool MeshDevice::initialize(
     mesh_command_queues_.reserve(this->num_hw_cqs());
     if (this->using_fast_dispatch()) {
         for (std::size_t cq_id = 0; cq_id < this->num_hw_cqs(); cq_id++) {
+            std::shared_ptr<EventIDGenerator> event_id_generator = nullptr;
+            if (parent_mesh_ and parent_mesh_->event_id_generators_.size()) {
+                event_id_generator = parent_mesh_->event_id_generators_[cq_id];
+            } else {
+                event_id_generators_.push_back(std::make_shared<EventIDGenerator>());
+                event_id_generator = event_id_generators_.back();
+            }
             mesh_command_queues_.push_back(std::make_unique<FDMeshCommandQueue>(
                 this,
                 cq_id,
                 dispatch_thread_pool_,
                 reader_thread_pool_,
-                worker_launch_message_buffer_state  //
+                worker_launch_message_buffer_state,
+                event_id_generator  //
                 ));
         }
     } else {

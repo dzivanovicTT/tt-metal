@@ -550,6 +550,10 @@ typename device_operation_t::tensor_return_value_t launch_on_single_device(
 
     auto first_tensor = tt::stl::reflection::get_first_object_of_type<Tensor>(tensor_args);
     if (auto mesh_device = first_tensor.mesh_device(); mesh_device != nullptr) {
+        if constexpr (implements_mesh_device<typename device_operation_t::operation_attributes_t>()) {
+            mesh_device = operation_attributes.mesh_device();
+        }
+        std::cout << "Launch on: " << mesh_device->id() << std::endl;
         using MeshCompatibleOp = MeshDeviceOperationAdapter<device_operation_t>;
         launch_operation_with_adapter<MeshCompatibleOp>(
             cq_id, operation_attributes, tensor_args, tensor_return_value, mesh_device);

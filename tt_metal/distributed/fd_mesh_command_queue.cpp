@@ -72,10 +72,12 @@ FDMeshCommandQueue::FDMeshCommandQueue(
     uint32_t id,
     std::shared_ptr<ThreadPool>& dispatch_thread_pool,
     std::shared_ptr<ThreadPool>& reader_thread_pool,
-    std::shared_ptr<DispatchArray<LaunchMessageRingBufferState>>& worker_launch_message_buffer_state) :
+    std::shared_ptr<DispatchArray<LaunchMessageRingBufferState>>& worker_launch_message_buffer_state,
+    std::shared_ptr<EventIDGenerator> event_id_generator) :
     MeshCommandQueueBase(mesh_device, id, dispatch_thread_pool),
     reader_thread_pool_(reader_thread_pool),
-    worker_launch_message_buffer_state_(worker_launch_message_buffer_state)  //
+    worker_launch_message_buffer_state_(worker_launch_message_buffer_state),
+    event_id_generator_(event_id_generator)  //
 {
     program_dispatch::reset_config_buf_mgrs_and_expected_workers(
         config_buffer_mgr_,
@@ -96,7 +98,9 @@ FDMeshCommandQueue::~FDMeshCommandQueue() {
         // This allows physical device close to proceed correctly, since we still
         // rely on single device CQs during this step. Not needed for functionality
         // once single device CQs are removed, however this is still good practice.
-        this->clear_expected_num_workers_completed();
+        if (!this->mesh_device_->is_parent_mesh()) {
+            this->clear_expected_num_workers_completed();
+        }
     }
 
     TT_FATAL(completion_queue_reads_.empty(), "The completion reader queue must be empty when closing devices.");
@@ -160,8 +164,8 @@ CoreType FDMeshCommandQueue::dispatch_core_type() const { return this->dispatch_
 void FDMeshCommandQueue::clear_expected_num_workers_completed() {
     auto sub_device_ids = buffer_dispatch::select_sub_device_ids(mesh_device_, {});
     auto& sysmem_manager = this->reference_sysmem_manager();
-    auto event =
-        MeshEvent(sysmem_manager.get_next_event(id_), mesh_device_, id_, MeshCoordinateRange(mesh_device_->shape()));
+    auto event_id = event_id_generator_->get_next_event_id();
+    auto event = MeshEvent(event_id, mesh_device_, id_, MeshCoordinateRange(mesh_device_->shape()));
 
     // Issue commands to clear expected_num_workers_completed counter(s) on the dispatcher
     for (auto device : mesh_device_->get_devices()) {
@@ -546,7 +550,7 @@ MeshEvent FDMeshCommandQueue::enqueue_record_event_helper(
     TT_FATAL(!trace_id_.has_value(), "Event Synchronization is not supported during trace capture.");
     auto& sysmem_manager = this->reference_sysmem_manager();
     auto event = MeshEvent(
-        sysmem_manager.get_next_event(id_),
+        event_id_generator_->get_next_event_id(),
         mesh_device_,
         id_,
         device_range.value_or(MeshCoordinateRange(mesh_device_->shape())));
