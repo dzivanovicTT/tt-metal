@@ -270,7 +270,7 @@ def model_location_generator(is_ci_v2_env):
 
     return model_location_generator_
 
-    @pytest.fixture(scope="session")
+@pytest.fixture(scope="session")
 def model_location_generator2(is_ci_v2_env):
     """
     Testing stuff out by making a copy of the model_location_generator
