@@ -253,38 +253,23 @@ class TtUnet:
         dec1 = ttnn.sharded_to_interleaved(dec1, ttnn.DRAM_MEMORY_CONFIG)
         dec1 = ttnn.permute(dec1, (0, 3, 1, 2))
         dec1 = ttnn.reshape(dec1, (1, 32, 480, 640))
-        print(dec1.shape, dec1.memory_config(), dec1.get_layout(), dec1.get_dtype())
-        print(
-            self.bn_parameters.running_mean.shape,
-            self.bn_parameters.running_mean.memory_config(),
-            self.bn_parameters.running_mean.get_layout(),
-            self.bn_parameters.running_mean.get_dtype(),
-        )
-        print(
-            self.bn_parameters.running_var.shape,
-            self.bn_parameters.running_var.memory_config(),
-            self.bn_parameters.running_var.get_layout(),
-            self.bn_parameters.running_var.get_dtype(),
-        )
-        print(
-            self.bn_parameters.weight.shape,
-            self.bn_parameters.weight.memory_config(),
-            self.bn_parameters.weight.get_layout(),
-            self.bn_parameters.weight.get_dtype(),
-        )
-        print(
-            self.bn_parameters.bias.shape,
-            self.bn_parameters.bias.memory_config(),
-            self.bn_parameters.bias.get_layout(),
-            self.bn_parameters.bias.get_dtype(),
-        )
+        dec1 = ttnn.to_device(dec1, device)
+        running_mean = self.bn_parameters.running_mean
+        running_var = self.bn_parameters.running_var
+        eps = self.bn_parameters.eps
+        weight = self.bn_parameters.weight
+        bias = self.bn_parameters.bias
+        running_mean = ttnn.to_device(running_mean, device)
+        running_var = ttnn.to_device(running_var, device)
+        weight = ttnn.to_device(weight, device)
+        bias = ttnn.to_device(bias, device)
         dec1 = ttnn.batch_norm(
             dec1,
-            running_mean=self.bn_parameters.running_mean,
-            running_var=self.bn_parameters.running_var,
-            eps=self.bn_parameters.eps,
-            weight=self.bn_parameters.weight,
-            bias=self.bn_parameters.bias,
+            running_mean=running_mean,
+            running_var=running_var,
+            eps=eps,
+            weight=weight,
+            bias=bias,
         )
         return dec1
 
