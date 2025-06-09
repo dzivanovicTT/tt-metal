@@ -15,6 +15,7 @@ from tests.ttnn.unit_tests.operations.ccl.test_all_gather_TG_post_commit import 
 )
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from tracy import signpost
+from tests.ttnn.unit_tests.operations.ccl.test_llama_prefill_ccl_ops import padded_shape
 
 NUM_BUFFERS = 8
 
@@ -107,9 +108,9 @@ def run_ag_with_trace(
     return tt_out_tensor
 
 
-def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
+def run_all_gather_on_TG(
     mesh_device,
-    num_devices_per_line,
+    num_devices,
     per_chip_output_shape,
     tensor_memory_layout,
     dim,
@@ -131,7 +132,7 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     profiler=BenchmarkProfiler(),
 ):
     input_shape_per_chip = list(per_chip_output_shape)
-    input_shape_per_chip[dim] //= num_devices_per_line
+    input_shape_per_chip[dim] //= num_devices
     tensor_height_per_all_gather = per_chip_output_shape[-2]
 
     full_mesh_input_shape = list(per_chip_output_shape)
@@ -140,7 +141,7 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     all_gather_instances_concat_dim = 1 if dim == 0 else 0
     full_mesh_input_shape[all_gather_instances_concat_dim] *= num_all_gather_instances
     logger.info(
-        f"per_chip_output_shape: {full_mesh_input_shape}, dim: {dim}, all_gather_instances_concat_dim: {all_gather_instances_concat_dim}, num_devices_per_line: {num_devices_per_line}"
+        f"per_chip_output_shape: {full_mesh_input_shape}, dim: {dim}, all_gather_instances_concat_dim: {all_gather_instances_concat_dim}, num_devices: {num_devices}"
     )
 
     all_gather_instances_goldens = []
@@ -151,17 +152,15 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     concat_dims = shard_dims
 
     mesh_shape = (
-        (num_devices_per_line, num_all_gather_instances)
-        if cluster_axis == 0
-        else (num_all_gather_instances, num_devices_per_line)
+        (num_devices, num_all_gather_instances) if cluster_axis == 0 else (num_all_gather_instances, num_devices)
     )
 
     if input_shard_spec is not None and output_shard_spec is None:
         output_shard_shape = list(input_shard_spec.shape)
         if dim == len(per_chip_output_shape) - 1:
-            output_shard_shape[1] *= num_devices_per_line
+            output_shard_shape[1] *= num_devices
         else:
-            output_shard_shape[0] *= num_devices_per_line
+            output_shard_shape[0] *= num_devices
         output_shard_spec = ttnn.ShardSpec(
             input_shard_spec.grid,
             output_shard_shape,
@@ -193,9 +192,8 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
         mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
     )
 
-    per_chip_output_shape[0] += 2
     ttnn_persistent_intermediate_tensor = ttnn.from_torch(
-        torch.zeros(per_chip_output_shape),
+        torch.zeros(padded_shape(per_chip_output_shape, tile, num_devices, num_links, input_dtype)),
         tile=ttnn.Tile(tile),
         dtype=input_dtype,
         device=mesh_device,
@@ -203,7 +201,6 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
         memory_config=output_mem_config,
         mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
     )
-    per_chip_output_shape[0] -= 2
 
     sub_device_stall_group = []
     compute_grid_size = mesh_device.compute_with_storage_grid_size()
@@ -247,7 +244,6 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
 
         else:
             signpost("start")
-            print("num_iters", num_iters)
             for i in range(num_iters):
                 logger.info("Running all-gather async")
                 ttnn_tensor_out = ttnn.experimental.all_gather_async(
@@ -272,7 +268,6 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
         mesh_device.reset_sub_device_stall_group()
 
     # ttnn.visualize_mesh_device(mesh_device, tensor=ttnn_tensor_out)
-    print(ttnn_tensor_out.shape)
     tt_output_tensor = ttnn.to_torch(
         ttnn_tensor_out, mesh_composer=ConcatMesh2dToTensor(mesh_device, mesh_shape=mesh_shape, dims=concat_dims)
     )
@@ -291,7 +286,7 @@ def run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
     # Repeat the input tensor to represent the fact that the full concatenated input tensor lives across every
     # device in the line
     repeat_factor = [1] * len(output_golden.shape)
-    repeat_factor[dim] = num_devices_per_line
+    repeat_factor[dim] = num_devices
     output_golden[:, :, :, :] = full_input_tensor_unfractured.repeat(repeat_factor)
 
     eq = True
@@ -396,9 +391,9 @@ def run_rs_with_trace(
     return ttnn_tensor_out
 
 
-def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
+def run_reduce_scatter_on_TG(
     mesh_device,
-    num_devices_per_line,
+    num_devices,
     per_chip_input_shape,
     tensor_memory_layout,
     dim,
@@ -418,16 +413,15 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     # New all-gather-async and persistent fabric params
 ):
     ttnn.enable_program_cache(mesh_device)
-    print(f"{num_iters=}, {warmup_iters=}")
     per_reduce_scatter_output_shape = list(per_chip_input_shape)
-    per_reduce_scatter_output_shape[dim] *= num_devices_per_line
+    per_reduce_scatter_output_shape[dim] *= num_devices
     full_mesh_input_shape = list(per_reduce_scatter_output_shape)
     ## The `reduce_scatter_instances_concat_dim` is the dimension we will split the cluster spanning tensor along in order to split it
     ## off into per-all-gather tensors
     reduce_scatter_instances_concat_dim = 1 if dim == 0 else 0
     full_mesh_input_shape[reduce_scatter_instances_concat_dim] *= num_reduce_scatter_instances
     logger.info(
-        f"full_mesh_input_shape: {full_mesh_input_shape}, dim: {dim}, reduce_scatter_instances_concat_dim: {reduce_scatter_instances_concat_dim}, num_devices_per_line: {num_devices_per_line}"
+        f"full_mesh_input_shape: {full_mesh_input_shape}, dim: {dim}, reduce_scatter_instances_concat_dim: {reduce_scatter_instances_concat_dim}, num_devices: {num_devices}"
     )
 
     sub_device_stall_group = []
@@ -454,11 +448,11 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     ## Compute golden
     ##
     per_chip_output_shape = list(per_chip_input_shape)
-    per_chip_output_shape[dim] //= num_devices_per_line
+    per_chip_output_shape[dim] //= num_devices
     per_reduce_scatter_inputs = []
     per_reduce_scatter_goldens = []
     for i in range(num_reduce_scatter_instances):
-        per_chip_inputs = [torch.rand(per_chip_input_shape).bfloat16() for _ in range(num_devices_per_line)]
+        per_chip_inputs = [torch.rand(per_chip_input_shape).bfloat16() for _ in range(num_devices)]
         per_reduce_scatter_inputs.append(per_chip_inputs)
 
         golden_canonical_out_tensor = torch.zeros(per_chip_input_shape).bfloat16()
@@ -481,18 +475,18 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     concat_dims = shard_dims
 
     mesh_shape = (
-        (num_devices_per_line, num_reduce_scatter_instances)
+        (num_devices, num_reduce_scatter_instances)
         if cluster_axis == 0
-        else (num_reduce_scatter_instances, num_devices_per_line)
+        else (num_reduce_scatter_instances, num_devices)
     )
 
     output_shard_spec = None
     if input_shard_spec is not None:
         output_shard_shape = list(input_shard_spec.shape)
         if dim == 3:
-            output_shard_shape[1] //= num_devices_per_line
+            output_shard_shape[1] //= num_devices
         else:
-            output_shard_shape[0] //= num_devices_per_line
+            output_shard_shape[0] //= num_devices
         output_shard_spec = ttnn.ShardSpec(
             input_shard_spec.grid,
             output_shard_shape,
@@ -511,8 +505,6 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
 
     persistent_buffers = None
     tile = (32, 32)
-    padded_per_chip_input_shape = list(per_chip_input_shape)
-    padded_per_chip_input_shape[0] += 2
     persistent_buffers = [
         ttnn.from_torch(
             torch.zeros(per_chip_output_shape),
@@ -524,7 +516,7 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
             mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
         ),
         ttnn.from_torch(
-            torch.zeros(padded_per_chip_input_shape),
+            torch.zeros(padded_shape(per_chip_input_shape, tile, num_devices, num_links, input_dtype)),
             tile=ttnn.Tile(tile),
             dtype=input_dtype,
             device=mesh_device,
@@ -581,7 +573,6 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     # Check the tensor addresses
     persistent_output_tensors = ttnn.get_device_tensors(persistent_buffers[0])
     output_tensors = ttnn.get_device_tensors(ttnn_tensor_out)
-    print("Persistent output tensors:", persistent_output_tensors)
 
     for persistent_tensor, output_tensor in zip(persistent_output_tensors, output_tensors):
         assert (
@@ -592,8 +583,8 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     for i in range(num_reduce_scatter_instances):
         # The result of all-chips in the reduce scatter line having their outputs concatenated
         reduce_scatter_outputs_concatenated = output_tensors_list[i]
-        per_chip_outputs = torch.chunk(reduce_scatter_outputs_concatenated, num_devices_per_line, dim=dim)
-        per_chip_goldens = torch.chunk(per_reduce_scatter_goldens[i], num_devices_per_line, dim=dim)
+        per_chip_outputs = torch.chunk(reduce_scatter_outputs_concatenated, num_devices, dim=dim)
+        per_chip_goldens = torch.chunk(per_reduce_scatter_goldens[i], num_devices, dim=dim)
 
         assert len(per_chip_outputs) == len(per_chip_goldens)
         # compare the output and golden (zip)
@@ -614,7 +605,7 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
     [
         (8, 4, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
         (4, 4, [1, 1, 4096, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
-        (4, 4, [1, 1, 8192, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 4096, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
     ],
 )
 @pytest.mark.parametrize(
@@ -626,6 +617,9 @@ def run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
 @pytest.mark.parametrize("mesh_device", [pytest.param((8, 4), id="8x4_grid")], indirect=True)
 @pytest.mark.parametrize(
     "device_params", [{"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING, "trace_region_size": 5554176}], indirect=True
+)
+@pytest.mark.parametrize(
+    "trace_mode, warmup_iters, num_iters", [(False, 0, 1), (True, 15, 100)], ids=["no_trace", "trace"]
 )
 def test_all_gather_TG(
     mesh_device,
@@ -640,11 +634,13 @@ def test_all_gather_TG(
     use_program_cache,
     function_level_defaults,
     replication_factor,
-    num_iters=100,
+    num_iters,
+    warmup_iters,
+    trace_mode,
 ):
     if len(mesh_device.get_devices()) != 32:
         pytest.skip("Not TG!")
-    run_line_all_gather_on_TG_with_mesh_tensor_along_rows(
+    run_all_gather_on_TG(
         mesh_device,
         num_devices,
         per_chip_output_shape,
@@ -656,10 +652,11 @@ def test_all_gather_TG(
         buffer_type,
         use_program_cache,
         function_level_defaults,
-        warmup_iters=15,
+        warmup_iters=warmup_iters,
         num_iters=num_iters,
         num_all_gather_instances=replication_factor,
         cluster_axis=cluster_axis,
+        trace_mode=trace_mode,
     )
 
 
@@ -683,6 +680,9 @@ def test_all_gather_TG(
 @pytest.mark.parametrize(
     "device_params", [{"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING, "trace_region_size": 5554176}], indirect=True
 )
+@pytest.mark.parametrize(
+    "trace_mode, warmup_iters, num_iters", [(False, 0, 1), (True, 15, 100)], ids=["no_trace", "trace"]
+)
 def test_reduce_scatter_TG(
     mesh_device,
     num_devices,
@@ -696,12 +696,14 @@ def test_reduce_scatter_TG(
     use_program_cache,
     function_level_defaults,
     replication_factor,
-    num_iters=100,
+    num_iters,
+    warmup_iters,
+    trace_mode,
 ):
     if len(mesh_device.get_devices()) != 32:
         pytest.skip("Not TG!")
 
-    run_line_reduce_scatter_on_TG_with_mesh_tensor_along_rows(
+    run_reduce_scatter_on_TG(
         mesh_device,
         num_devices,
         rs_input_shape,
@@ -715,8 +717,8 @@ def test_reduce_scatter_TG(
         use_program_cache,
         function_level_defaults,
         num_iters=num_iters,
-        warmup_iters=15,
+        warmup_iters=warmup_iters,
         num_reduce_scatter_instances=replication_factor,
         cluster_axis=cluster_axis,
-        trace_mode=True,
+        trace_mode=trace_mode,
     )
