@@ -270,6 +270,42 @@ def model_location_generator(is_ci_v2_env):
 
     return model_location_generator_
 
+    @pytest.fixture(scope="session")
+def model_location_generator2(is_ci_v2_env):
+    """
+    Testing stuff out by making a copy of the model_location_generator
+    """
+
+    def model_location_generator2_(model_version, model_subdir="", download_if_ci_v2=False, ci_v2_timeout_in_s=300):
+        model_folder = Path("tt_dnn-models") / model_subdir
+        internal_weka_path = Path("/mnt/MLPerf") / model_folder / model_version
+        has_internal_weka = internal_weka_path.exists()
+
+        download_from_ci_v2 = download_if_ci_v2 and is_ci_v2_env
+
+        if download_from_ci_v2:
+            assert (
+                not has_internal_weka
+            ), "For some reason, we see a file existing at the expected MLPerf location: {internal_weka_path} on CIv2. Please use the opportunity to clean up your model and get rid of MLPerf if you're moving to CIv2"
+            assert (
+                not model_subdir
+            ), f"model_subdir is set to {model_subdir}, but we don't support further levels of directories in the large file cache in CIv2"
+            civ2_download_path = CIv2ModelDownloadUtils_.download_from_ci_v2_cache(
+                model_version, download_dir_suffix="model_weights", timeout_in_s=ci_v2_timeout_in_s
+            )
+            logger.info(f"For model location, using CIv2 large file cache: {civ2_download_path}")
+            return civ2_download_path
+        elif has_internal_weka:
+            logger.info(f"For model location, using internal MLPerf path: {internal_weka_path}")
+            return internal_weka_path
+        else:
+            logger.info(
+                f"For model location, local copy not found, so likely downloading straight from HF: {model_version}"
+            )
+            return model_version
+
+    return model_location_generator2_
+
 
 @pytest.fixture(scope="session")
 def get_tt_cache_path():

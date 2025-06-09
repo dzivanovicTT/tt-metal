@@ -9,6 +9,8 @@ from datasets import load_dataset
 from loguru import logger
 from torch.utils.data import Dataset
 
+from conftest import model_location_generator2
+
 
 class SQUADV2Dataset(Dataset):
     """Configurable SQuad-V2 Dataset."""
@@ -97,7 +99,7 @@ def squad_divide_chunks(dataset_question, dataset_context, dataset_reference, ba
 
 
 def squadv2_1K_samples_input(tokenizer, seq_len, attention_mask, token_type_ids, microbatch=8):
-    squadv2_dataset = load_dataset("squad_v2", use_auth_token=False, streaming=True)["validation"]
+    squadv2_dataset = load_dataset(model_location_generator("squad_v2"), use_auth_token=False, streaming=True)["validation"]
     # squadv2_dataset = load_dataset("squad_v2", use_auth_token=True, streaming=True)["validation"]
 
     dataset_iter = iter(squadv2_dataset)
