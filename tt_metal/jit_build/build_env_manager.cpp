@@ -176,7 +176,7 @@ JitBuildStateSet create_build_state(JitBuildEnv& build_env, chip_id_t /*device_i
                 return std::make_shared<JitBuildActiveEthernet>(
                     build_env,
                     JitBuiltStateConfig{
-                        .processor_id = processor_class,
+                        .processor_id = processor_type,
                         .is_fw = is_fw,
                         .dispatch_message_addr = dispatch_message_addr,
                         .is_cooperative = hal.get_eth_fw_is_cooperative()});
@@ -186,9 +186,10 @@ JitBuildStateSet create_build_state(JitBuildEnv& build_env, chip_id_t /*device_i
                 return std::make_shared<JitBuildIdleEthernet>(
                     build_env,
                     JitBuiltStateConfig{
-                        .processor_id = processor_class,
+                        .processor_id = processor_type,
                         .is_fw = is_fw,
-                        .dispatch_message_addr = dispatch_message_addr});
+                        .dispatch_message_addr = dispatch_message_addr,
+                        .is_cooperative = hal.get_eth_fw_is_cooperative()});
                 break;
             }
             default:

@@ -43,6 +43,7 @@
 #include "command_queue.hpp"
 #include "dispatch/command_queue_common.hpp"
 #include "common/core_assignment.hpp"
+#include "hal.hpp"
 #include "program/program_impl.hpp"
 #include "core_coord.hpp"
 #include "device.hpp"
@@ -322,10 +323,9 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
     const auto& hal = MetalContext::instance().hal();
     uint32_t core_type_idx = hal.get_programmable_core_type_index(core_type);
     uint32_t processor_class_count = hal.get_processor_classes_count(core_type);
-    auto jit_build_config =
-        hal.get_jit_build_config(core_type_idx, 0, 0);  // Only the first risc needs to be programmed
     const auto& rtoptions = tt_metal::MetalContext::instance().rtoptions();
 
+    // TOOD: Lower all of this into the HAL
     switch (core_type) {
         case HalProgrammableCoreType::TENSIX: {
             for (uint32_t processor_class = 0; processor_class < processor_class_count; processor_class++) {
@@ -369,13 +369,22 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
                 }
             }
 
+            auto jit_build_config = hal.get_jit_build_config(core_type_idx, 0, 0);
+            tt::tt_metal::MetalContext::instance().get_cluster().write_core(
+                &jit_build_config.fw_launch_addr_value,
+                sizeof(uint32_t),
+                tt_cxy_pair(this->id_, virtual_core),
+                jit_build_config.fw_launch_addr);
+
             break;
         }
         case HalProgrammableCoreType::ACTIVE_ETH:
         case HalProgrammableCoreType::IDLE_ETH: {
-            bool is_idle_eth = core_type == HalProgrammableCoreType::IDLE_ETH;
+            const bool is_idle_eth = core_type == HalProgrammableCoreType::IDLE_ETH;
+            const bool is_active_eth = !is_idle_eth;
             TensixSoftResetOptions reset_val = TENSIX_ASSERT_SOFT_RESET;
-            if (not is_idle_eth) {
+            // Do not put dm0 into reset. It is running base fw
+            if (is_active_eth) {
                 reset_val =
                     reset_val & static_cast<TensixSoftResetOptions>(
                                     ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::BRISC));
@@ -384,6 +393,12 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
                 tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
                     tt_cxy_pair(this->id(), virtual_core), reset_val);
             }
+
+            // Ethernet worker core. Launch messages will be sent by FD infra if it's enabled
+            // Idle ethernet core. Used by FD infra. Host will write launch messages during init.
+            launch_msg->kernel_config.mode =
+                (this->using_slow_dispatch() or is_idle_eth) ? DISPATCH_MODE_HOST : DISPATCH_MODE_DEV;
+
             if (not rtoptions.get_skip_loading_fw()) {
                 for (uint32_t processor_class = 0; processor_class < processor_class_count; processor_class++) {
                     auto num_build_states = hal.get_processor_types_count(core_type_idx, processor_class);
@@ -397,22 +412,37 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
                         llrt::test_load_write_read_risc_binary(
                             binary_mem, this->id(), virtual_core, core_type_idx, processor_class, eriscv_id);
                     }
+
+                    for (uint32_t eriscv_id = 0; eriscv_id < num_build_states; eriscv_id++) {
+                        // Launching DM0 uses PC or ETH FW API
+                        // Other DMs use PC only, but deassert reset are handled by DM0
+                        auto jit_build_config = hal.get_jit_build_config(core_type_idx, 0 /* Eth */, eriscv_id);
+                        if (eriscv_id != 0 || hal.get_eth_fw_is_cooperative() ||
+                            core_type != HalProgrammableCoreType::ACTIVE_ETH) {
+                            // PC
+                            tt::tt_metal::MetalContext::instance().get_cluster().write_core(
+                                &jit_build_config.fw_launch_addr_value,
+                                sizeof(uint32_t),
+                                tt_cxy_pair(this->id_, virtual_core),
+                                jit_build_config.fw_launch_addr);
+                        } else {
+                            // ETH FW API
+                            tt::llrt::internal_::send_msg_to_eth_mailbox(
+                                id_,
+                                virtual_core,
+                                tt_metal::FWMailboxMsg::ETH_MSG_RELEASE_CORE,
+                                {/*l1 addr to execute*/ jit_build_config.fw_launch_addr_value},
+                                true);
+                        }
+                    }
                 }
             }
-            // Ethernet worker core. Launch messages will be sent by FD infra if it's enabled
-            // Idle ethernet core. Used by FD infra. Host will write launch messages during init.
-            launch_msg->kernel_config.mode = (this->using_slow_dispatch() or is_idle_eth) ? DISPATCH_MODE_HOST :  DISPATCH_MODE_DEV;
+
             break;
         }
         default:
             TT_THROW("Unsupported programable core type {} to initialize build states", magic_enum::enum_name(core_type));
     }
-
-    tt::tt_metal::MetalContext::instance().get_cluster().write_core(
-        &jit_build_config.fw_launch_addr_value,
-        sizeof(uint32_t),
-        tt_cxy_pair(this->id_, virtual_core),
-        jit_build_config.fw_launch_addr);
 
     // Initialize each entry in the launch_msg ring buffer with the correct dispatch mode - Cores that don't get a valid
     // launch_message during program execution need to at least have the correct dispatch mode.
@@ -552,6 +582,26 @@ void Device::reset_cores() {
                 tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
                     tt_cxy_pair(this->id(), virtual_core));
             }
+        }
+    } else {
+        // Active ethernet
+        for (const auto& eth_core : this->get_active_ethernet_cores()) {
+            TensixSoftResetOptions reset_val = TENSIX_ASSERT_SOFT_RESET;
+            // Only reset subordinate cores. Do not reset DM0
+            reset_val =
+                reset_val & static_cast<TensixSoftResetOptions>(
+                                ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::BRISC));
+            CoreCoord virtual_core = this->ethernet_core_from_logical_core(eth_core);
+            tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
+                tt_cxy_pair(this->id(), virtual_core), reset_val);
+        }
+
+        // Idle ethernet
+        for (const auto& eth_core : this->get_inactive_ethernet_cores()) {
+            TensixSoftResetOptions reset_val = TENSIX_ASSERT_SOFT_RESET;
+            CoreCoord virtual_core = this->ethernet_core_from_logical_core(eth_core);
+            tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
+                tt_cxy_pair(this->id(), virtual_core), reset_val);
         }
     }
 
@@ -727,8 +777,7 @@ void Device::initialize_and_launch_firmware() {
     core_info->worker_grid_size_x = this->logical_grid_size().x;  // Grid size as virtual coords see it (workers only)
     core_info->worker_grid_size_y = this->logical_grid_size().y;
 
-    // Download to worker cores
-    log_debug(tt::LogMetal, "Initializing firmware");
+    log_info(tt::LogMetal, "Initializing worker cores");
     CoreCoord grid_size = this->logical_grid_size();
     std::unordered_set<CoreCoord> not_done_cores;
 
@@ -766,7 +815,7 @@ void Device::initialize_and_launch_firmware() {
             hal.get_dev_addr(HalProgrammableCoreType::ACTIVE_ETH, HalL1MemAddrType::APP_SYNC_INFO));
     }
 
-    // Load erisc app base FW to eth cores on WH and active_erisc FW on second risc of BH active eth cores
+    log_info(tt::LogMetal, "Initializing active ethernet cores");
     std::unordered_set<CoreCoord> active_eth_cores;
     for (const auto &eth_core : this->get_active_ethernet_cores()) {
         CoreCoord phys_eth_core = this->ethernet_core_from_logical_core(eth_core);
@@ -781,6 +830,7 @@ void Device::initialize_and_launch_firmware() {
         }
     }
 
+    log_info(tt::LogMetal, "Initializing idle ethernet cores");
     for (const auto &eth_core : this->get_inactive_ethernet_cores()) {
         CoreCoord phys_eth_core = this->ethernet_core_from_logical_core(eth_core);
         core_info->absolute_logical_x = eth_core.x;
@@ -794,31 +844,31 @@ void Device::initialize_and_launch_firmware() {
     // Barrier between L1 writes above and deassert below
     tt::tt_metal::MetalContext::instance().get_cluster().l1_barrier(this->id());
 
-    // Deassert worker cores
-    TensixSoftResetOptions reset_val;
+    // Deassert the first risc of all cores
+    // The first risc is the one responsible for deasserting other riscs on the same core
     for (const auto& worker_core : not_done_cores) {
-        if (active_eth_cores.find(worker_core) != active_eth_cores.end()) {
-            // bit 12 needs to be deasserted to run second erisc on BH
-            reset_val = TENSIX_DEASSERT_SOFT_RESET &
-                        static_cast<TensixSoftResetOptions>(
-                            ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::TRISC0));
-        } else {
-            reset_val = TENSIX_DEASSERT_SOFT_RESET;
+        if (is_active_ethernet_core(worker_core) && !hal.get_eth_fw_is_cooperative()) {
+            log_info(
+                tt::LogMetal,
+                "Skipping deassert of active ethernet core {} because it's cooperative",
+                worker_core.str());
+            continue;
         }
+        TensixSoftResetOptions reset_val = TENSIX_DEASSERT_SOFT_RESET;
         tt::tt_metal::MetalContext::instance().get_cluster().deassert_risc_reset_at_core(
             tt_cxy_pair(this->id(), worker_core), reset_val);
     }
 
     // Wait until fw init is done, ensures the next launch msg doesn't get
     // written while fw is still in init
-    log_debug(tt::LogMetal, "Waiting for firmware init complete");
+    log_info(tt::LogMetal, "Waiting for firmware init complete on device {}", this->id_);
     const int timeout_ms = 10000; // 10 seconds for now
     try {
         llrt::internal_::wait_until_cores_done(this->id(), RUN_MSG_INIT, not_done_cores, timeout_ms);
     } catch (std::runtime_error &e) {
         TT_THROW("Device {} init: failed to initialize FW! Try resetting the board.", this->id());
     }
-    log_debug(tt::LogMetal, "Firmware init complete");
+    log_info(tt::LogMetal, "Firmware init complete on device {}", this->id_);
 }
 
 void Device::clear_l1_state() {
@@ -1114,9 +1164,11 @@ bool Device::close() {
             CoreCoord worker_core = this->worker_core_from_logical_core(logical_core);
 
             if (!dispatch_cores.contains(worker_core) && !routing_cores.contains(worker_core)) {
-                if (!this->storage_only_cores_.contains(logical_core)) {
+                if (!this->storage_only_cores_.contains(logical_core) && !is_active_ethernet_core(logical_core)) {
                     tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
                         tt_cxy_pair(this->id(), worker_core));
+                } else if (is_active_ethernet_core(logical_core)) {
+                    log_info(tt::LogMetal, "{} is an active ethernet core, not resetting", worker_core.str());
                 }
             } else {
                 log_debug(tt::LogMetal, "{} will not be Reset when closing Device {}", worker_core.str(), this->id());
@@ -1126,6 +1178,7 @@ bool Device::close() {
 
     if (!MetalContext::instance().hal().get_eth_fw_is_cooperative()) {
         for (const auto& eth_core : this->get_active_ethernet_cores()) {
+            // Put non primary risc into reset
             CoreCoord virtual_eth_core = this->ethernet_core_from_logical_core(eth_core);
             TensixSoftResetOptions reset_val =
                 TENSIX_ASSERT_SOFT_RESET &

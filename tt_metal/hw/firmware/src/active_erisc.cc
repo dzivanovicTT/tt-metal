@@ -65,6 +65,12 @@ uint32_t sumIDs[SUM_COUNT] __attribute__((used));
 }  // namespace kernel_profiler
 #endif
 
+void set_deassert_addresses() {
+#ifdef ARCH_BLACKHOLE
+    WRITE_REG(SUBORDINATE_AERISC_RESET_PC, MEM_SUBORDINATE_AERISC_FIRMWARE_BASE);
+#endif
+}
+
 int main() {
     configure_csr();
     WAYPOINT("I");
@@ -86,9 +92,11 @@ int main() {
     for (uint32_t n = 0; n < NUM_NOCS; n++) {
         noc_local_state_init(n);
     }
+    deassert_all_reset();
 
     mailboxes->go_message.signal = RUN_MSG_DONE;
 
+    // TODO Break out of this loop when signalled from the host to return to base FW
     while (1) {
         // Wait...
         WAYPOINT("GW");
@@ -139,8 +147,6 @@ int main() {
                 // one time here instead of setting it everytime in dataflow_api.
                 NOC_CMD_BUF_WRITE_REG(0 /* noc */, NCRISC_WR_CMD_BUF, NOC_AT_LEN_BE_1, 0);
 #endif
-                // TODO: This currently runs on second risc on active eth cores but with newer drop of syseng FW
-                //  this will run on risc0
                 int index = static_cast<std::underlying_type<EthProcessorTypes>::type>(EthProcessorTypes::DM0);
                 uint32_t kernel_lma =
                     mailboxes->launch[mailboxes->launch_msg_rd_ptr].kernel_config.kernel_text_offset[index];
