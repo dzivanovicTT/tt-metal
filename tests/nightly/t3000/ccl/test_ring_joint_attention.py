@@ -12,7 +12,7 @@ from tests.tt_eager.python_api_testing.sweep_tests.comparison_funcs import (
 import ttnn
 from loguru import logger
 import pytest
-from .test_scaled_dot_product_attention import fa_rand
+from tests.tt_eager.python_api_testing.unit_testing.misc.test_scaled_dot_product_attention import fa_rand
 
 
 def torch_sdpa(q, k, v, joint_q, joint_k, joint_v, num_devices):
@@ -72,8 +72,8 @@ def run_ring_joint_sdpa(
     all_gather_topology,
 ):
     full_compute_grid = submesh.compute_with_storage_grid_size()
-    sdpa_compute_grid = (8, 7)
-    ccl_core_grid_offset = (0, 7)
+    sdpa_compute_grid = (full_compute_grid.x, full_compute_grid.y - 1)
+    ccl_core_grid_offset = (0, full_compute_grid.y - 1)
 
     # Basic CCL setup
     ccl_sub_device_crs = ttnn.CoreRangeSet(
@@ -295,10 +295,6 @@ def run_ring_joint_sdpa(
 @pytest.mark.parametrize(
     "device_params, all_gather_topology",
     [
-        # (
-        #     {"worker_l1_size": 1344544, "trace_region_size": 200000, "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING},
-        #     ttnn.Topology.Ring,
-        # ),
         (
             {"worker_l1_size": 1344544, "trace_region_size": 200000, "fabric_config": ttnn.FabricConfig.FABRIC_1D},
             ttnn.Topology.Linear,
@@ -306,7 +302,6 @@ def run_ring_joint_sdpa(
     ],
     indirect=["device_params"],
     ids=[
-        # "ring",
         "line",
     ],
 )
@@ -386,6 +381,7 @@ def test_ring_joint_sdpa(
         up_axis,
         all_gather_topology,
     )
+    ttnn.close_mesh_device(submesh)
 
 
 @pytest.mark.parametrize("dtype", [ttnn.bfloat16], ids=["bf16"])
@@ -489,3 +485,4 @@ def test_ring_joint_sdpa_program_cache(
         )
 
     assert submesh.num_program_cache_entries() == 1
+    ttnn.close_mesh_device(submesh)
