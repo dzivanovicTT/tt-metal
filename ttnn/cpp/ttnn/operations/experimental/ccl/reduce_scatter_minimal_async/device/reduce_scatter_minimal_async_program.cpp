@@ -120,7 +120,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
     const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
     uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
-
+    uint32_t tiles_to_write_per_packet = 1;
     uint32_t tile_granularity = 4 * num_pages_per_packet;
     uint32_t cb_num_pages = 3 * tile_granularity;  // double buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
@@ -191,7 +191,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         ring_size,                                               // ring_size
         num_batches,                                             // num_batches
         fuse_op,                                                 // fused op
-        num_pages_per_packet                                     // contig_pages_advanced
+        tiles_to_write_per_packet,                               // contig_pages_advanced
     };
     auto worker_sender_reader_kernel_id = tt::tt_metal::CreateKernel(
         program,
@@ -216,7 +216,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         batch_slice_num_pages,                                   // batch_slice_num_pages
         ring_size,                                               // ring_size
         num_batches,                                             // num_batches
-        num_pages_per_packet,                                    // contig_pages_advanced
+        tiles_to_write_per_packet,                               // contig_pages_advanced
     };
     auto worker_sender_writer_kernel_id = tt::tt_metal::CreateKernel(
         program,

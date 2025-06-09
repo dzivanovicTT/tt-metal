@@ -107,32 +107,29 @@ void kernel_main() {
             uint32_t stride_Wt = input_tensor_Wt;
             uint32_t pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
             uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
+            uint32_t intermediate_pages_read_in_row = (link * batch_slice_num_pages / num_links) % slice_Wt;
+            uint32_t intermediate_row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
             uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
             uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
-            DPRINT << "READER: for link " << link << ", tiles_read: " << tiles_read
-                   << ", tiles_to_read: " << tiles_to_read << ", "
-                   << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset
-                   << ", slice_Wt: " << slice_Wt << ", stride_Wt: " << stride_Wt << ", batch_offset: " << batch_offset
-                   << "\n";
+            // DPRINT << "READER: for link " << link << ", tiles_read: " << tiles_read
+            //        << ", tiles_to_read: " << tiles_to_read << ", "
+            //        << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset
+            //        << ", slice_Wt: " << slice_Wt << ", stride_Wt: " << stride_Wt << ", batch_offset: " <<
+            //        batch_offset
+            //        << "\n";
 
             /**
              * Interleave forward and backward ring reads
              * forward handles even tiles, backward handles odd tiles
              * after ring_size-1 steps, we've transferred all tiles
              */
-            DPRINT << "Waiting on semaphore for link " << link << "\n";
             if (do_reduce) {
                 while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_fwd) <= i - 1);
                 while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_bwd) <= i - 1);
             }
-            DPRINT << "Got semaphore for link " << link << "\n";
             bool read_forward = true;
-            uint32_t packet_id = (tiles_read + contig_pages_advanced - 1) / contig_pages_advanced;
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
-
-                uint32_t intermediate_pages_read_in_row = pages_read_in_row;
-                uint32_t intermediate_row_offset = row_offset;
 
                 cb_reserve_back(cb_in0, num_pages_to_read);
                 const uint32_t l1_write_addr_base = get_write_ptr(cb_in0);
@@ -159,20 +156,18 @@ void kernel_main() {
                     cb_reserve_back(cb_intermediate_id, num_pages_to_read);
                     size_t intermediate_l1_write_addr = get_write_ptr(cb_intermediate_id);
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
-                        uint32_t payload_size_bytes =
-                            input_tensor_page_size * std::min(contig_pages_advanced, num_pages_to_read - j);
-                        uint32_t intermediate_packet_id =
-                            (read_forward ? actual_fwd_slice_idx : actual_bwd_slice_idx) + packet_id * ring_size;
+                        noc_async_read_tile(
+                            (read_forward ? fwd_input_tile_id_start : bwd_input_tile_id_start) +
+                                intermediate_row_offset + intermediate_pages_read_in_row,
+                            intermediate_tensor_addrgen,
+                            intermediate_l1_write_addr);
+                        intermediate_l1_write_addr += input_tensor_page_size;
 
-                        uint32_t intermediate_packet_first_tile_id =
-                            (intermediate_packet_id % N_DRAM_BANKS) +
-                            contig_pages_advanced * N_DRAM_BANKS * (intermediate_packet_id / N_DRAM_BANKS);
-                        uint64_t packet_addr = get_noc_addr(
-                            intermediate_packet_first_tile_id, intermediate_tensor_addrgen, 0 /*offset*/, 0 /*noc_id*/);
-
-                        noc_async_read(packet_addr, intermediate_l1_write_addr, payload_size_bytes);
-                        intermediate_l1_write_addr += payload_size_bytes;
-                        packet_id++;
+                        intermediate_pages_read_in_row++;
+                        if (intermediate_pages_read_in_row >= slice_Wt) {
+                            intermediate_row_offset += stride_Wt;
+                            intermediate_pages_read_in_row = 0;
+                        }
                     }
 
                     noc_async_read_barrier();
