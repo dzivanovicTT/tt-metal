@@ -124,8 +124,6 @@ void kernel_main() {
         uint32_t actual_bwd_slice_id_x = my_chip_id_x;
         uint32_t actual_bwd_slice_id_y = my_chip_id_y;
         for (uint32_t i = 0; i < ring_size; ++i) {
-            // uint32_t actual_fwd_slice_idx = (fwd_slice_idx + ring_size) % ring_size;
-            // uint32_t actual_bwd_slice_idx = bwd_slice_idx % ring_size;
             actual_fwd_slice_id_x = (actual_fwd_slice_id_x == 0) ? ring_size - 1 : actual_fwd_slice_id_x - 1;
             actual_bwd_slice_id_x = (actual_bwd_slice_id_x == ring_size - 1) ? 0 : actual_bwd_slice_id_x + 1;
 
@@ -259,8 +257,8 @@ void kernel_main() {
                 noc_async_writes_flushed();
             } else {
                 // Otherwise, on the last slice, write it to output buffer
-                uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
-                uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
+                uint32_t tiles_read = tiles_read_0;
+                uint32_t tiles_to_read = tiles_to_read_0;
                 uint32_t tile_id_start = batch_offset;
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
