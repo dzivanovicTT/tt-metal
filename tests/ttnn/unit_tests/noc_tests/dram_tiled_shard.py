@@ -7,7 +7,7 @@ import ttnn
 from tests.ttnn.utils_for_testing import assert_with_pcc
 import pytest
 
-compute_grid = ttnn.CoreGrid(x=10, y=10)  # actual 13, 10
+compute_grid = ttnn.CoreGrid(x=10, y=10)  # actual 13, 10 # 1,1 for just direct dram transfer
 num_tiles_per_dim = 10
 tensor_size = (32 * num_tiles_per_dim * compute_grid.y, 32 * num_tiles_per_dim * compute_grid.x)
 # x,y=multiple of (compute_grid.y*compute_grid.x*32) <= sqrt(max elements per core * num cores) so that its shardable in any orientation and maxes out L1

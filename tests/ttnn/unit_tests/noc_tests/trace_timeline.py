@@ -6,7 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticks
 
-create_plot = True
+create_plot = False
 trace_file = (
     "/localdev/sohaibnadeem/tt-metal/generated/profiler/.logs/noc_trace_dev0_ID35840.json"
     if len(sys.argv) == 1

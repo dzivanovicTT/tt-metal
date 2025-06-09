@@ -4,8 +4,8 @@ set -e
 test_dir="/localdev/sohaibnadeem/tt-metal/tests/ttnn/unit_tests/noc_tests"
 metal=/localdev/sohaibnadeem/tt-metal
 npe=/localdev/sohaibnadeem/tt-npe
-device=wormhole_b0
-test_files="l1_tiled_shard.py " #$(ls -p $test_dir | grep -v "/" | grep py)
+device=blackhole
+test_files="l1_tiled_shard.py" #$(ls -p $test_dir | grep -v "/" | grep py)
 reuse_traces=false
 #old_headers="Opname,Op ID,NoC Util,DRAM BW Util,Cong Impact,% Overall Cycles"
 headers="test name, test config, trace file, max_transfer_dispatch_delay, congestion impact, estimated cycles, golden cycles, cycle pred error, DRAM BW Util (using golden), DRAM BW Util (using estimated), avg Link util, max Link util, avg Link demand, max Link demand, avg NIU demand, max NIU demand, num timesteps, wallclock time"
