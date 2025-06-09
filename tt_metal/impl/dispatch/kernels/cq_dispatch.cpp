@@ -922,6 +922,7 @@ static void process_wait() {
     WAYPOINT("PWD");
 
     if (clear_stream) {
+        DPRINT << "CLEAR STREAM" << ENDL();
         volatile uint32_t* sem_addr = reinterpret_cast<volatile uint32_t*>(
             STREAM_REG_ADDR(stream, STREAM_REMOTE_DEST_BUF_SPACE_AVAILABLE_REG_INDEX));
         uint32_t neg_sem_val = -(*sem_addr);

@@ -29,6 +29,14 @@ struct DeviceMemoryAddress {
     DeviceAddr address;
 };
 
+class EventIDGenerator {
+public:
+    uint32_t get_next_event_id() { return ++event_id; }
+
+private:
+    uint32_t event_id = 0;
+};
+
 class FDMeshCommandQueue final : public MeshCommandQueueBase {
 private:
     void populate_read_descriptor_queue();
@@ -151,6 +159,7 @@ private:
     // Used to Maintain state: Mark/Check if this data structure is being used for dispatch.
     // This is temporary - will not be needed when we MeshCommandQueue is the only dispatch interface.
     std::atomic<bool> in_use_ = false;
+    std::shared_ptr<EventIDGenerator> event_id_generator_;
 
 protected:
     void write_shard_to_device(
@@ -174,7 +183,8 @@ public:
         uint32_t id,
         std::shared_ptr<ThreadPool>& dispatch_thread_pool,
         std::shared_ptr<ThreadPool>& reader_thread_pool,
-        std::shared_ptr<DispatchArray<LaunchMessageRingBufferState>>& worker_launch_message_buffer_state);
+        std::shared_ptr<DispatchArray<LaunchMessageRingBufferState>>& worker_launch_message_buffer_state,
+        std::shared_ptr<EventIDGenerator> event_id_generator);
 
     ~FDMeshCommandQueue() override;
 

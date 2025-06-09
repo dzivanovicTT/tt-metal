@@ -62,6 +62,7 @@ namespace distributed {
 class MeshCommandQueue;
 class MeshDeviceView;
 class MeshTraceBuffer;
+class EventIDGenerator;
 
 using DeviceIds = std::vector<int>;
 
@@ -117,6 +118,7 @@ private:
     // Num Virtual Eth Cores == Max Number of Eth Cores across all opened devices (Issue #19729)
     std::size_t num_virtual_eth_cores_ = 0;
     std::unique_ptr<program_cache::detail::ProgramCache> program_cache_;
+    std::vector<std::shared_ptr<EventIDGenerator>> event_id_generators_;
     // This is a reference device used to query properties that are the same for all devices in the mesh.
     IDevice* reference_device() const;
 
