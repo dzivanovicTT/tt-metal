@@ -4,6 +4,9 @@
 
 import ttnn
 import torch
+import os
+
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
 
 
 class TT_CCL:
@@ -28,10 +31,7 @@ class TT_CCL:
         self.to_remote_semaphore_handles = []
         self.all_gather_concat_inter_tensor = self.get_all_gather_concat_inter_buffer()
 
-        self.is_6u = (
-            ttnn.GetNumPCIeDevices() == 32 and ttnn.GetNumAvailableDevices() == 32
-        )  # TODO: find better way to do this
-        self.use_ring_prefill = self.is_6u and mode == "prefill"
+        self.use_ring_prefill = is_RING_6U and mode == "prefill"
 
         # Double buffered on each axis
         self.gather_semaphore_handles = [[], []]
@@ -52,7 +52,7 @@ class TT_CCL:
                             [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(2)]
                         )
                         self.reduce_semaphore_handles[i].append(
-                            [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(3)]
+                            [ttnn.create_global_semaphore(self.mesh_device, self.sub_device_crs, 0) for _ in range(12)]
                         )
 
                     else:
@@ -74,7 +74,11 @@ class TT_CCL:
         if mode == "prefill":
             self.support_seqlens = [16 * 1024, 8192, 4096, 1024, 2048, 128]
             if allocate_prefill_buffers:
-                self.persistent_buffers = self.get_prefill_reduce_scatter_buffers()
+                self.persistent_buffers = (
+                    self.get_ring_prefill_reduce_scatter_buffers()
+                    if is_RING_6U
+                    else self.get_prefill_reduce_scatter_buffers()
+                )
                 self.all_gather_buffers = self.get_prefill_all_gather_buffers()
             else:
                 for seqlen in self.support_seqlens:
@@ -377,6 +381,75 @@ class TT_CCL:
             persistent_buffers_all[seqlen] = persistent_buffers
         return persistent_buffers_all
 
+    def padded_shape(output_shape, tile, num_devices, num_links, ag_input_dtype):
+        num_banks = 12
+
+        # calculate num tiles sent in one iteration on one link
+        output_tiles_shape = (math.ceil(output_shape[2] / tile[0]), math.ceil(output_shape[3] / tile[1]))
+        output_tile_num = output_tiles_shape[0] * output_tiles_shape[1]
+        tile_num_per_link = math.ceil(output_tile_num / (num_devices * num_links))
+
+        max_num_tiles_per_package = 2
+        if ag_input_dtype == ttnn.bfloat8_b:
+            max_num_tiles_per_package = 4
+
+        # for bfloat8_b, tile_num_per_link=6, we would need to send 2 packages, but they can be of size 3 instead of 4
+        num_packages_per_link = math.ceil(tile_num_per_link / max_num_tiles_per_package)
+        actual_num_tiles_per_package = math.ceil(tile_num_per_link / num_packages_per_link)
+
+        # calculate total num packages that will be in intermediate tensor
+        total_num_packages = num_packages_per_link * num_devices * num_links
+
+        # calculate num tiles needed for total packages to fit
+        padded_output_tile_num = math.floor(total_num_packages / num_banks) * num_banks * actual_num_tiles_per_package
+        if total_num_packages % num_banks > 0:
+            padded_output_tile_num += (actual_num_tiles_per_package - 1) * num_banks + total_num_packages % num_banks
+
+        padded_shape = [
+            output_shape[0],
+            output_shape[1],
+            tile[0],
+            padded_output_tile_num * tile[1],
+        ]
+        return padded_shape
+
+    def get_ring_prefill_reduce_scatter_buffers(self):
+        """
+        Currently, this is hardcoded with llama specific shapes with hardcoded padding.
+        """
+        persistent_buffers_all = {}
+        for seqlen in self.support_seqlens:
+            persistent_buffers = {}
+
+            if self.model_config is None:
+                return persistent_buffers
+
+            buffers_dict = {
+                "QKV": [(1, 1, seqlen, 1280), 4],
+                "WO": [(1, 1, seqlen, 2048), 8],
+                "FF1": [(1, 1, seqlen, 3584), 4],
+                "FF3": [(1, 1, seqlen, 3584), 4],
+                "FF2": [(1, 1, seqlen, 2048), 8],
+            }
+            padded_buffers = {key: padded_shape(value[0], (32, 32), value[1], 4, ttnn.bfloat8_b)}
+            for key, shape in padded_buffers.items():
+                tt_buffers = []
+                for i in range(2):
+                    tt_buffer = ttnn.as_tensor(
+                        torch.zeros(shape[0]),
+                        device=self.mesh_device,
+                        layout=ttnn.TILE_LAYOUT,
+                        dtype=ttnn.bfloat8_b,
+                        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                        mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                        cache_file_name=self.weight_cache_path / (f"pb_rs_ring_{key}_{i}_{seqlen}"),
+                    )
+                    tt_buffers.append(tt_buffer)
+
+                persistent_buffers[key] = tt_buffers
+            persistent_buffers_all[seqlen] = persistent_buffers
+        return persistent_buffers_all
+
     def get_prefill_all_gather_buffers(self):
         """
         Currently, this is hardcoded with llama specific shapes.
@@ -407,24 +480,53 @@ class TT_CCL:
                     mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
                     cache_file_name=self.weight_cache_path / ("pb_ag_" + key + str(seqlen)),
                 )
+                ag_persistent_buffers[key] = tt_buffer
+            ag_persistent_buffers_all[seqlen] = ag_persistent_buffers
+        return ag_persistent_buffers_all
 
-                if self.use_ring_prefill:
-                    tt_intermediate_buffer = ttnn.as_tensor(
-                        torch.zeros(shape[0]),
-                        device=self.mesh_device,
-                        layout=ttnn.TILE_LAYOUT,
-                        dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
-                        memory_config=ttnn.DRAM_MEMORY_CONFIG,
-                        mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
-                        cache_file_name=self.weight_cache_path / ("pb_ag_out" + key + str(seqlen)),
-                    )
+    def get_ring_prefill_all_gather_buffers(self):
+        ag_persistent_buffers_all = {}
+        for seqlen in self.support_seqlens:
+            ag_persistent_buffers = {}
 
-                    ag_persistent_buffers[key] = {
-                        "intermediate": tt_intermediate_buffer,
-                        "output": tt_buffer,
-                    }
-                else:
-                    ag_persistent_buffers[key] = tt_buffer
+            buffers_dict = {
+                "QKV": [(1, 1, seqlen, 1280), 4],
+                "WO": [(1, 1, seqlen, 2048), 8],
+                "FF1": [(1, 1, seqlen, 3584), 4],
+                "FF3": [(1, 1, seqlen, 3584), 4],
+                "FF2": [(1, 1, seqlen, 2048), 8],
+                "LAYERNORM": [(1, 1, seqlen, 128), 4],
+            }
+            padded_buffers = {
+                key: padded_shape(
+                    value[0], (32, 32), value[1], 4, ttnn.ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b
+                )
+            }
+            for key, shape in buffers_dict.items():
+                tt_buffer = ttnn.as_tensor(
+                    torch.zeros(shape[0]),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                    cache_file_name=self.weight_cache_path / ("pb_ring_ag_0_" + key + str(seqlen)),
+                )
+
+                tt_intermediate_buffer = ttnn.as_tensor(
+                    torch.zeros(shape[0]),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                    cache_file_name=self.weight_cache_path / ("pb_ring_ag_1_" + key + str(seqlen)),
+                )
+
+                ag_persistent_buffers[key] = {
+                    "intermediate": tt_intermediate_buffer,
+                    "output": tt_buffer,
+                }
 
             ag_persistent_buffers_all[seqlen] = ag_persistent_buffers
         return ag_persistent_buffers_all
@@ -625,14 +727,22 @@ class TT_CCL:
         )
         seqlen = input_tensor_mesh.shape[-2]
         persistent_buffers = self.persistent_buffers[seqlen].get(buffer_key, None)
-        print("RING REDUCE SCATTER: ", input_tensor_mesh.shape)
+
+        if seqlen == 128:
+            num_links = 1
+        else:
+            num_links = 4
+        print(f"RING REDUCE SCATTER: {num_links} {input_tensor_mesh.shape}")
+        num_semaphores = 3 * num_links
         ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor=input_tensor_mesh,
-            persistent_intermediate_buffer=persistent_buffers[1],
-            persistent_output_buffer=persistent_buffers[2],
+            persistent_intermediate_buffer=persistent_buffers[0],
+            persistent_output_buffer=persistent_buffers[1],
             dim=dim,
-            multi_device_global_semaphore=self.reduce_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]],
-            num_links=1,
+            multi_device_global_semaphore=self.reduce_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]][
+                :num_semaphores
+            ],
+            num_links=num_links,
             memory_config=memory_config,
             topology=ttnn.Topology.Ring,
             subdevice_id=self.worker_sub_device_id,
@@ -720,14 +830,19 @@ class TT_CCL:
         persistent_buffers = self.all_gather_buffers[seqlen].get(buffer_key, None)
 
         # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
-        print("RING ALL GATHER: ", input_tensor_mesh.shape)
+
+        if seqlen == 128:
+            num_links = 1
+        else:
+            num_links = 4
+        print(f"RING ALL GATHER: {num_links} {input_tensor_mesh.shape}")
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor=input_tensor_mesh,
             persistent_intermediate_buffer=persistent_buffers["intermediate"],
             persistent_output_buffer=persistent_buffers["output"],
             dim=dim,
             multi_device_global_semaphore=self.gather_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]],
-            num_links=1,
+            num_links=num_links,
             memory_config=memory_config,
             topology=ttnn.Topology.Ring,
             subdevice_id=self.worker_sub_device_id,
