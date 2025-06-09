@@ -15,8 +15,8 @@ THRESHOLD = 0.4
     "ag_type, warmup_iters, perf_target_us",
     [
         ("sdpa", 15, 1200.9),
-        # ("binary_mult", 15, 1200.54),
-        # ("layernorm", 15, 5.4),
+        ("binary_mult", 15, 1200.54),
+        ("layernorm", 15, 5.4),
     ],
 )
 @pytest.mark.models_device_performance_bare_metal
@@ -30,7 +30,9 @@ def test_ag_tg_llama_perf(
     step_name = f"all_gather_{ag_type}"
 
     subdir = "llama_ccl_perf"
-    command = f"pytest tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG"
+    command = (
+        f"pytest tests/ttnn/unit_tests/operations/ccl/test_ccl_async_TG_llama.py::test_all_gather_tg_llama -k {ag_type}"
+    )
     cols = ["DEVICE KERNEL"]
     op_name = "AllGatherAsync"
     warmup_iters = warmup_iters * 32  # 5 iterations per device
