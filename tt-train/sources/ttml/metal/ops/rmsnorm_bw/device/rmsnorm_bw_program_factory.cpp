@@ -251,7 +251,7 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     auto cb_rhs =
         create_circular_buffer(program, all_cores, kRhsCbIndex, data_format, single_tile_size_bytes, Wt);  // 2
     auto cb_a_over_rms_a =
-        create_circular_buffer(program, all_cores, kAOverRmsACbIndex, data_format, single_tile_size_bytes, 1);
+        create_circular_buffer(program, all_cores, kAOverRmsACbIndex, data_format, single_tile_size_bytes, Wt);  // 1?
     auto cb_dL_dgamma_components =
         create_circular_buffer(program, all_cores, kDLdgammaComponentsCbIndex, data_format, single_tile_size_bytes, Wt);
 
