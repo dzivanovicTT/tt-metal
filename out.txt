@@ -1,0 +1,573 @@
+[32m2025-06-09 17:38:06.646[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.647[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.648[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.649[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.650[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.651[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.652[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.653[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.653[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.654[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.655[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.656[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.657[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.658[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.659[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.660[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.660[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.661[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.663[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.663[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.664[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.665[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.666[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.667[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.668[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.669[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.669[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.670[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.671[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.672[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.673[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.673[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.674[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.676[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.679[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.680[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.683[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.684[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.686[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.688[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.690[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.691[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.693[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.695[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.697[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.699[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.701[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.703[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.705[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.707[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.728[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.729[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.731[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.733[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.735[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.736[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.738[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.740[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.742[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.744[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.746[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.748[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.749[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.751[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+                 Device | INFO     | Opening user mode device driver
+[32m2025-06-09 17:38:06.936[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.937[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.938[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.939[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.940[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.941[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.942[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.942[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.943[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.944[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.945[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.946[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.946[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.947[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.948[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.949[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.949[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.950[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.951[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.952[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.953[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.954[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.955[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.956[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.957[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.957[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.958[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.959[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.960[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.961[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.962[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.962[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.963[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.965[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.967[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.969[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.971[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.973[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.975[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.977[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.978[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.980[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.982[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.984[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.986[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.987[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.989[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.991[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.993[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.995[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.997[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:06.999[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.000[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.002[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.004[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.006[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.007[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.009[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.011[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.013[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.014[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.016[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.018[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.020[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.205[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.206[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.207[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.208[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.209[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.210[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.210[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.211[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.212[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.213[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.214[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.214[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.216[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.216[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.217[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.218[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.219[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.220[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.221[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.222[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.223[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.224[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.225[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.225[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.226[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.227[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.228[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.229[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.230[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.231[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.232[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.233[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.234[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.279[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.324[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.369[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.414[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.459[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.504[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.549[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.593[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.638[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.683[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.728[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.773[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.818[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.863[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.908[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.952[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:07.997[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.042[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.087[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.132[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.177[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.222[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.267[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.312[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.357[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.402[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.447[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.492[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.537[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.582[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.627[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.853[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 31 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:08.898[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 31; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.937[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:08.938[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 31 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:08.938[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 31 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:08.941[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 30 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:08.985[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 30; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:08.986[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:08.987[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 30 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:08.987[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 30 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:08.989[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 29 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.033[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 29; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.034[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.035[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 29 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.035[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 29 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.038[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 12 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.082[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 12; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.082[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.083[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 12 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.083[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 12 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.086[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 11 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.130[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 11; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.131[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.131[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 11 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.131[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 11 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.134[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 10 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.178[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 10; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.179[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.179[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 10 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.179[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 10 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.182[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 9 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.226[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 9; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.227[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.228[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 9 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.228[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 9 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.231[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 8 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.275[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 8; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.275[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.276[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 8 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.276[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 8 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.279[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 7 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.323[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 7; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.324[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.324[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 7 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.324[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 7 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.327[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 6 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.371[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 6; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.372[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.372[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 6 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.372[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 6 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.375[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 5 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.419[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 5; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.420[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.420[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 5 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.420[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 5 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.423[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 4 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.467[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 4; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.468[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.469[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 4 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.469[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 4 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.471[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 3 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.515[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 3; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.516[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.516[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 3 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.516[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 3 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.519[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 2 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.563[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 2; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.564[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.565[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 2 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.565[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 2 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.568[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 1 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.611[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 1; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.612[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.613[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 1 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.613[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 1 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.615[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 0 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.659[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 0; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.660[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.660[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 0 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.661[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 0 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.663[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 13 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.707[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 13; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.708[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.708[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 13 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.708[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 13 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.711[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 14 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.755[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 14; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.756[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.756[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 14 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.756[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 14 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.759[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 15 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.803[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 15; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.804[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.804[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 15 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.804[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 15 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.807[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 16 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.851[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 16; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.852[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.852[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 16 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.852[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 16 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.855[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 17 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.899[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 17; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.900[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.900[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 17 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.900[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 17 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.903[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 18 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.947[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 18; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.948[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.949[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 18 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.949[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 18 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.952[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 19 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:09.995[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 19; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:09.996[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:09.997[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 19 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:09.997[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 19 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:09.999[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 20 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.043[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 20; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.045[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.045[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 20 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.045[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 20 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.048[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 21 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.092[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 21; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.093[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.093[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 21 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.093[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 21 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.096[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 22 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.140[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 22; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.141[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.141[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 22 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.141[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 22 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.144[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 23 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.188[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 23; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.188[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.189[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 23 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.189[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 23 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.192[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 24 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.236[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 24; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.236[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.237[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 24 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.237[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 24 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.240[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 25 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.284[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 25; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.284[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.285[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 25 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.285[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 25 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.288[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 26 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.332[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 26; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.332[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.333[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 26 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.333[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 26 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.336[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 27 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.380[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 27; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.380[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.381[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 27 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.381[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 27 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.384[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Harvesting mask for chip 28 is 0x0 (physical layout: 0x0, logical: 0x0, simulated harvesting mask: 0x0).
+[32m2025-06-09 17:38:10.427[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Opened PCI device 28; KMD version: 1.33.0, IOMMU: disabled
+[32m2025-06-09 17:38:10.429[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - NumHostMemChannels: 1 used for device_id: 0x401e less than target: 4. Workload will fail if it exceeds NumHostMemChannels. Increase Number of Hugepages.
+[32m2025-06-09 17:38:10.429[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - hwloc_set_area_membind(): failed for physical_device_id: 28 on NodeSet: [0] with errno: Operation not permitted (pid: 61589 tid: 140368102182912)
+[32m2025-06-09 17:38:10.429[0m | [1m[38;2;255;165;000mWARNING [0m | [36mSiliconDriver  [0m - ---- ttSiliconDevice::init_hugepage: bind_area_to_memory_nodeset() failed (physical_device_id: 28 ch: 0). Hugepage allocation is not on NumaNode matching TT Device. Side-Effect is decreased Device->Host perf (Issue #893).
+[32m2025-06-09 17:38:10.432[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Detected PCI devices: [25, 24, 23, 29, 0, 3, 12, 11, 10, 9, 8, 7, 6, 26, 27, 28, 4, 30, 1, 5, 31, 2, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22]
+[32m2025-06-09 17:38:10.432[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Using local chip ids: {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31} and remote chip ids {}
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 0)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 1)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 2)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 3)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 4)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 5)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 6)
+[32m2025-06-09 17:38:10.607[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 7)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 8)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 9)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 10)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 11)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 12)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 13)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 14)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 15)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 16)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 17)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 18)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 19)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 20)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 21)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 22)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 23)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 24)
+[32m2025-06-09 17:38:10.608[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 25)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 26)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 27)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 28)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 29)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 30)
+[32m2025-06-09 17:38:10.609[0m | [1m[38;2;100;149;237mINFO    [0m | [36mSiliconDriver  [0m - Software version 6.0.0, Ethernet FW version 6.14.0 (Device 31)
+============================= test session starts ==============================
+platform linux -- Python 3.10.12, pytest-7.2.2, pluggy-1.6.0 -- /opt/venv/bin/python3
+cachedir: .pytest_cache
+benchmark: 4.0.0 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /work/tt-metal, configfile: pytest.ini
+plugins: anyio-4.9.0, dash-2.15.0, benchmark-4.0.0, github-actions-annotate-failures-0.3.0, split-0.8.2, timeout-2.2.0, xdist-3.6.1
+timeout: 300.0s
+timeout method: signal
+timeout func_only: False
+collecting ... collected 2 items / 1 deselected / 1 selected
+
+tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG[silicon_arch_name=wormhole_b0-no_trace-device_params={'fabric_config': <FabricConfig.FABRIC_1D_RING: 2>, 'trace_region_size': 5554176}-8x4_grid-buffer_type=BufferType.DRAM-num_devices=4-num_links=4-per_chip_output_shape=[1, 1, 128, 128]-dim=3-layout=Layout.TILE-input_dtype=DataType.BFLOAT16-cluster_axis=1-replication_factor=8]                   Metal | INFO     | Initializing device 0. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 0 is:   1000 MHz
+                  Metal | INFO     | Initializing device 1. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 1 is:   1000 MHz
+                  Metal | INFO     | Initializing device 2. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 2 is:   1000 MHz
+                  Metal | INFO     | Initializing device 3. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 3 is:   1000 MHz
+                  Metal | INFO     | Initializing device 4. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 4 is:   1000 MHz
+                  Metal | INFO     | Initializing device 5. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 5 is:   1000 MHz
+                  Metal | INFO     | Initializing device 6. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 6 is:   1000 MHz
+                  Metal | INFO     | Initializing device 7. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 7 is:   1000 MHz
+                  Metal | INFO     | Initializing device 8. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 8 is:   1000 MHz
+                  Metal | INFO     | Initializing device 9. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 9 is:   1000 MHz
+                  Metal | INFO     | Initializing device 10. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 10 is:   1000 MHz
+                  Metal | INFO     | Initializing device 11. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 11 is:   1000 MHz
+                  Metal | INFO     | Initializing device 12. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 12 is:   1000 MHz
+                  Metal | INFO     | Initializing device 13. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 13 is:   1000 MHz
+                  Metal | INFO     | Initializing device 14. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 14 is:   1000 MHz
+                  Metal | INFO     | Initializing device 15. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 15 is:   1000 MHz
+                  Metal | INFO     | Initializing device 16. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 16 is:   1000 MHz
+                  Metal | INFO     | Initializing device 17. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 17 is:   1000 MHz
+                  Metal | INFO     | Initializing device 18. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 18 is:   1000 MHz
+                  Metal | INFO     | Initializing device 19. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 19 is:   1000 MHz
+                  Metal | INFO     | Initializing device 20. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 20 is:   1000 MHz
+                  Metal | INFO     | Initializing device 21. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 21 is:   1000 MHz
+                  Metal | INFO     | Initializing device 22. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 22 is:   1000 MHz
+                  Metal | INFO     | Initializing device 23. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 23 is:   1000 MHz
+                  Metal | INFO     | Initializing device 24. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 24 is:   1000 MHz
+                  Metal | INFO     | Initializing device 25. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 25 is:   1000 MHz
+                  Metal | INFO     | Initializing device 26. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 26 is:   1000 MHz
+                  Metal | INFO     | Initializing device 27. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 27 is:   1000 MHz
+                  Metal | INFO     | Initializing device 28. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 28 is:   1000 MHz
+                  Metal | INFO     | Initializing device 29. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 29 is:   1000 MHz
+                  Metal | INFO     | Initializing device 30. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 30 is:   1000 MHz
+                  Metal | INFO     | Initializing device 31. Program cache is NOT enabled
+                  Metal | INFO     | AI CLK for device 31 is:   1000 MHz
+                  Metal | INFO     | Profiler started on device 0
+                  Metal | INFO     | Profiler started on device 1
+                  Metal | INFO     | Profiler started on device 2
+                  Metal | INFO     | Profiler started on device 3
+                  Metal | INFO     | Profiler started on device 4
+                  Metal | INFO     | Profiler started on device 5
+                  Metal | INFO     | Profiler started on device 6
+                  Metal | INFO     | Profiler started on device 7
+                  Metal | INFO     | Profiler started on device 8
+                  Metal | INFO     | Profiler started on device 9
+                  Metal | INFO     | Profiler started on device 10
+                  Metal | INFO     | Profiler started on device 11
+                  Metal | INFO     | Profiler started on device 12
+                  Metal | INFO     | Profiler started on device 13
+                  Metal | INFO     | Profiler started on device 14
+                  Metal | INFO     | Profiler started on device 15
+                  Metal | INFO     | Profiler started on device 16
+                  Metal | INFO     | Profiler started on device 17
+                  Metal | INFO     | Profiler started on device 18
+                  Metal | INFO     | Profiler started on device 19
+                  Metal | INFO     | Profiler started on device 20
+                  Metal | INFO     | Profiler started on device 21
+                  Metal | INFO     | Profiler started on device 22
+                  Metal | INFO     | Profiler started on device 23
+                  Metal | INFO     | Profiler started on device 24
+                  Metal | INFO     | Profiler started on device 25
+                  Metal | INFO     | Profiler started on device 26
+                  Metal | INFO     | Profiler started on device 27
+                  Metal | INFO     | Profiler started on device 28
+                  Metal | INFO     | Profiler started on device 29
+                  Metal | INFO     | Profiler started on device 30
+                  Metal | INFO     | Profiler started on device 31
+                  Metal | INFO     | Initializing Fabric
+                  Metal | INFO     | Fabric Initialized
+                  Metal | INFO     | Enabling program cache on MeshDevice 0
+PASSED                  Metal | INFO     | Disabling and clearing program cache on MeshDevice 0
+                  Metal | INFO     | Closing device 0
+                  Metal | INFO     | Disabling and clearing program cache on device 0
+                  Metal | INFO     | Closing device 1
+                  Metal | INFO     | Disabling and clearing program cache on device 1
+                  Metal | INFO     | Closing device 2
+                  Metal | INFO     | Disabling and clearing program cache on device 2
+                  Metal | INFO     | Closing device 3
+                  Metal | INFO     | Disabling and clearing program cache on device 3
+                  Metal | INFO     | Closing device 4
+                  Metal | INFO     | Disabling and clearing program cache on device 4
+                  Metal | INFO     | Closing device 5
+                  Metal | INFO     | Disabling and clearing program cache on device 5
+                  Metal | INFO     | Closing device 6
+                  Metal | INFO     | Disabling and clearing program cache on device 6
+                  Metal | INFO     | Closing device 7
+                  Metal | INFO     | Disabling and clearing program cache on device 7
+                  Metal | INFO     | Closing device 8
+                  Metal | INFO     | Disabling and clearing program cache on device 8
+                  Metal | INFO     | Closing device 9
+                  Metal | INFO     | Disabling and clearing program cache on device 9
+                  Metal | INFO     | Closing device 10
+                  Metal | INFO     | Disabling and clearing program cache on device 10
+                  Metal | INFO     | Closing device 11
+                  Metal | INFO     | Disabling and clearing program cache on device 11
+                  Metal | INFO     | Closing device 12
+                  Metal | INFO     | Disabling and clearing program cache on device 12
+                  Metal | INFO     | Closing device 13
+                  Metal | INFO     | Disabling and clearing program cache on device 13
+                  Metal | INFO     | Closing device 14
+                  Metal | INFO     | Disabling and clearing program cache on device 14
+                  Metal | INFO     | Closing device 15
+                  Metal | INFO     | Disabling and clearing program cache on device 15
+                  Metal | INFO     | Closing device 16
+                  Metal | INFO     | Disabling and clearing program cache on device 16
+                  Metal | INFO     | Closing device 17
+                  Metal | INFO     | Disabling and clearing program cache on device 17
+                  Metal | INFO     | Closing device 18
+                  Metal | INFO     | Disabling and clearing program cache on device 18
+                  Metal | INFO     | Closing device 19
+                  Metal | INFO     | Disabling and clearing program cache on device 19
+                  Metal | INFO     | Closing device 20
+                  Metal | INFO     | Disabling and clearing program cache on device 20
+                  Metal | INFO     | Closing device 21
+                  Metal | INFO     | Disabling and clearing program cache on device 21
+                  Metal | INFO     | Closing device 22
+                  Metal | INFO     | Disabling and clearing program cache on device 22
+                  Metal | INFO     | Closing device 23
+                  Metal | INFO     | Disabling and clearing program cache on device 23
+                  Metal | INFO     | Closing device 24
+                  Metal | INFO     | Disabling and clearing program cache on device 24
+                  Metal | INFO     | Closing device 25
+                  Metal | INFO     | Disabling and clearing program cache on device 25
+                  Metal | INFO     | Closing device 26
+                  Metal | INFO     | Disabling and clearing program cache on device 26
+                  Metal | INFO     | Closing device 27
+                  Metal | INFO     | Disabling and clearing program cache on device 27
+                  Metal | INFO     | Closing device 28
+                  Metal | INFO     | Disabling and clearing program cache on device 28
+                  Metal | INFO     | Closing device 29
+                  Metal | INFO     | Disabling and clearing program cache on device 29
+                  Metal | INFO     | Closing device 30
+                  Metal | INFO     | Disabling and clearing program cache on device 30
+                  Metal | INFO     | Closing device 31
+                  Metal | INFO     | Disabling and clearing program cache on device 31
+
+
+==================================== PASSES ====================================
+- generated xml file: /work/tt-metal/generated/test_reports/most_recent_tests.xml -
+============================== slowest durations ===============================
+7.72s setup    tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG[silicon_arch_name=wormhole_b0-no_trace-device_params={'fabric_config': <FabricConfig.FABRIC_1D_RING: 2>, 'trace_region_size': 5554176}-8x4_grid-buffer_type=BufferType.DRAM-num_devices=4-num_links=4-per_chip_output_shape=[1, 1, 128, 128]-dim=3-layout=Layout.TILE-input_dtype=DataType.BFLOAT16-cluster_axis=1-replication_factor=8]
+1.01s call     tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG[silicon_arch_name=wormhole_b0-no_trace-device_params={'fabric_config': <FabricConfig.FABRIC_1D_RING: 2>, 'trace_region_size': 5554176}-8x4_grid-buffer_type=BufferType.DRAM-num_devices=4-num_links=4-per_chip_output_shape=[1, 1, 128, 128]-dim=3-layout=Layout.TILE-input_dtype=DataType.BFLOAT16-cluster_axis=1-replication_factor=8]
+0.27s teardown tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG[silicon_arch_name=wormhole_b0-no_trace-device_params={'fabric_config': <FabricConfig.FABRIC_1D_RING: 2>, 'trace_region_size': 5554176}-8x4_grid-buffer_type=BufferType.DRAM-num_devices=4-num_links=4-per_chip_output_shape=[1, 1, 128, 128]-dim=3-layout=Layout.TILE-input_dtype=DataType.BFLOAT16-cluster_axis=1-replication_factor=8]
+=========================== short test summary info ============================
+PASSED tests/ttnn/unit_tests/operations/ccl/test_llama_prefill_ccl_ops_TG.py::test_all_gather_TG[silicon_arch_name=wormhole_b0-no_trace-device_params={'fabric_config': <FabricConfig.FABRIC_1D_RING: 2>, 'trace_region_size': 5554176}-8x4_grid-buffer_type=BufferType.DRAM-num_devices=4-num_links=4-per_chip_output_shape=[1, 1, 128, 128]-dim=3-layout=Layout.TILE-input_dtype=DataType.BFLOAT16-cluster_axis=1-replication_factor=8]
+======================= 1 passed, 1 deselected in 9.10s ========================

@@ -603,9 +603,16 @@ def run_reduce_scatter_on_TG(
 @pytest.mark.parametrize(
     "num_devices, num_links, per_chip_output_shape, dim, layout, input_dtype, cluster_axis, replication_factor",
     [
+        # 4k seq len
         (8, 4, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
         (4, 4, [1, 1, 4096, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
         (4, 4, [1, 1, 4096, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 4096, 32 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
+        # 128 seq len
+        (8, 4, [1, 1, 128, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
+        (4, 4, [1, 1, 128, 320 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 128, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 128, 32 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
     ],
 )
 @pytest.mark.parametrize(
@@ -665,9 +672,14 @@ def test_all_gather_TG(
 @pytest.mark.parametrize(
     "num_devices, num_links, rs_input_shape, dim, layout, input_dtype, cluster_axis, replication_factor",
     [
+        # 4k seq len
         (8, 4, [1, 1, 4096, 2048], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
         (4, 4, [1, 1, 4096, 1280], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
         (4, 4, [1, 1, 4096, 3584], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # 128 seq len
+        (8, 4, [1, 1, 128, 2048], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
+        (4, 4, [1, 1, 128, 1280], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 128, 3584], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
     ],
 )
 @pytest.mark.parametrize(

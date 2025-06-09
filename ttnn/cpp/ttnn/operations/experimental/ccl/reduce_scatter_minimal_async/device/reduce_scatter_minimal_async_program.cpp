@@ -116,12 +116,28 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
     const auto [sender_worker_core_range, sender_worker_cores] = choose_worker_cores(
         num_links, num_senders_per_link, enable_persistent_fabric_mode, mesh_device, sub_device_id, core_grid_offset);
 
+    // Tensor Info
+    const auto input_tensor_buffer_type = input_tensor.buffer()->buffer_type();
+    const auto output_tensor_buffer_type = output_tensor.buffer()->buffer_type();
+    const auto input_tensor_shape = input_tensor.get_padded_shape();
+    const auto intermediate_tensor_buffer_type = intermediate_tensor.buffer()->buffer_type();
+    const auto input_tensor_num_pages = input_tensor.buffer()->num_pages();
+    const auto num_batches = input_tensor_shape[0];
+    const auto batch_slice_num_pages = input_tensor_num_pages / ring_size / num_batches;
+
     // L1 Scratch CB Creation
     const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
-    uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
-
-    uint32_t tile_granularity = 4 * num_pages_per_packet;
+    // Will be reworked
+    uint32_t num_pages_per_packet;
+    uint32_t tile_granularity;
+    if ((batch_slice_num_pages / num_links) % 4 != 0) {
+        num_pages_per_packet = 2;
+        tile_granularity = 2;
+    } else {
+        num_pages_per_packet = 4;
+        tile_granularity = 4;
+    }
     uint32_t cb_num_pages = 3 * tile_granularity;  // double buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
@@ -161,15 +177,6 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
             .set_page_size(reserved_packet_header_CB_index, packet_header_size_bytes);
     auto reserved_packet_header_CB_handle =
         CreateCircularBuffer(program, sender_worker_core_range, cb_reserved_packet_header_config);
-
-    // Tensor Info
-    const auto input_tensor_buffer_type = input_tensor.buffer()->buffer_type();
-    const auto output_tensor_buffer_type = output_tensor.buffer()->buffer_type();
-    const auto input_tensor_shape = input_tensor.get_padded_shape();
-    const auto intermediate_tensor_buffer_type = intermediate_tensor.buffer()->buffer_type();
-    const auto input_tensor_num_pages = input_tensor.buffer()->num_pages();
-    const auto num_batches = input_tensor_shape[0];
-    const auto batch_slice_num_pages = input_tensor_num_pages / ring_size / num_batches;
 
     TT_ASSERT(!(input_tensor_shape[3] % tt::constants::TILE_WIDTH));
     uint32_t input_tensor_Wt = input_tensor_shape[3] / tt::constants::TILE_WIDTH;
@@ -232,7 +239,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         intermediate_cb_index,
         compute_output_cb_index,
         batch_slice_num_pages,
-        (8 < tile_granularity ? 8 : tile_granularity),
+        tile_granularity,
         ring_size,
         num_batches,
         num_links};
