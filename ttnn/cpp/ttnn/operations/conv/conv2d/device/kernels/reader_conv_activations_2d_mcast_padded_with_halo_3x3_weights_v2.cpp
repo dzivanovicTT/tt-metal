@@ -144,60 +144,66 @@ void kernel_main() {
 
     noc_async_read_one_packet_set_state(get_noc_addr(act_l1_read_addr), coalesced_read_bytes);
 
+    constexpr uint32_t TILE_HEIGHT = 32;
+    constexpr uint32_t ntile_height = act_block_h_datums / TILE_HEIGHT;
+    constexpr uint32_t block_width = act_block_num_tiles / ntile_height;
+    constexpr uint32_t act_block_h_datums_per_tile_half = (act_block_h_datums / ntile_height) / 2;
+    constexpr uint32_t stride_h_bytes = padded_conv_act_size_w * conv_act_c_read_bytes * dilation_h;
+    constexpr uint32_t stride_w_bytes = conv_act_c_read_bytes * dilation_w;
+
     // Reset reader_idx to finish act_block_h_datums
     uint32_t reader_idx = 0;
     for (uint32_t nbh = 0; nbh < act_num_blocks_h; nbh++) {
-        cb_reserve_back(cb_id_act_row_major_bfloat16, act_block_num_tiles);
-        uint32_t l1_write_addr_act = get_write_ptr(cb_id_act_row_major_bfloat16);
+        for (uint32_t tile_h_index = 0; tile_h_index < ntile_height; tile_h_index++) {
+            cb_reserve_back(cb_id_act_row_major_bfloat16, block_width);
+            uint32_t l1_write_addr_act = get_write_ptr(cb_id_act_row_major_bfloat16);
 
-        constexpr uint32_t stride_h_bytes = padded_conv_act_size_w * conv_act_c_read_bytes * dilation_h;
-        constexpr uint32_t stride_w_bytes = conv_act_c_read_bytes * dilation_w;
-
-        for (uint32_t bh = 0; bh < act_block_h_datums / 2; bh++) {
-            uint32_t two_reader_indices = packed_reader_indices_ptr[reader_idx];
-            if constexpr (DILATION_W == 1) {
-                read_channels(
-                    l1_write_addr_act,
-                    act_l1_read_addr,
-                    two_reader_indices & 0xffff,
-                    conv_act_c_read_bytes,
-                    coalesced_read_bytes,
-                    stride_h_bytes);
-                if constexpr (act_block_w_extra_align_bytes) {
-                    l1_write_addr_act += act_block_w_extra_align_bytes;
+            for (uint32_t bh = 0; bh < act_block_h_datums_per_tile_half; bh++) {
+                uint32_t two_reader_indices = packed_reader_indices_ptr[reader_idx];
+                if constexpr (DILATION_W == 1) {
+                    read_channels(
+                        l1_write_addr_act,
+                        act_l1_read_addr,
+                        two_reader_indices & 0xffff,
+                        conv_act_c_read_bytes,
+                        coalesced_read_bytes,
+                        stride_h_bytes);
+                    if constexpr (act_block_w_extra_align_bytes) {
+                        l1_write_addr_act += act_block_w_extra_align_bytes;
+                    }
+                    read_channels(
+                        l1_write_addr_act,
+                        act_l1_read_addr,
+                        two_reader_indices >> 16,
+                        conv_act_c_read_bytes,
+                        coalesced_read_bytes,
+                        stride_h_bytes);
+                    if constexpr (act_block_w_extra_align_bytes) {
+                        l1_write_addr_act += act_block_w_extra_align_bytes;
+                    }
+                } else {
+                    read_dilated_channels<weight_size_h, weight_size_w>(
+                        l1_write_addr_act,
+                        act_l1_read_addr,
+                        two_reader_indices & 0xffff,
+                        conv_act_c_read_bytes,
+                        stride_h_bytes,
+                        stride_w_bytes);
+                    read_dilated_channels<weight_size_h, weight_size_w>(
+                        l1_write_addr_act,
+                        act_l1_read_addr,
+                        two_reader_indices >> 16,
+                        conv_act_c_read_bytes,
+                        stride_h_bytes,
+                        stride_w_bytes);
                 }
-                read_channels(
-                    l1_write_addr_act,
-                    act_l1_read_addr,
-                    two_reader_indices >> 16,
-                    conv_act_c_read_bytes,
-                    coalesced_read_bytes,
-                    stride_h_bytes);
-                if constexpr (act_block_w_extra_align_bytes) {
-                    l1_write_addr_act += act_block_w_extra_align_bytes;
-                }
-            } else {
-                read_dilated_channels<weight_size_h, weight_size_w>(
-                    l1_write_addr_act,
-                    act_l1_read_addr,
-                    two_reader_indices & 0xffff,
-                    conv_act_c_read_bytes,
-                    stride_h_bytes,
-                    stride_w_bytes);
-                read_dilated_channels<weight_size_h, weight_size_w>(
-                    l1_write_addr_act,
-                    act_l1_read_addr,
-                    two_reader_indices >> 16,
-                    conv_act_c_read_bytes,
-                    stride_h_bytes,
-                    stride_w_bytes);
+                reader_idx++;
             }
-            reader_idx++;
+            noc_async_read_barrier();
+            cb_push_back(cb_id_act_row_major_bfloat16, block_width);
         }
         // incrementing num issued in one shot is actually slower
         // noc_async_read_inc_num_issued(num_issued_reads_per_block); // "false" on read
-        noc_async_read_barrier();
-        cb_push_back(cb_id_act_row_major_bfloat16, act_block_num_tiles);
 
         // Round robin self-mcast and receive tilized act matrix in cb_id_act
         // Compute should function like regular mm

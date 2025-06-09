@@ -56,6 +56,7 @@ std::tuple<tt::tt_metal::CBHandle, tt::tt_metal::CBHandle, tt::tt_metal::CBHandl
     uint32_t num_cb0_second_reader_tiles,
     uint32_t num_cb1_tiles,
     uint32_t num_cb0_tilized_tiles,
+    uint32_t num_act_cb_row_major_bfloat16,
     uint32_t num_output_tiles,
     uint32_t num_reblock_cb_tiles,
     uint32_t num_writer_output_tiles,
@@ -121,12 +122,17 @@ std::tuple<tt::tt_metal::CBHandle, tt::tt_metal::CBHandle, tt::tt_metal::CBHandl
             // num_cb0_tilized_tiles is single buffered
             cb_indices.act_cb_row_major_bfloat16 = cb_indices.get_next_cb_index();
             tt::tt_metal::create_cb(
-                cb_indices.act_cb_row_major_bfloat16, program, core, act_tile_size, num_cb0_tilized_tiles, act_df);
+                cb_indices.act_cb_row_major_bfloat16,
+                program,
+                core,
+                act_tile_size,
+                num_act_cb_row_major_bfloat16,
+                act_df);
             log_debug(
                 LogOp,
                 "Act CB Row Major BFLOAT16: {}, npages: {}, pagesize: {}",
                 cb_indices.act_cb_row_major_bfloat16,
-                num_cb0_tilized_tiles,
+                num_act_cb_row_major_bfloat16,
                 act_tile_size);
         } else {
             // For 1D convs, locally create act matrix in act_cb, which is always ROW_MAJOR BFLOAT16
@@ -1168,6 +1174,11 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         // TODO: Moving this function call to after kernel logic causes pcc fails
         // There are additional CBs and semaphores created in 2D conv in kernel logic,
         // so does order of create_cb calls matter?
+        uint32_t num_act_cb_row_major_bfloat16 = act_block_w_ntiles;
+        if (act_block_h_ntiles > 1) {
+            num_act_cb_row_major_bfloat16 *= 2;
+        }
+
         input_output_cbs = create_CBs_for_sharded_input_v2(
             program,
             a,
@@ -1176,6 +1187,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
             num_act_cb_second_reader_tiles,  // row major act cb second reader
             num_weight_cb_tiles,             // tiled weight cb
             num_cb0_tilized_tiles,           // tiled act cb
+            num_act_cb_row_major_bfloat16,   // num_act_cb_row_major_bfloat16
             output_block_num_tiles,          // math output cb
             weight_block_w_ntiles,           // reblock cb
             writer_output_block_num_tiles,   // writer output cb, double bufferred
