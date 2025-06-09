@@ -55,6 +55,7 @@ void kernel_main() {
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem_forward = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem_backward = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
 
@@ -134,9 +135,11 @@ void kernel_main() {
     uint32_t tiles_read = input_tile_id_start;
     uint32_t tiles_to_read = input_tile_id_end;
     uint32_t tile_id_start = my_chip_id * input_tensor_Wt;
-    uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+    uint32_t packet_id =
+        ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) / contig_pages_advanced * link;
     DPRINT << "WRITER: Reading tiles...\n";
     while (tiles_read < tiles_to_read) {
+        DPRINT << "tiles_read: " << (uint32_t)tiles_read << " , packet_id: " << (uint32_t)packet_id << "\n";
         uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
         cb_wait_front(cb_forward_id, num_pages_to_read);
         size_t l1_read_addr = get_read_ptr(cb_forward_id);
@@ -234,17 +237,17 @@ void kernel_main() {
         // In the linear case, I expect num_targets_backward_direction slices from the left, and check if I have a
         // neighbor to the right
         // In the ring case, I expect to write to the right num_forward_target times
-        DPRINT << "WRITER: backward_writes: " << backward_writes
-               << " backward_writes_expected: " << backward_writes_expected << " forward_writes: " << forward_writes
-               << " forward_writes_expected: " << forward_writes_expected << "\n";
         if ((forward_writes < forward_writes_expected) && fabric_connection.has_forward_connection()) {
             tiles_read = input_tile_id_start;
             int slice_chip_id = my_chip_id - forward_writes - 1;
             uint32_t actual_slice_chip_id = (slice_chip_id < 0) ? ring_size + slice_chip_id : slice_chip_id;
             tiles_to_read = input_tile_id_end;
 
-            uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+            uint32_t packet_id =
+                ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) / contig_pages_advanced * link;
             while (tiles_read < tiles_to_read) {
+                DPRINT << "link: " << (uint32_t)link << " tiles_read: " << (uint32_t)tiles_read
+                       << " , packet_id: " << (uint32_t)packet_id << " fwd\n";
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                 cb_wait_front(cb_forward_id, num_pages_to_read);
                 size_t l1_read_addr = get_read_ptr(cb_forward_id);
@@ -276,6 +279,7 @@ void kernel_main() {
             pkt_hdr_fwd->to_chip_unicast(1);
             fabric_connection.get_forward_connection().send_payload_flush_blocking_from_address(
                 packet_header_buffer_seminc_forward, sizeof(PACKET_HEADER_TYPE));
+            DPRINT << "WRITER fwd sem inc\n";
 
             forward_writes++;
             // DPRINT << "WRITER fwd writers: " << forward_writes <<"\n";
@@ -292,8 +296,11 @@ void kernel_main() {
             uint32_t actual_slice_chip_id = (slice_chip_id >= ring_size) ? slice_chip_id - ring_size : slice_chip_id;
             tiles_to_read = input_tile_id_end;
 
-            uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+            uint32_t packet_id =
+                ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) / contig_pages_advanced * link;
             while (tiles_read < tiles_to_read) {
+                DPRINT << "link: " << (uint32_t)link << " tiles_read: " << (uint32_t)tiles_read
+                       << " , packet_id: " << (uint32_t)packet_id << " bwd\n";
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                 cb_wait_front(cb_backward_id, num_pages_to_read);
                 size_t l1_read_addr = get_read_ptr(cb_backward_id);
@@ -325,7 +332,7 @@ void kernel_main() {
             pkt_hdr_bwd->to_chip_unicast(1);
             fabric_connection.get_backward_connection().send_payload_flush_blocking_from_address(
                 packet_header_buffer_seminc_backward, sizeof(PACKET_HEADER_TYPE));
-
+            DPRINT << "WRITER bwd sem inc\n";
             backward_writes++;
         }
     }

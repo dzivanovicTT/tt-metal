@@ -52,6 +52,7 @@ void kernel_main() {
     const uint8_t signal_receiver_sem_forward_noc0_y = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t signal_receiver_sem_backward_noc0_x = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t signal_receiver_sem_backward_noc0_y = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
 
     // all args, we can only print uint32_t
     DPRINT << "Reader: " << "input_tensor_address: " << (uint32_t)input_tensor_address << "\n";
@@ -105,6 +106,7 @@ void kernel_main() {
         noc_async_read_barrier();
         cb_push_back(cb_forward_id, num_pages_to_read);
     }
+    DPRINT << "reader: done local\n";
 
     constexpr bool intermediate_tensor_is_dram = intermediate_buffer_type == tt::tt_metal::BufferType::DRAM;
     auto intermediate_tensor_addrgen = InterleavedAddrGenFast<intermediate_tensor_is_dram>{
@@ -157,7 +159,8 @@ void kernel_main() {
                 tiles_read = input_tile_id_start;
                 tiles_to_read = input_tile_id_end;
 
-                uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+                uint32_t packet_id = ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) /
+                                     contig_pages_advanced * link;
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);  // 2
                     cb_reserve_back(cb_forward_id, num_pages_to_read);
@@ -208,7 +211,8 @@ void kernel_main() {
                 tiles_read = input_tile_id_start;
                 tiles_to_read = input_tile_id_end;
 
-                uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+                uint32_t packet_id = ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) /
+                                     contig_pages_advanced * link;
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                     cb_reserve_back(cb_backward_id, num_pages_to_read);

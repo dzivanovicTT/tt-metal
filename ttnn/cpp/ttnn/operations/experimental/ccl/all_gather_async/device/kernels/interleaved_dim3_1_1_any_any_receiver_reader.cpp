@@ -41,6 +41,7 @@ void kernel_main() {
     uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_semaphore(get_arg_val<uint32_t>(arg_idx++));
+    uint32_t link = get_arg_val<uint32_t>(arg_idx++);
 
     constexpr bool intermediate_tensor_is_dram = intermediate_buffer_type == tt::tt_metal::BufferType::DRAM;
     auto intermediate_tensor_addrgen = InterleavedAddrGenFast<intermediate_tensor_is_dram>{
@@ -91,7 +92,10 @@ void kernel_main() {
         uint32_t tiles_read = input_tile_id_start;
         uint32_t tiles_to_read = input_tile_id_end;
 
-        uint32_t packet_id = (input_tile_id_start + contig_pages_advanced - 1) / contig_pages_advanced;
+        uint32_t packet_id =
+            ((input_tile_id_end - input_tile_id_start) + contig_pages_advanced - 1) / contig_pages_advanced * link;
+        DPRINT << "link: " << (uint32_t)link << " tiles_read: " << (uint32_t)tiles_read
+               << " , packet_id: " << (uint32_t)packet_id << " bwd\n";
         while (tiles_read < tiles_to_read) {
             uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
             cb_reserve_back(cb_intermediate_id, num_pages_to_read);
