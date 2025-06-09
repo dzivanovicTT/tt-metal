@@ -16,7 +16,7 @@ void MAIN {
     constexpr uint32_t num_batches = get_compile_time_arg_val(6);
     constexpr uint32_t num_links = get_compile_time_arg_val(7);
 
-    const uint32_t num_packets = batch_slice_num_pages / tile_granularity / num_links;
+    const uint32_t num_packets = batch_slice_num_pages / tile_granularity / num_links / 2;  // 2 for forward/backward
     DPRINT << "num_packets: " << num_packets << ", batch_slice_num_pages: " << batch_slice_num_pages
            << ", tile_granularity: " << tile_granularity << ", num_links: " << num_links << "\t" << num_packets << "\n";
 
