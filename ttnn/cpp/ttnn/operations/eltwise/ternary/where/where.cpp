@@ -60,13 +60,8 @@ Tensor WhereOperation::invoke(
     const Tensor& value_false,
     const std::optional<MemoryConfig>& output_mem_config,
     std::optional<Tensor> output_tensor) {
-    return ternary_utils::where_impl(
-        queue_id,
-        predicate,
-        value_true,
-        value_false,
-        output_mem_config.value_or(predicate.memory_config()),
-        std::move(output_tensor));
+    // should call ttnn::prim::where here
+    // return ttnn::prim::where(queue_id, predicate, value_true, value_false, output_mem_config, output_tensor);
 }
 
 Tensor WhereOperation::invoke(
