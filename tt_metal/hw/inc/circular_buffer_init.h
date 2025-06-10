@@ -26,7 +26,6 @@ FORCE_INLINE void setup_local_cb_read_write_interfaces(
 // The following code is a C++ version of the assembly loop. It performs the same operations as the assembly, but
 // the compiler doesn't optimize it as well as the assembly version (roughly 770 vs 595 cycles for 32 CBs on wormhole).
 // This code is only to demonstrate the logic of the loop and is not used in production builds.
-#if DISABLE_CB_ASSEMBLY
 
     bool next_cb_exists = local_cb_mask & 1;
     while (true) {
@@ -76,94 +75,6 @@ FORCE_INLINE void setup_local_cb_read_write_interfaces(
         }
     }
 
-#else
-
-    asm volatile(
-        "    j .LOOP_ENTRY%=\n\t"
-
-        // Process a single CB.
-        ".LOOP%=:\n\t"
-        "    lw a3, 4(%[cbconfig])\n\t"  // fifo_size = *(circular_buffer_config_addr + 1)
-        "    lw a2, 0(%[cbconfig])\n\t"  // fifo_addr = *(circular_buffer_config_addr + 0)
-        ".if %[write]\n\t"
-        "    lw a6, 8(%[cbconfig])\n\t"  // fifo_num_pages = *(circular_buffer_config_addr + 2)
-        ".endif\n\t"
-        "    lw a7, 12(%[cbconfig])\n\t"  // fifo_page_size = *(circular_buffer_config_addr + 3)
-
-        // Fill the load latency (8 cycles) with useful work.
-        "    srli %[local_cb_mask], %[local_cb_mask], 1\n\t"  // local_cb_mask >>= 1
-        "    andi t0, %[local_cb_mask], 1\n\t"                // next_cb_exists = local_cb_mask & 1
-
-        "    sw zero, %[off_tiles_acked](%[liptr])\n\t"  // local_interface.tiles_acked_received_init = 0;
-        ".if %[init_wr_tile_ptr]\n\t"
-        "    sw zero, %[off_fifo_tile_wr_ptr](%[liptr])\n\t"  // local_interface.fifo_wr_tile_ptr = 0;
-        ".endif\n\t"
-
-        // Advance to next cb config.
-        "    addi %[cbconfig], %[cbconfig], %[circular_buffer_byte_size]\n\t"
-
-        // 8 cycles have passed, so we can now use the loaded values.
-
-        ".if %[cb_addr_shift] != 0\n\t"
-        "    srli a3, a3, %[cb_addr_shift]\n\t"  // fifo_size >>= cb_addr_shift
-        "    srli a2, a2, %[cb_addr_shift]\n\t"  // fifo_addr >>= cb_addr_shift
-        "    srli a7, a7, %[cb_addr_shift]\n\t"  // fifo_page_size >>= cb_addr_shift
-        ".endif\n\t"
-
-        "    sw a3, %[off_fifo_size](%[liptr])\n\t"
-        "    add a3, a2, a3\n\t"  // fifo_limit = fifo_addr + fifo_size
-        "    sw a3, %[off_fifo_limit](%[liptr])\n\t"
-
-        ".if %[write]\n\t"
-        "    sw a2, %[off_fifo_wr_ptr](%[liptr])\n\t"
-        "    sw a6, %[off_fifo_num_pages](%[liptr])\n\t"
-        ".endif\n\t"
-
-        ".if %[read]\n\t"
-        "    sw a2, %[off_fifo_rd_ptr](%[liptr])\n\t"
-        ".endif\n\t"
-
-        "    sw a7, %[off_fifo_page_size](%[liptr])\n\t"
-
-        "    addi %[liptr], %[liptr], %[local_cb_interface_size]\n\t"  // local_interface_ptr++;
-
-        "    bnez t0, .LOOP%=\n\t"                     // if (next_cb_exists) goto LOOP
-        "    beqz %[local_cb_mask], .LOOP_EXIT%=\n\t"  // if (local_cb_mask == 0) goto LOOP_EXIT
-
-        // Skip over the current cb since it's not in the mask.
-        ".NO_CB%=:\n\t"
-        // Advance cb config address and local interface pointer
-        "    addi %[cbconfig], %[cbconfig], %[circular_buffer_byte_size]\n\t"
-        "    addi %[liptr], %[liptr], %[local_cb_interface_size]\n\t"
-
-        "    srli %[local_cb_mask], %[local_cb_mask], 1\n\t"  // local_cb_mask >>= 1
-
-        ".LOOP_ENTRY%=:\n\t"
-        "    andi t0, %[local_cb_mask], 1\n\t"     // next_cb_exists = local_cb_mask & 1
-        "    bnez t0, .LOOP%=\n\t"                 // if (next_cb_exists) goto LOOP
-        "    bnez %[local_cb_mask], .NO_CB%=\n\t"  // if (local_cb_mask != 0) goto NO_CB
-
-        ".LOOP_EXIT%=:\n\t"
-
-        : [cbconfig] "+r"(circular_buffer_config_addr),
-          [local_cb_mask] "+r"(local_cb_mask),
-          [liptr] "+r"(local_interface_ptr)
-        : [off_fifo_size] "i"(offsetof(LocalCBInterface, fifo_size)),
-          [off_fifo_limit] "i"(offsetof(LocalCBInterface, fifo_limit)),
-          [off_fifo_page_size] "i"(offsetof(LocalCBInterface, fifo_page_size)),
-          [off_fifo_num_pages] "i"(offsetof(LocalCBInterface, fifo_num_pages)),
-          [off_fifo_rd_ptr] "i"(offsetof(LocalCBInterface, fifo_rd_ptr)),
-          [off_fifo_wr_ptr] "i"(offsetof(LocalCBInterface, fifo_wr_ptr)),
-          [off_tiles_acked] "i"(offsetof(LocalCBInterface, tiles_acked_received_init)),
-          [off_fifo_tile_wr_ptr] "i"(offsetof(LocalCBInterface, fifo_wr_tile_ptr)),
-          [local_cb_interface_size] "i"(sizeof(CBInterface)),
-          [circular_buffer_byte_size] "i"(UINT32_WORDS_PER_LOCAL_CIRCULAR_BUFFER_CONFIG * sizeof(uint32_t)),
-          [read] "i"(read ? 1 : 0),
-          [write] "i"(write ? 1 : 0),
-          [init_wr_tile_ptr] "i"(init_wr_tile_ptr ? 1 : 0),
-          [cb_addr_shift] "i"(cb_addr_shift)
-        : "a2", "a3", "a6", "a7", "t0", "memory");
-#endif
 }
 
 namespace experimental {

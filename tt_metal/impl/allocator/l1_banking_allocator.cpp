@@ -82,10 +82,10 @@ void Allocator::init_compute_and_storage_l1_bank_manager() {
             "setup",
             logical_core.y,
             logical_core.x);
-        CoreCoord noc_core({
+        CoreCoord noc_core{
             static_cast<std::size_t>(config_.worker_log_to_virtual_routing_x.at(logical_core.x)),
             static_cast<std::size_t>(config_.worker_log_to_virtual_routing_y.at(logical_core.y)),
-        });
+        };
         TT_ASSERT(
             config_.core_type_from_noc_coord_table.find(noc_core) != config_.core_type_from_noc_coord_table.end(),
             "Cannot find noc-coord=[.y={}, .x={}] in core_type_from_noc_coord_table... invalid AllocatorConfig setup",

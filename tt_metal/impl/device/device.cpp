@@ -253,11 +253,11 @@ std::unique_ptr<Allocator> Device::initialize_allocator(
         config.dram_bank_offsets.push_back(soc_desc.get_address_offset(channel));
     }
     // Initialize core_type_from_noc_coord_table table
-    for (const CoreCoord& core : soc_desc.get_all_cores(CoordSystem::PHYSICAL)) {
+    for (const tt_xy_pair& core : soc_desc.get_all_cores(CoordSystem::PHYSICAL)) {
         config.core_type_from_noc_coord_table.insert(
             {this->virtual_core_from_physical_core({core.x, core.y}), AllocCoreType::Invalid});
     }
-    for (const CoreCoord& core : soc_desc.get_all_harvested_cores(CoordSystem::PHYSICAL)) {
+    for (const tt_xy_pair& core : soc_desc.get_all_harvested_cores(CoordSystem::PHYSICAL)) {
         config.core_type_from_noc_coord_table.insert(
             {this->virtual_core_from_physical_core({core.x, core.y}), AllocCoreType::Invalid});
     }
@@ -276,7 +276,7 @@ std::unique_ptr<Allocator> Device::initialize_allocator(
         const auto noc_coord = this->virtual_core_from_logical_core(core, dispatch_core_type);
         config.core_type_from_noc_coord_table[noc_coord] = AllocCoreType::Dispatch;
     }
-    for (const tt::umd::CoreCoord& core : soc_desc.get_cores(CoreType::ETH, CoordSystem::LOGICAL)) {
+    for (const tt_xy_pair& core : soc_desc.get_cores(CoreType::ETH, CoordSystem::LOGICAL)) {
         this->ethernet_cores_.insert({core.x, core.y});
     }
 
