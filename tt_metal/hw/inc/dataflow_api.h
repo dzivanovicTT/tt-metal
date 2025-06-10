@@ -900,7 +900,11 @@ FORCE_INLINE void noc_async_read_tile(
     uint32_t offset = 0,
     uint8_t noc = noc_index) {
     // COMMENTING THIS OUT MAKES THE PCIE ERROR SHOW UP
-    validate_no_linked_transactions(noc);
+    // validate_no_linked_transactions(noc);
+    // NOC_CMD_BUF_READ_REG(noc, 0, NOC_CMD_CTRL);
+    // NOC_CMD_BUF_READ_REG(noc, 1, NOC_CMD_CTRL);
+    // NOC_CMD_BUF_READ_REG(noc, 2, NOC_CMD_CTRL);
+    // NOC_CMD_BUF_READ_REG(noc, 3, NOC_CMD_CTRL);
     /*
         Read requests - use static VC
         Read responses - assigned VCs dynamically
@@ -914,6 +918,15 @@ FORCE_INLINE void noc_async_read_tile(
     uint32_t bank_index = interleaved_addr_gen::get_bank_index<DRAM>(id, bank_offset_index);
     uint32_t src_addr = s.get_addr(id, bank_offset_index, bank_index, offset);
     uint32_t src_noc_xy = interleaved_addr_gen::get_noc_xy<DRAM>(bank_index, noc);
+
+    // DPRINT << "DRAM " << (uint32_t)DRAM
+    //        << " id " << id
+    //        << " data_format " << (uint32_t)s.data_format
+    //        << " base " << (uint32_t)s.bank_base_address
+    //        << " bank index " << bank_index
+    //        << " src_addr "  << src_addr << " src_noc_xy " << src_noc_xy
+    //        << " page size " << s.page_size
+    //        << " noc " << (uint32_t)noc << ENDL();
 
     WAYPOINT("NRTW");
     DEBUG_SANITIZE_NOC_READ_TRANSACTION(noc, get_noc_addr_helper(src_noc_xy, src_addr), dst_local_l1_addr, s.page_size);
