@@ -91,7 +91,7 @@ void kernel_main() {
                 // Indicate to the coordinator that the core is ready
                 noc_semaphore_inc(coordinator_core_addr, 1);
                 noc_semaphore_wait(semaphore_ptr, INVALID);  // Wait for coordinator to signal to start
-                noc_semaphore_set(semaphore_ptr, VALID);  // Reset the semaphore
+                noc_semaphore_set(semaphore_ptr, VALID);     // Reset the semaphore
 
                 // Process tile
                 for (uint32_t index_tile_offset = 0; index_tile_offset < current_iteration_tile_count;
@@ -124,7 +124,7 @@ void kernel_main() {
                 // Indicate to the coordinator that the core is ready
                 noc_semaphore_inc(coordinator_core_addr, 1);
                 noc_semaphore_wait(semaphore_ptr, INVALID);  // Wait for coordinator to signal to start
-                noc_semaphore_set(semaphore_ptr, VALID);  // Reset the semaphore
+                noc_semaphore_set(semaphore_ptr, VALID);     // Reset the semaphore
 
                 // Reset input buffer
                 cb_push_back(input_tensor_cb_index, one_tile);   // Push tile to the writer
