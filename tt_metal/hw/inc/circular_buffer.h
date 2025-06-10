@@ -97,6 +97,7 @@ extern uint32_t cb_interface_mask;
 // Named this way for compatibility with existing code where existing code references local_cb_interface as cb_interface
 extern CBInterface cb_interface[NUM_CIRCULAR_BUFFERS];
 
+#if 0
 void validate_cb_interface(uint32_t cb_id) {
     if ((cb_interface_mask & (1 << cb_id)) == 0) {
         WAYPOINT("QQQQ");
@@ -105,8 +106,9 @@ void validate_cb_interface(uint32_t cb_id) {
     }
     // ASSERT((cb_interface_mask & (1 << cb_id)) != 0);
 }
+#endif
 FORCE_INLINE LocalCBInterface& get_local_cb_interface(uint32_t cb_id) {
-    validate_cb_interface(cb_id);
+    //validate_cb_interface(cb_id);
      return cb_interface[cb_id].local_cb_interface; }
 
 FORCE_INLINE RemoteSenderCBInterface& get_remote_sender_cb_interface(uint32_t cb_id) {
