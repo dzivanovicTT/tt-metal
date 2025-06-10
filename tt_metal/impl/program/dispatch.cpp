@@ -1020,7 +1020,7 @@ public:
         const uint16_t num_multicast_cb_sub_cmds = circular_buffers_unique_coreranges.size();
         cb_config_payloads = std::vector<std::vector<uint32_t>>(
             num_multicast_cb_sub_cmds,
-            std::vector<uint32_t>(program.get_program_config(index).cb_size / sizeof(uint32_t), 0));
+            std::vector<uint32_t>(program.get_program_config(index).cb_size / sizeof(uint32_t), 0xff));
         if (num_multicast_cb_sub_cmds > 0) {
             uint32_t i = 0;
             uint32_t max_overall_index = 0;
