@@ -15,6 +15,7 @@ void kernel_main() {
     constexpr uint32_t window_inner = get_compile_time_arg_val(4);
     constexpr uint32_t act_block_h_datums = get_compile_time_arg_val(5);
     constexpr uint32_t act_block_num_tiles = get_compile_time_arg_val(6);
+    constexpr uint32_t weights_size_h = get_compile_time_arg_val(7);
     constexpr uint32_t weight_size_w = get_compile_time_arg_val(8);
     constexpr uint32_t conv_act_size_w_padded = get_compile_time_arg_val(9);
     constexpr uint32_t act_block_w_extra_align_bytes = get_compile_time_arg_val(10);
@@ -72,36 +73,27 @@ void kernel_main() {
     noc_async_read_one_packet_set_state(get_noc_addr(act_l1_read_addr), coalesced_read_bytes);
 
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
-    uint32_t start_reader_idx = 0;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
-        uint32_t reader_offset = act_l1_read_addr;
-        for (uint32_t outer = 0; outer < window_outer; outer++) {
-            // Reset reader_idx to finish act_block_h_datums
-            reader_idx = start_reader_idx;
+        cb_reserve_back(cb_id_act, act_block_num_tiles);
+        uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
 
-            cb_reserve_back(cb_id_act, act_block_num_tiles);
-            uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
+        uint32_t act_block_h_datums_read_curr =
+            bh == act_num_blocks_h - 1 ? act_block_h_datums_read_last_block : act_block_h_datums_read;
 
-            uint32_t act_block_h_datums_read_curr =
-                bh == act_num_blocks_h - 1 ? act_block_h_datums_read_last_block : act_block_h_datums_read;
+        read_sticks<
+            dilation_w,
+            coalesced_read_bytes,
+            conv_act_c_read_bytes,
+            act_block_w_extra_align_bytes,
+            stride_w_bytes,
+            window_outer_offset,
+            weight_size_w,
+            weights_size_h>(
+            act_block_h_datums_read_curr, packed_reader_indices_ptr, act_l1_read_addr, l1_write_addr_act, reader_idx);
 
-            read_sticks<
-                dilation_w,
-                coalesced_read_bytes,
-                conv_act_c_read_bytes,
-                act_block_w_extra_align_bytes,
-                stride_w_bytes,
-                weight_size_w>(
-                act_block_h_datums_read_curr, packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx);
+        noc_async_read_barrier();
 
-            noc_async_read_barrier();
-
-            cb_push_back(cb_id_act, act_block_num_tiles);
-
-            reader_offset += window_outer_offset;
-        }
-
-        start_reader_idx = reader_idx;
+        cb_push_back(cb_id_act, act_block_num_tiles);
 #ifdef SPLIT_READER
         start_reader_idx += act_block_h_datums_second_reader_read;
 #endif
