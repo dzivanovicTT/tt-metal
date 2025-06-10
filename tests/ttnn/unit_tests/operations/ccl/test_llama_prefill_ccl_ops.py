@@ -8,9 +8,7 @@ import pytest
 from loguru import logger
 from tests.ttnn.unit_tests.operations.ccl.test_new_reduce_scatter import run_reduce_scatter_impl
 from tests.ttnn.unit_tests.operations.ccl.test_all_gather import is_unsupported_case
-from tests.ttnn.unit_tests.operations.ccl.test_new_all_reduce import check_mesh_tensor_alloc
 from tests.tt_eager.python_api_testing.sweep_tests.comparison_funcs import comp_equal, comp_pcc
-from models.utility_functions import skip_for_grayskull
 
 
 def create_global_semaphores(mesh_device, num_devices, cores, initial_value):
@@ -44,12 +42,11 @@ def run_all_gather_impl(
     )
     if is_known_failure:
         pytest.skip(f"Skipping unsupported case {message}.")
+
     compute_grid_size = t3k_mesh_device.compute_with_storage_grid_size()
     ccl_sub_device_crs = ttnn.CoreRangeSet(
         {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
     )
-    print(f"{compute_grid_size=}")
-    print(f"{ccl_sub_device_crs=}")
     worker_sub_device = ttnn.SubDevice(
         [
             ccl_sub_device_crs,
@@ -64,7 +61,7 @@ def run_all_gather_impl(
 
     # create global semaphore handles
     ccl_semaphore_handles = [
-        create_global_semaphores(t3k_mesh_device, 8, ccl_sub_device_crs, 0) for _ in range(num_iters)
+        create_global_semaphores(t3k_mesh_device, num_devices, ccl_sub_device_crs, 0) for _ in range(num_iters)
     ]
 
     ### Create persistent output buffers
@@ -92,10 +89,6 @@ def run_all_gather_impl(
         for _ in range(num_iters)
     ]
 
-    for im_buf, out_buf in zip(persistent_intermediate_buffers, persistent_output_buffers):
-        check_mesh_tensor_alloc(im_buf)
-        check_mesh_tensor_alloc(out_buf)
-
     logger.info("Done creating persistent buffers")
 
     ##### All gather input setup #####
@@ -110,14 +103,13 @@ def run_all_gather_impl(
         for i, t in enumerate(input_tensors):
             tt_input_tensors.append(ttnn.Tensor(t, ag_input_dtype).to(layout))
         input_tensor_mesh = ttnn.aggregate_as_tensor(tt_input_tensors).to(t3k_mesh_device, mem_config)
-        print(input_tensor_mesh)
+
         input_tensor_mesh_list.append(input_tensor_mesh)
 
     ##### Perform the TT ops #####
     tt_all_gather_out_tensor_list = []
 
     def run_op(i):
-        print("running all_gather", input_tensor_mesh_list[i])
         tt_all_gather_out_tensor = ttnn.experimental.all_gather_async(
             input_tensor_mesh_list[i],
             persistent_intermediate_buffer=persistent_intermediate_buffers[i],
@@ -164,30 +156,40 @@ def run_all_gather_impl(
 
             logger.info(f"Done iteration {i}")
 
-    # for i in range(num_iters):
-    #     tt_ag_out_tensor = tt_all_gather_out_tensor_list[i]
-    #     torch_ag_out_tensor = ag_output_tensor_goldens_list[i]
+    for i in range(num_iters):
+        tt_ag_out_tensor = tt_all_gather_out_tensor_list[i]
+        torch_ag_out_tensor = ag_output_tensor_goldens_list[i]
 
-    #     tt_ag_out = ttnn.from_device(tt_ag_out_tensor)
-    #     tt_ag_out = ttnn.to_torch(tt_ag_out, mesh_composer=ttnn.ConcatMeshToTensor(t3k_mesh_device, dim=3))[
-    #         :, :, :, 0 : torch_ag_out_tensor.shape[3]
-    #     ]
-    #     eq, output = comp_pcc(tt_ag_out, torch_ag_out_tensor)
-    #     logger.info(f"{output}, iteration {i}")
-    #     assert eq, f"{i} FAILED ag: {output}"
+        tt_ag_out = ttnn.from_device(tt_ag_out_tensor)
+        tt_ag_out = ttnn.to_torch(tt_ag_out, mesh_composer=ttnn.ConcatMeshToTensor(t3k_mesh_device, dim=3))[
+            :, :, :, 0 : torch_ag_out_tensor.shape[3]
+        ]
+        eq, output = comp_pcc(tt_ag_out, torch_ag_out_tensor)
+        logger.info(f"{output}, iteration {i}")
+        assert eq, f"{i} FAILED ag: {output}"
 
     t3k_mesh_device.reset_sub_device_stall_group()
     t3k_mesh_device.clear_loaded_sub_device_manager()
 
 
-@skip_for_grayskull("Requires eth connected devices to run")
 @pytest.mark.parametrize(
     "num_devices, num_links, ag_output_shape, dim, layout, ag_input_dtype",
     [
-        # (8, 1, [1, 1, 4096, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        # (8, 1, [1, 1, 4096, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (32, 1, [1, 1, 512, 1024 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
-        # (8, 1, [1, 1, 4096, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # 128 shapes
+        (8, 1, [1, 1, 128, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 128, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 128, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        (8, 1, [1, 1, 128, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # 4k shapes
+        (8, 1, [1, 1, 4096, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 4096, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        (8, 1, [1, 1, 4096, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # 8k shapes
+        (8, 1, [1, 1, 8192, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 8192, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 8192, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        (8, 1, [1, 1, 8192, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
     ],
 )
 @pytest.mark.parametrize(
@@ -204,9 +206,8 @@ def run_all_gather_impl(
     ],
     indirect=["device_params"],
 )
-@pytest.mark.parametrize("mesh_device", [pytest.param((8, 4), id="8x4_grid")], indirect=True)
 def test_all_gather_async(
-    mesh_device,
+    t3k_mesh_device,
     num_devices,
     ag_output_shape,
     dim,
@@ -219,7 +220,7 @@ def test_all_gather_async(
     all_gather_topology,
 ):
     run_all_gather_impl(
-        mesh_device,
+        t3k_mesh_device,
         num_devices,
         ag_output_shape,
         dim,
