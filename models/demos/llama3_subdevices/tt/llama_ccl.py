@@ -5,6 +5,7 @@
 import ttnn
 import torch
 import os
+import math
 
 is_RING_6U = os.environ.get("RING_6U", "0") == "1"
 
@@ -79,7 +80,9 @@ class TT_CCL:
                     if is_RING_6U
                     else self.get_prefill_reduce_scatter_buffers()
                 )
-                self.all_gather_buffers = self.get_prefill_all_gather_buffers()
+                self.all_gather_buffers = (
+                    self.get_ring_prefill_all_gather_buffers() if is_RING_6U else self.get_prefill_all_gather_buffers()
+                )
             else:
                 for seqlen in self.support_seqlens:
                     self.persistent_buffers[seqlen] = {}
@@ -381,7 +384,7 @@ class TT_CCL:
             persistent_buffers_all[seqlen] = persistent_buffers
         return persistent_buffers_all
 
-    def padded_shape(output_shape, tile, num_devices, num_links, ag_input_dtype):
+    def padded_shape(self, output_shape, tile, num_devices, num_links, ag_input_dtype):
         num_banks = 12
 
         # calculate num tiles sent in one iteration on one link
@@ -425,28 +428,38 @@ class TT_CCL:
                 return persistent_buffers
 
             buffers_dict = {
-                "QKV": [(1, 1, seqlen, 1280), 4],
-                "WO": [(1, 1, seqlen, 2048), 8],
-                "FF1": [(1, 1, seqlen, 3584), 4],
-                "FF3": [(1, 1, seqlen, 3584), 4],
-                "FF2": [(1, 1, seqlen, 2048), 8],
+                "QKV": [(1, 1, seqlen, 1280), (1, 1, seqlen, 1280 // 4), 4],
+                "WO": [(1, 1, seqlen, 2048), (1, 1, seqlen, 2048 // 8), 8],
+                "FF1": [(1, 1, seqlen, 3584), (1, 1, seqlen, 3584 // 4), 4],
+                "FF3": [(1, 1, seqlen, 3584), (1, 1, seqlen, 3584 // 4), 4],
+                "FF2": [(1, 1, seqlen, 2048), (1, 1, seqlen, 2048 // 8), 8],
             }
-            padded_buffers = {key: padded_shape(value[0], (32, 32), value[1], 4, ttnn.bfloat8_b)}
+            padded_buffers = {
+                key: (self.padded_shape(value[0], [32, 32], value[2], 4, ttnn.bfloat8_b), value[1])
+                for key, value in buffers_dict.items()
+            }
             for key, shape in padded_buffers.items():
-                tt_buffers = []
-                for i in range(2):
-                    tt_buffer = ttnn.as_tensor(
-                        torch.zeros(shape[0]),
-                        device=self.mesh_device,
-                        layout=ttnn.TILE_LAYOUT,
-                        dtype=ttnn.bfloat8_b,
-                        memory_config=ttnn.DRAM_MEMORY_CONFIG,
-                        mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
-                        cache_file_name=self.weight_cache_path / (f"pb_rs_ring_{key}_{i}_{seqlen}"),
-                    )
-                    tt_buffers.append(tt_buffer)
-
-                persistent_buffers[key] = tt_buffers
+                print(f"RS BUFFERS: {shape[0]}, {shape[1]}")
+                tt_intermediate_buffer = ttnn.as_tensor(
+                    torch.zeros(shape[0]),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ttnn.bfloat8_b,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                    cache_file_name=self.weight_cache_path / (f"pb_rs_ring_{key}_{seqlen}"),
+                )
+                # output buffer is reused from line imlementation
+                tt_output_buffer = ttnn.as_tensor(
+                    torch.zeros(shape[1]),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ttnn.bfloat8_b,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                    cache_file_name=self.weight_cache_path / (f"pb_rs_00_{key}_0_{seqlen}"),
+                )
+                persistent_buffers[key] = {"intermediate": tt_intermediate_buffer, "output": tt_output_buffer}
             persistent_buffers_all[seqlen] = persistent_buffers
         return persistent_buffers_all
 
@@ -498,21 +511,16 @@ class TT_CCL:
                 "LAYERNORM": [(1, 1, seqlen, 128), 4],
             }
             padded_buffers = {
-                key: padded_shape(
-                    value[0], (32, 32), value[1], 4, ttnn.ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b
+                key: (
+                    self.padded_shape(
+                        value[0], (32, 32), value[1], 4, ttnn.ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b
+                    ),
+                    value[0],
                 )
+                for key, value in buffers_dict.items()
             }
-            for key, shape in buffers_dict.items():
-                tt_buffer = ttnn.as_tensor(
-                    torch.zeros(shape[0]),
-                    device=self.mesh_device,
-                    layout=ttnn.TILE_LAYOUT,
-                    dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
-                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
-                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
-                    cache_file_name=self.weight_cache_path / ("pb_ring_ag_0_" + key + str(seqlen)),
-                )
-
+            for key, shape in padded_buffers.items():
+                print(f"AG BUFFERS: {shape[0]}, {shape[1]}")
                 tt_intermediate_buffer = ttnn.as_tensor(
                     torch.zeros(shape[0]),
                     device=self.mesh_device,
@@ -520,12 +528,22 @@ class TT_CCL:
                     dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
                     memory_config=ttnn.DRAM_MEMORY_CONFIG,
                     mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
-                    cache_file_name=self.weight_cache_path / ("pb_ring_ag_1_" + key + str(seqlen)),
+                    cache_file_name=self.weight_cache_path / ("pb_ring_ag_" + key + str(seqlen)),
+                )
+
+                tt_output_buffer = ttnn.as_tensor(
+                    torch.zeros(shape[1]),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ttnn.bfloat16 if key == "LAYERNORM" else ttnn.bfloat8_b,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                    cache_file_name=self.weight_cache_path / ("pb_ag_" + key + str(seqlen)),
                 )
 
                 ag_persistent_buffers[key] = {
                     "intermediate": tt_intermediate_buffer,
-                    "output": tt_buffer,
+                    "output": tt_output_buffer,
                 }
 
             ag_persistent_buffers_all[seqlen] = ag_persistent_buffers
@@ -736,8 +754,8 @@ class TT_CCL:
         num_semaphores = 3 * num_links
         ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor=input_tensor_mesh,
-            persistent_intermediate_buffer=persistent_buffers[0],
-            persistent_output_buffer=persistent_buffers[1],
+            persistent_intermediate_buffer=persistent_buffers["intermediate"],
+            persistent_output_buffer=persistent_buffers["output"],
             dim=dim,
             multi_device_global_semaphore=self.reduce_semaphore_handles[cluster_axis][self.gather_idx[cluster_axis]][
                 :num_semaphores
