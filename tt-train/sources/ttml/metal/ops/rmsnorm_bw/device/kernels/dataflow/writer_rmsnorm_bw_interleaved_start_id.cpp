@@ -85,9 +85,34 @@ void kernel_main() {
     // DPRINT << "cb_rhs" << ENDL();
     // print_full_tile(cb_rhs, 0);
 
-    // cb_wait_front(cb_dL_da_idx, onetile);
-    // DPRINT << "cb_dL_da_idx" << ENDL();
-    // print_full_tile(cb_dL_da_idx, 0);
+    /// SECTION: dL_da
+
+    cb_wait_front(cb_dL_da_idx, onetile);
+    DPRINT << "cb_dL_da_idx" << ENDL();
+    print_full_tile(cb_dL_da_idx, 0);
+
+    DPRINT << "cb_gained_dL_dout" << ENDL();
+    print_full_tile(cb_gained_dL_dout, 0);
+
+    DPRINT << "cb_scale" << ENDL();
+    print_full_tile(cb_scale, 0);
+
+    DPRINT << "cb_c_by_ms_a" << ENDL();
+    print_full_tile(cb_c_by_ms_a, 0);
+
+    DPRINT << "cb_rhs" << ENDL();
+    print_full_tile(cb_rhs, 0);
+
+    DPRINT << "cb_input_idx" << ENDL();
+    print_full_tile(cb_input_idx, 0);
+
+    DPRINT << "cb_rms_a_idx" << ENDL();
+    print_full_tile(cb_rms_a_idx, 0);
+
+    DPRINT << "cb_dL_out_idx" << ENDL();
+    print_full_tile(cb_dL_out_idx, 0);
+
+    /// SECTION: dL_dgamma_components
 
     // cb_wait_front(cb_dL_dgamma_components, onetile);
     // DPRINT << "cb_dL_dgamma_components" << ENDL();
@@ -108,7 +133,7 @@ void kernel_main() {
     for (uint32_t r = start_row; r < end_row; ++r) {
         // Write dx (grad w.r.t. input)
         for (uint32_t c = 0, idx = r * Wt; c < Wt; c += block_size) {
-            cb_wait_front(cb_dL_da_idx, block_size);
+            // cb_wait_front(cb_dL_da_idx, block_size);
             uint32_t l1_read_addr = get_read_ptr(cb_dL_da_idx);
             for (uint32_t block_idx = 0; block_idx < block_size; ++block_idx, ++idx) {
                 noc_async_write_tile(idx, dx_output_addr_generator, l1_read_addr);
