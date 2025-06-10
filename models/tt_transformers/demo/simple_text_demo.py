@@ -543,10 +543,6 @@ def test_demo_text(
     # To simulate a deployment environment, the demo supports repeating batched prompts.
     # This loop will rotate the prompts between the users for each batch, to simulate users sending different requests
     # If batch_size=1, the same prompt is repeated for each batch
-    test_id = "accuracy"
-
-    if token_accuracy:
-        token_acc = TokenAccuracy(model_name="Llama3.2-1B-Instruct")
 
     model_args, model, page_table, tt_kv_cache, tokenizer = prepare_generator_args(
         num_devices=num_devices,
@@ -559,6 +555,9 @@ def test_demo_text(
         page_params=page_params,
         paged_attention=paged_attention,
     )
+
+    if token_accuracy:
+        token_acc = TokenAccuracy(model_name=model_args[0].model_name)
 
     generator = Generator(model, model_args, mesh_device, tokenizer=tokenizer)
 
