@@ -371,8 +371,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
     const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
     uint32_t tiles_to_write_per_packet = 1;
-    uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
-    uint32_t cb_num_pages = 3 * num_pages_per_packet;  // triple buffering
+    uint32_t num_pages_per_packet = 1;
+    uint32_t cb_num_pages = 24;  // triple buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
     // CBs for transferring data between sender_reader and sender_writer
@@ -536,13 +536,24 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         }
 
         // Set Sender Reader runtime args
+        // batch_head_size needs to be 1 for now
         uint32_t batch_head_size = input_tensor_shape[0] * input_tensor_shape[1];
 
-        uint32_t single_batch_head_num_pages = input_tensor_num_pages / batch_head_size;
-        uint32_t base_pages_per_worker = single_batch_head_num_pages / num_links;
-        uint32_t remainder = single_batch_head_num_pages % num_links;
-        uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
-        uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
+#uint32_t single_batch_head_num_pages = input_tensor_num_pages / batch_head_size;
+#uint32_t base_pages_per_worker = single_batch_head_num_pages / num_links;
+#uint32_t remainder = single_batch_head_num_pages % num_links;
+#uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
+#uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
+
+        uint32_t NUM_BANKS = 12;
+
+        uint32_t base_banks_per_worker = NUM_BANKS / num_links;
+        uint32_t remainder = NUM_BANKS % num_links;
+        uint32_t bank_id_start = link * base_banks_per_worker + std::min(link, remainder);
+        uint32_t bank_id_end = (link + 1) * base_banks_per_worker + std::min(link + 1, remainder);
+
+        uint32_t num_pages_per_bank = input_tensor_num_pages / NUM_BANKS;
+        uint32_t banks_with_extra_page = input_tensor_num_pages % NUM_BANKS;
 
         TT_ASSERT(!(input_tensor_shape[3] % TILE_WIDTH));
         TT_ASSERT(!(output_tensor_shape[3] % TILE_WIDTH));
@@ -561,10 +572,12 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             output_tensor_Ht,                   // height in tiles of entire output
             dim,                                // dim to gather on
             batch_head_size,                    // product of the first two dims
-            input_tile_id_start,                //
-            input_tile_id_end,                  //
+            bank_id_start,                      //
+            bank_id_end,                        //
             ring_size,                          // ring_size
             semaphore.at(1).address(),          // out_ready_semaphore_forward
+            num_pages_per_bank,
+            banks_with_extra_page,
         };
         if (fuse_op) {
             fused_op_signaler_forward->push_all_gather_fused_op_rt_args(reader_forward_rt_args, 1, 0, 1);
@@ -581,10 +594,12 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             output_tensor_Ht,                   // height in tiles of entire output
             dim,                                // dim to gather on
             batch_head_size,                    // product of the first two dims
-            input_tile_id_start,                // slice_num_pages
-            input_tile_id_end,                  // slice_num_pages
+            bank_id_start,                      // slice_num_pages
+            bank_id_end,                        // slice_num_pages
             ring_size,                          // ring_size
             semaphore.at(0).address(),          // out_ready_semaphore_backward
+            num_pages_per_bank,
+            banks_with_extra_page,
         };
         if (fuse_op) {
             fused_op_signaler_backward->push_all_gather_fused_op_rt_args(reader_backward_rt_args, 1, 0, 0);
@@ -603,12 +618,14 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             output_tensor_Ht,                   // height in tiles of entire output
             dim,                                // dim to gather on
             batch_head_size,                    // product of the first two dims
-            input_tile_id_start,                //
-            input_tile_id_end,                  //
+            bank_id_start,                      //
+            bank_id_end,                        //
             sender_forward_worker_core.x,       // out_ready_sem_noc0_x
             sender_forward_worker_core.y,       // out_ready_sem_noc0_y
             ring_size,                          // ring_size
             semaphore.at(1).address()           // out_ready_semaphore_forward
+            num_pages_per_bank,
+            banks_with_extra_page,
         };
         writer_forward_rt_args.push_back(false);
         writer_forward_rt_args.push_back(backward_device.has_value());
@@ -635,12 +652,14 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             output_tensor_Ht,                   // height in tiles of entire output
             dim,                                // dim to gather on
             batch_head_size,                    // product of the first two dims
-            input_tile_id_start,                //
-            input_tile_id_end,                  //
+            bank_id_start,                      //
+            bank_id_end,                        //
             sender_backward_worker_core.x,      // out_ready_sem_noc0_x
             sender_backward_worker_core.y,      // out_ready_sem_noc0_y
             ring_size,                          // ring_size
             semaphore.at(0).address()           // out_ready_semaphore_backward
+            num_pages_per_bank,
+            banks_with_extra_page,
         };
         writer_backward_rt_args.push_back(forward_device.has_value());
         if (forward_device.has_value()) {

@@ -47,12 +47,15 @@ void kernel_main() {
     uint32_t output_tensor_Ht = get_arg_val<uint32_t>(arg_idx++);
     uint32_t gather_dim = get_arg_val<uint32_t>(arg_idx++);
     uint32_t input_batch_head_count = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t input_tile_id_start = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t bank_id_start = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t bank_id_end = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t out_ready_sem_noc0_x = get_arg_val<uint32_t>(arg_idx++);
     const uint8_t out_ready_sem_noc0_y = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t num_pages_per_bank = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t banks_with_extra_page = get_arg_val<uint32_t>(arg_idx++);
+
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
     // DPRINT << "Writer: " << "output_address: " << (uint32_t)output_address << "\n";

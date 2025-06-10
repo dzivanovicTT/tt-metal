@@ -44,10 +44,12 @@ void kernel_main() {
     uint32_t output_tensor_Ht = get_arg_val<uint32_t>(arg_idx++);
     uint32_t gather_dim = get_arg_val<uint32_t>(arg_idx++);
     uint32_t input_batch_head_count = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t input_tile_id_start = get_arg_val<uint32_t>(arg_idx++);
-    uint32_t input_tile_id_end = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t bank_id_start = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t bank_id_end = get_arg_val<uint32_t>(arg_idx++);
     uint32_t ring_size = get_arg_val<uint32_t>(arg_idx++);
     size_t out_ready_sem = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t num_pages_per_bank = get_arg_val<uint32_t>(arg_idx++);
+    uint32_t banks_with_extra_page = get_arg_val<uint32_t>(arg_idx++);
 
     // // all args, we can only print uint32_t
     // DPRINT << "Reader: " << "input_tensor_address: " << (uint32_t)input_tensor_address << "\n";
