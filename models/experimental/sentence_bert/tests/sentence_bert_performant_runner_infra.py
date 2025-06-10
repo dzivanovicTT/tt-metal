@@ -12,6 +12,7 @@ from models.experimental.sentence_bert.reference.sentence_bert import BertModel,
 from models.experimental.sentence_bert.ttnn.ttnn_sentence_bert_model import TtnnSentenceBertModel
 from models.experimental.sentence_bert.ttnn.common import custom_preprocessor, preprocess_inputs
 from ttnn.model_preprocessing import preprocess_model_parameters
+from models.utility_functions import is_wormhole_b0
 
 
 def load_reference_model(model_name, config):
@@ -75,20 +76,64 @@ class SentenceBERTPerformanceRunnerInfra:
 
         self.ttnn_sentencebert_model = load_ttnn_model(self.device, self.torch_model, config)
 
+    def setup_l1_sharded_input(self, device, input_ids=None):
+        if is_wormhole_b0():
+            core_grid = ttnn.CoreGrid(y=8, x=8)
+        else:
+            exit("Unsupported device")
+        input_ids = self.input_ids if input_ids is None else input_ids
+        print("its input is ", input_ids.shape)
+        input_ids = ttnn.from_torch(input_ids, dtype=ttnn.uint32)
+        input_memory_config = ttnn.create_sharded_memory_config(
+            input_ids.shape,
+            core_grid=device.core_grid,
+            strategy=ttnn.ShardStrategy.BLOCK,
+            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        )
+
+        return input_ids, input_memory_config
+
     def setup_input(self):
+        print("setup input is called")
         tt_inputs_host, self.ttnn_token_type_ids, self.ttnn_position_ids, self.ttnn_attention_mask = preprocess_inputs(
             self.input_ids, self.token_type_ids, self.position_ids, self.extended_mask, self.device
         )
-
         return tt_inputs_host
+
+    def setup_dram_sharded_input(self, device):
+        tt_inputs_host, input_mem_config = self.setup_l1_sharded_input(device)
+        dram_grid_size = device.dram_grid_size()
+        dram_shard_spec = ttnn.ShardSpec(
+            ttnn.CoreRangeSet(
+                {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(dram_grid_size.x - 1, dram_grid_size.y - 1))}
+            ),
+            tt_inputs_host.shape,
+            ttnn.ShardOrientation.ROW_MAJOR,
+        )
+        sharded_mem_config_DRAM = ttnn.MemoryConfig(
+            ttnn.TensorMemoryLayout.BLOCK_SHARDED, ttnn.BufferType.DRAM, dram_shard_spec
+        )
+        _, ttnn_token_type_ids, ttnn_position_ids, ttnn_attention_mask = preprocess_inputs(
+            self.input_ids, self.token_type_ids, self.position_ids, self.extended_mask, self.device
+        )
+
+        return (
+            tt_inputs_host,
+            sharded_mem_config_DRAM,
+            input_mem_config,
+            ttnn_token_type_ids,
+            ttnn_position_ids,
+            ttnn_attention_mask,
+        )
 
     def run(self):
         # print("before", self.input_ids.shape, self.extended_mask.shape, self.token_type_ids.shape, self.position_ids.shape)
+        print("run is called")
         self.ttnn_output_tensor = self.ttnn_sentencebert_model(
             self.ttnn_input_ids,
-            attention_mask=self.ttnn_attention_mask,
-            token_type_ids=self.ttnn_token_type_ids,
-            position_ids=self.ttnn_position_ids,
+            attention_mask=self.ttnn_att_mask,
+            token_type_ids=self.ttnn_token_ids,
+            position_ids=self.ttnn_pos_ids,
             device=self.device,
         )
 

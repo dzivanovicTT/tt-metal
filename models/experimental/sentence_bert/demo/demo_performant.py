@@ -13,7 +13,7 @@ import os
 from loguru import logger
 from tqdm import tqdm
 from itertools import islice, cycle
-from models.experimental.sentence_bert.tests.sentence_bert_e2e_performant import SentenceBERTrace2CQ
+from models.experimental.sentence_bert.tests.sentence_bert_performant_runner import SentenceBERTPerformantRunner
 
 
 def mean_pooling(token_embeddings, attention_mask):
@@ -48,20 +48,17 @@ def compute_ttnn_embeddings(sentences, model_name, device, batch_size=8):
         position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.int64).unsqueeze(dim=0)
         if sentence_bert_trace_2cq is None:
             logger.info("initialising trace..")
-            sentence_bert_trace_2cq = SentenceBERTrace2CQ()
-
-            sentence_bert_trace_2cq.initialize_sentence_bert_trace_2cqs_inference(
-                device,
-                input_ids,
-                extended_mask,
-                token_type_ids,
-                position_ids,
-                device_batch_size=batch_size,
-                weight_dtype=ttnn.bfloat8_b,
-                sequence_length=384,
+            sentence_bert_trace_2cq = SentenceBERTPerformantRunner(
+                device=device,
+                input_ids=input_ids,
+                extended_mask=extended_mask,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
             )
 
-        ttnn_output = sentence_bert_trace_2cq.run(input_ids, iter=0)
+            sentence_bert_trace_2cq._capture_sentencebert_trace_2cqs()
+
+        ttnn_output = sentence_bert_trace_2cq.run(input_ids, extended_mask)
         print("ttnn output is", ttnn_output.shape, ttnn_output.layout)
         logger.info("Running inference on TTNN model for current batch...")
         ttnn_output = ttnn.to_torch(ttnn_output).squeeze(dim=1)
@@ -111,7 +108,8 @@ def test_semantic_search_with_ttnn(device, use_program_cache):
         )
         input_ids = encoded_input["input_ids"]
         attention_mask = encoded_input["attention_mask"]
-        ttnn_output = model_instance.run(input_ids, iter=0)
+        extended_mask = custom_extended_mask(attention_mask, dtype=torch.bfloat16)
+        ttnn_output = model_instance.run(input_ids, extended_mask)
         print("ttnn output is", ttnn_output.shape, ttnn_output.layout)
         logger.info("Running inference on TTNN model for current batch...")
         ttnn_output = ttnn.to_torch(ttnn_output).squeeze(dim=1)

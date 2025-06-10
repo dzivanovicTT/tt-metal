@@ -92,11 +92,11 @@ def test_e2e_performant_sentencebert(
     for _ in range(10):
         t0 = time.time()
         print("iter is", _)
-        _ = performant_runner.run(input_ids)
-        performant_runner.runner_infra.input_ids = input_ids
-        performant_runner.runner_infra.extended_mask = extended_mask
-        performant_runner.runner_infra.token_type_ids = token_type_ids
-        performant_runner.runner_infra.position_ids = position_ids
+        _ = performant_runner.run(input_ids, token_type_ids, position_ids, extended_mask)
+        # performant_runner.runner_infra.input_ids = input_ids
+        # performant_runner.runner_infra.extended_mask = extended_mask
+        # performant_runner.runner_infra.token_type_ids = token_type_ids
+        # performant_runner.runner_infra.position_ids = position_ids
 
         print(assert_with_pcc(reference_out.last_hidden_state, ttnn.to_torch(_).squeeze(dim=1), 0.0))
         t1 = time.time()

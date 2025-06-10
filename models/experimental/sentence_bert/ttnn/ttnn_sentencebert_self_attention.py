@@ -10,6 +10,13 @@ from models.experimental.sentence_bert.ttnn.common import (
 )
 
 
+def p(x, a="x"):
+    print(f"{a}'s  shape: {x.shape}")
+    print(f"{a}'s  layout: {x.layout}")
+    print(f"{a}'s  dtype: {x.dtype}")
+    print(f"{a}'s config: {x.memory_config()}")
+
+
 class TtnnSentenceBertSelfAttention:
     def __init__(self, parameters, config):
         self.parameters = parameters
@@ -56,12 +63,16 @@ class TtnnSentenceBertSelfAttention:
         )
         ttnn.deallocate(query_layer)
         ttnn.deallocate(key_layer)
+        print("attention mask is", attention_mask.shape)
+        p(attention_mask, "att mask")
+        # attention_mask_t = ttnn.to_layout(attention_mask,ttnn.TILE_LAYOUT)
         attention_probabilities = ttnn.transformer.attention_softmax_(
             attention_scores,
             attention_mask=attention_mask,
             head_size=head_size,
             program_config=softmax_config,
         )
+        # ttnn.deallocate(attention_mask)
         context_layer = ttnn.matmul(
             attention_probabilities,
             value_layer,

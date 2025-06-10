@@ -114,15 +114,13 @@ def preprocess_inputs(
     device,
 ):
     input_ids = ttnn.from_torch(input_ids, dtype=ttnn.uint32)  # , device=device, memory_config=ttnn.L1_MEMORY_CONFIG)
-    token_type_ids = ttnn.from_torch(
-        token_type_ids, dtype=ttnn.uint32, device=device, memory_config=ttnn.L1_MEMORY_CONFIG
-    )
-    position_ids = ttnn.from_torch(position_ids, dtype=ttnn.uint32, device=device, memory_config=ttnn.L1_MEMORY_CONFIG)
-    attention_mask = ttnn.from_torch(
-        attention_mask,
-        dtype=ttnn.bfloat16,
-        device=device,
-        layout=ttnn.TILE_LAYOUT,
-        memory_config=ttnn.L1_MEMORY_CONFIG,
-    )
+    token_type_ids = ttnn.from_torch(token_type_ids, dtype=ttnn.uint32)
+    # , device=device, memory_config=ttnn.L1_MEMORY_CONFIG
+    # )
+    position_ids = ttnn.from_torch(position_ids, dtype=ttnn.uint32)
+    #    device=device, memory_config=ttnn.L1_MEMORY_CONFIG)
+    attention_mask = ttnn.from_torch(attention_mask, dtype=ttnn.bfloat16, layout=ttnn.TILE_LAYOUT)
+    #     device=device,
+    #     memory_config=ttnn.L1_MEMORY_CONFIG,
+    # )
     return input_ids, token_type_ids, position_ids, attention_mask

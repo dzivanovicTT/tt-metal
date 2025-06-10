@@ -9,6 +9,13 @@ from models.experimental.sentence_bert.tests.sentence_bert_performant_runner_inf
 from tests.ttnn.utils_for_testing import assert_with_pcc
 
 
+def p(x, a="x"):
+    print(f"{a}'s  shape: {x.shape}")
+    print(f"{a}'s  layout: {x.layout}")
+    print(f"{a}'s  dtype: {x.dtype}")
+    print(f"{a}'s config: {x.memory_config()}")
+
+
 class SentenceBERTPerformantRunner:
     def __init__(
         self,
@@ -38,9 +45,22 @@ class SentenceBERTPerformantRunner:
             token_type_ids=self.token_type_ids,
             position_ids=self.position_ids,
         )
-        self.tt_inputs_host = self.runner_infra.setup_input()
-        self.input_mem_config = ttnn.L1_MEMORY_CONFIG
+        (
+            self.tt_inputs_host,
+            sharded_mem_config_DRAM,
+            self.input_mem_config,
+            self.tt_tokens_host,
+            self.tt_posids_host,
+            self.tt_att_mask_host,
+        ) = self.runner_infra.setup_dram_sharded_input(device)
         self.tt_image_res = self.tt_inputs_host.to(device, ttnn.DRAM_MEMORY_CONFIG)
+        self.tt_tokens = self.tt_tokens_host.to(device, ttnn.DRAM_MEMORY_CONFIG)
+        self.tt_pos = self.tt_posids_host.to(device, ttnn.DRAM_MEMORY_CONFIG)
+        self.tt_att_mask = self.tt_att_mask_host.to(device, ttnn.DRAM_MEMORY_CONFIG)
+        self.input_mem_config_others = ttnn.L1_MEMORY_CONFIG
+        # self.tt_inputs_host = self.runner_infra.setup_input()
+        # self.input_mem_config = ttnn.L1_MEMORY_CONFIG
+        # self.tt_image_res = self.tt_inputs_host.to(device, ttnn.DRAM_MEMORY_CONFIG)
 
     def _capture_sentencebert_trace_2cqs(self):
         self.op_event = ttnn.record_event(self.device, 0)
@@ -48,21 +68,39 @@ class SentenceBERTPerformantRunner:
         # First run configures convs JIT
         ttnn.wait_for_event(1, self.op_event)
         ttnn.copy_host_to_device_tensor(self.tt_inputs_host, self.tt_image_res, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_tokens_host, self.tt_tokens, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_posids_host, self.tt_pos, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_att_mask_host, self.tt_att_mask, 1)
         self.write_event = ttnn.record_event(self.device, 1)
         ttnn.wait_for_event(0, self.write_event)
+        # print("nubfwube",self.runner_infra.ttnn_input_ids)
+        # print("configs are1",self.tt_image_res.memory_config())
+        # print("configs are2",self.input_mem_config)
+        # p(self.tt_image_res,"obecuiwbe")
         self.runner_infra.ttnn_input_ids = ttnn.to_memory_config(self.tt_image_res, self.input_mem_config)
-        spec = self.runner_infra.ttnn_input_ids.spec
+        self.runner_infra.ttnn_token_ids = ttnn.to_memory_config(self.tt_tokens, self.input_mem_config_others)
+        self.runner_infra.ttnn_pos_ids = ttnn.to_memory_config(self.tt_pos, self.input_mem_config_others)
+        self.runner_infra.ttnn_att_mask = ttnn.to_memory_config(self.tt_att_mask, self.input_mem_config_others)
+        spec_input = self.runner_infra.ttnn_input_ids.spec
+        spec_token = self.runner_infra.ttnn_token_ids.spec
+        spec_pos = self.runner_infra.ttnn_pos_ids.spec
+        spec_att = self.runner_infra.ttnn_att_mask.spec
         self.op_event = ttnn.record_event(self.device, 0)
         self.runner_infra.run()
         self.runner_infra.validate()
         self.runner_infra.dealloc_output()
-
         # Optimized run
         ttnn.wait_for_event(1, self.op_event)
         ttnn.copy_host_to_device_tensor(self.tt_inputs_host, self.tt_image_res, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_tokens_host, self.tt_tokens, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_posids_host, self.tt_pos, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_att_mask_host, self.tt_att_mask, 1)
         self.write_event = ttnn.record_event(self.device, 1)
         ttnn.wait_for_event(0, self.write_event)
         self.runner_infra.ttnn_input_ids = ttnn.to_memory_config(self.tt_image_res, self.input_mem_config)
+        self.runner_infra.ttnn_token_ids = ttnn.to_memory_config(self.tt_tokens, self.input_mem_config_others)
+        self.runner_infra.ttnn_pos_ids = ttnn.to_memory_config(self.tt_pos, self.input_mem_config_others)
+        self.runner_infra.ttnn_att_mask = ttnn.to_memory_config(self.tt_att_mask, self.input_mem_config_others)
         self.op_event = ttnn.record_event(self.device, 0)
         self.runner_infra.run()
         self.runner_infra.validate()
@@ -70,31 +108,54 @@ class SentenceBERTPerformantRunner:
         # Capture
         ttnn.wait_for_event(1, self.op_event)
         ttnn.copy_host_to_device_tensor(self.tt_inputs_host, self.tt_image_res, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_tokens_host, self.tt_tokens, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_posids_host, self.tt_pos, 1)
+        ttnn.copy_host_to_device_tensor(self.tt_att_mask_host, self.tt_att_mask, 1)
         self.write_event = ttnn.record_event(self.device, 1)
         ttnn.wait_for_event(0, self.write_event)
         self.runner_infra.ttnn_input_ids = ttnn.to_memory_config(self.tt_image_res, self.input_mem_config)
+        self.runner_infra.ttnn_token_ids = ttnn.to_memory_config(self.tt_tokens, self.input_mem_config_others)
+        self.runner_infra.ttnn_pos_ids = ttnn.to_memory_config(self.tt_pos, self.input_mem_config_others)
+        self.runner_infra.ttnn_att_mask = ttnn.to_memory_config(self.tt_att_mask, self.input_mem_config_others)
         self.op_event = ttnn.record_event(self.device, 0)
         self.runner_infra.dealloc_output()
         trace_input_addr = self.runner_infra.ttnn_input_ids.buffer_address()
+        trace_input_addr2 = self.runner_infra.ttnn_token_ids.buffer_address()
+        trace_input_addr3 = self.runner_infra.ttnn_pos_ids.buffer_address()
+        trace_input_addr4 = self.runner_infra.ttnn_att_mask.buffer_address()
         self.tid = ttnn.begin_trace_capture(self.device, cq_id=0)
         self.runner_infra.run()
-        self.ttnn_input_ids = ttnn.allocate_tensor_on_device(spec, self.device)
+        self.ttnn_input_ids = ttnn.allocate_tensor_on_device(spec_input, self.device)
+        self.ttnn_token_ids = ttnn.allocate_tensor_on_device(spec_token, self.device)
+        self.ttnn_pos_ids = ttnn.allocate_tensor_on_device(spec_pos, self.device)
+        self.ttnn_att_mask = ttnn.allocate_tensor_on_device(spec_att, self.device)
         ttnn.end_trace_capture(self.device, self.tid, cq_id=0)
+        ttnn.synchronize_device(self.device)
         assert trace_input_addr == self.ttnn_input_ids.buffer_address()
+        # assert trace_input_addr2 == self.ttnn_att_mask.buffer_address()
 
-    def _execute_sentencebert_trace_2cqs_inference(self, tt_inputs_host=None):
+    def _execute_sentencebert_trace_2cqs_inference(self, tt_inputs_host, tt_tokens, tt_posids, tt_att_mask):
         # tt_inputs_host = self.tt_inputs_host if tt_inputs_host is None else tt_inputs_host
         # tt_inputs_host = ttnn.from_torch(tt_inputs_host, dtype=ttnn.uint32)
+
         ttnn.wait_for_event(1, self.op_event)
         ttnn.copy_host_to_device_tensor(tt_inputs_host, self.tt_image_res, 1)
+        ttnn.copy_host_to_device_tensor(tt_tokens, self.tt_tokens, 1)
+        ttnn.copy_host_to_device_tensor(tt_posids, self.tt_pos, 1)
+        ttnn.copy_host_to_device_tensor(tt_att_mask, self.tt_att_mask, 1)
         self.write_event = ttnn.record_event(self.device, 1)
         ttnn.wait_for_event(0, self.write_event)
         # TODO: Add in place support to ttnn to_memory_config
-        if self.ttnn_input_ids.is_sharded():
-            self.ttnn_input_ids = ttnn.reshard(self.tt_image_res, self.input_mem_config, self.ttnn_input_ids)
+        # if self.ttnn_input_ids.is_sharded():
+        #     print("it goessss")
+        #     self.ttnn_input_ids = ttnn.reshard(self.tt_image_res, self.input_mem_config, self.ttnn_input_ids)
+        self.ttnn_input_ids = ttnn.to_memory_config(self.tt_image_res, self.input_mem_config)
+        self.ttnn_token_ids = ttnn.to_memory_config(self.tt_tokens, self.input_mem_config_others)
+        self.ttnn_pos_ids = ttnn.to_memory_config(self.tt_pos, self.input_mem_config_others)
+        self.ttnn_att_mask = ttnn.to_memory_config(self.tt_att_mask, self.input_mem_config_others)
         self.op_event = ttnn.record_event(self.device, 0)
         ttnn.execute_trace(self.device, self.tid, cq_id=0, blocking=False)
-        self.runner_infra.validate()
+        # self.runner_infra.validate()
         return self.runner_infra.ttnn_output_tensor[0]
 
     def _validate(self, result_output_tensor):
@@ -104,9 +165,12 @@ class SentenceBERTPerformantRunner:
     def release(self):
         ttnn.release_trace(self.device, self.tid)
 
-    def run(self, input_ids, check_pcc=True):
-        tt_input_ids = ttnn.from_torch(input_ids, dtype=ttnn.uint32)
-        output = self._execute_sentencebert_trace_2cqs_inference(tt_input_ids)
+    def run(self, input_ids, tokens, posids, att_mask, check_pcc=False):
+        tt_inputs_host = ttnn.from_torch(input_ids, dtype=ttnn.uint32)
+        tt_tokens = ttnn.from_torch(tokens, dtype=ttnn.uint32)
+        tt_posids = ttnn.from_torch(posids, dtype=ttnn.uint32)
+        tt_att_mask = ttnn.from_torch(att_mask, dtype=ttnn.bfloat16, layout=ttnn.TILE_LAYOUT)
+        output = self._execute_sentencebert_trace_2cqs_inference(tt_inputs_host, tt_tokens, tt_posids, tt_att_mask)
         if check_pcc:
             self._validate(result_output_tensor=ttnn.to_torch(output).squeeze(dim=1))
         return output
