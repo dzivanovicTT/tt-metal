@@ -21,7 +21,7 @@ FORCE_INLINE void setup_local_cb_read_write_interfaces(
 
     local_cb_mask >>= start_cb_index;
     uint32_t cb_id = start_cb_index;
-    LocalCBInterface* local_interface_ptr = &get_local_cb_interface(cb_id);
+    LocalCBInterface* local_interface_ptr = &cb_interface[cb_id].local_cb_interface;
 
 // The following code is a C++ version of the assembly loop. It performs the same operations as the assembly, but
 // the compiler doesn't optimize it as well as the assembly version (roughly 770 vs 595 cycles for 32 CBs on wormhole).
