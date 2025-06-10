@@ -766,15 +766,80 @@ TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestUnicastRaw) {
     auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
     CustomMeshGraphFabric2DDynamicFixture::SetUp(
         mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
-    for (uint32_t i = 0; i < 10; i++) {
+    for (uint32_t i = 0; i < 100; i++) {
         RunTestUnicastRaw(this);
     }
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast1) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::E, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::S, {routing_info});
+}
+
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast2) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::E, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::N, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast3) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::N, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::E, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast4) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::N, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::W, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast5) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::S, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::E, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast6) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::S, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::W, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast7) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::W, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::N, {routing_info});
+}
+
+TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMcast8) {
+    auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
+    CustomMeshGraphFabric2DDynamicFixture::SetUp(
+        mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
+    auto routing_info = McastRoutingInfo{.mcast_dir = RoutingDirection::W, .num_mcast_hops = 1};
+    RunTestLineMcast(this, RoutingDirection::S, {routing_info});
 }
 
 INSTANTIATE_TEST_SUITE_P(
     T3kCustomMeshGraphFabric2DDynamicTests,
     T3kCustomMeshGraphFabric2DDynamicFixture,
-    ::testing::ValuesIn(t3k_mesh_descriptor_chip_mappings));
+    ::testing::ValuesIn(t3k_disjoint_mesh_descriptor_chip_mappings));
 
 TEST_F(Fabric2DDynamicFixture, TestUnicastConnAPI) { RunTestUnicastConnAPI(this, 1); }
 
