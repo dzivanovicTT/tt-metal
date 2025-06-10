@@ -95,8 +95,7 @@ void kernel_main() {
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
                 cb_reserve_back(cb_output_id, num_pages_to_read);
-                const uint32_t l1_write_addr_base = get_write_ptr(cb_output_id);
-                uint32_t l1_write_addr = l1_write_addr_base;
+                uint32_t l1_write_addr = get_write_ptr(cb_output_id);
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     uint32_t packet_size_in_pages = std::min(num_pages_to_read - j, contig_pages_advanced);
                     uint32_t payload_size_bytes = packet_size_in_pages * input_tensor_page_size;
