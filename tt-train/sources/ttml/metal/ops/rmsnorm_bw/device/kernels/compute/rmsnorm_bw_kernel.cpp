@@ -7,6 +7,7 @@
 // #include <compute_kernel_api/common_globals.h>
 #include <compute_kernel_api/pack.h>
 #include <compute_kernel_api/reg_api.h>
+#include <dataflow_api.h>
 #include <debug/dprint.h>
 
 #include <cstdint>
@@ -22,29 +23,6 @@
 #include "compute_kernel_api/mask.h"
 #include "compute_kernel_api/reduce.h"
 #include "compute_kernel_api/tile_move_copy.h"
-// TODO: remove this using namespace. The functions should be accessible with out it.
-// using namespace ckernel;
-
-//  inline void print_loop(uint32_t count) {
-//     // UNPACK(DPRINT << "U-LOOP:" << (uint32_t)count << ENDL());
-//     // MATH(DPRINT << "M-LOOP:" << (uint32_t)count << ENDL());
-//     // PACK(DPRINT << "P-LOOP:" << (uint32_t)count << ENDL());
-// }
-
-//  inline void print_full_tile_column0(uint32_t cb_id, uint32_t tile_id = 0, bool untilize = false) {
-//     // UNPACK(DPRINT << "U=====!" << ENDL());
-//     // MATH(DPRINT << "M=====!" << ENDL());
-//     // PACK(DPRINT << "P=====!" << ENDL());
-//     for (uint8_t r = 0; r < 32; ++r) {
-//         SliceRange sr_left = SliceRange{.h0 = r, .h1 = (uint8_t)(r + 1), .hs = 1, .w0 = 0, .w1 = 1, .ws = 1};
-//         // UNPACK(DPRINT << (uint)r << ": " << TileSlice(cb_id, tile_id, sr_left, false, untilize) << " ");
-//         // MATH(DPRINT << (uint)r << ": " << TileSlice(cb_id, tile_id, sr_left, false, untilize) << " ");
-//         // PACK(DPRINT << (uint)r << ": " << TileSlice(cb_id, tile_id, sr_left, false, untilize) << " ");
-//     }
-//     // UNPACK(DPRINT << ENDL() << "U+++++!" << ENDL());
-//     // MATH(DPRINT << ENDL() << "M+++++!" << ENDL());
-//     // PACK(DPRINT << ENDL() << "P+++++!" << ENDL());
-// }
 
 // inline void print_full_tile(uint32_t cb_id, uint32_t tile_id = 0, bool untilize = false) {
 //     // UNPACK(DPRINT << "U=====!" << ENDL());
@@ -69,10 +47,6 @@
 //     // PACK(DPRINT << "P+++++!" << ENDL());
 // }
 
-// 32 x 32
-// 0 2 3 4 ... 15 | 16 17 18 19 ... 31
-
-// ~16: 256 - 271
 namespace NAMESPACE {
 
 constexpr uint32_t num_rows_per_core = get_compile_time_arg_val(0);
@@ -105,33 +79,13 @@ constexpr uint32_t cb_dL_dgamma_components = tt::CBIndex::c_15;
 
 constexpr uint32_t onetile = 1;
 
-// #define cb_input_idx tt::CBIndex::c_0
-// #define cb_mask_w_idx tt::CBIndex::c_1  // Unused atm
-// #define cb_scaler_idx tt::CBIndex::c_2
-// #define cb_gamma_idx tt::CBIndex::c_3  // Number of activations, i.e. c in the paper
-// #define cb_rms_a_idx tt::CBIndex::c_4
-// #define cb_dL_out_idx tt::CBIndex::c_5
-// // CBs with output datacb_gamm
-// // Create more intermedaite-output CBs that will be used exclusively by the writer. Do not compute anything on them
-// #define cb_dL_da_idx tt::CBIndex::c_6
-// #define cb_dL_dgamma_idx tt::CBIndex::c_7
-// // CBs with intermediate computations
-// #define cb_scaled_gain tt::CBIndex::c_8
-// #define cb_gained_dL_dout tt::CBIndex::c_9
-// #define cb_scale tt::CBIndex::c_10
-// #define cb_ms_a tt::CBIndex::c_11
-// #define cb_c_by_ms_a tt::CBIndex::c_12
-// #define cb_rhs tt::CBIndex::c_13
-// #define cb_a_over_rms_a tt::CBIndex::c_14
-// #define cb_dL_dgamma_components tt::CBIndex::c_15
-
-// #define onetile 1
-
 #ifdef DO_MASK_W  // Unsued atm
 constexpr bool do_mask_w = true;
 #else
 constexpr bool do_mask_w = false;
 #endif
+
+// [1, 2, 3, 4, ....]; -> sum then 0, or prod then 1
 
 // TODO: Maybe this should be moved to some utils?
 inline void pack_and_push(uint32_t reg, uint32_t cb) {
@@ -225,6 +179,10 @@ inline void compute_scaled_gain_and_gained_dL_dout(uint32_t col) {
     //     none,
     //     false);  // [B,1,S,C] x [B,1,S,C] -> [B,1,S,C]
 
+    // gained_dL_dout = g / rms_a * dL_dout
+    // [23, 0000] / [1] * [23, 0000] -> [23]
+    // mask: from 24 do 31 = 0 (mask_tile)
+
     // Q: maybe it would be better to move wait_fronts here?
     uint32_t rms_register = 0;
     tile_regs_acquire();
@@ -258,7 +216,7 @@ inline void compute_scale(uint32_t col) {
 
     // Perform elementwise multiplication and sum reduction in one step
     reduce_init<false, PoolType::SUM, ReduceDim::REDUCE_ROW>(cb_gained_dL_dout, cb_input_idx, cb_scale);
-
+    // + masking input
     reduce_tile<PoolType::SUM, ReduceDim::REDUCE_ROW>(  // (sum over inner dimension)
         cb_gained_dL_dout,                              // main input buffer
         cb_input_idx,                                   // scaler buffer (elementwise mul)
@@ -424,48 +382,48 @@ inline void compute_dL_dgamma_components(uint32_t col) {
     // Now we can perform the multiplication with dL_out.
     // We can use tile idx 0 for all cols as we do not need to store all of the a over rms_a values, but only the
     // current tile value.
+    // NOTE: is 0, 0 ok in tiles nums?
+    // cb_wait_front(cb_a_over_rms_a, onetile);
     compute_and_pack_mul(cb_dL_out_idx, cb_a_over_rms_a, /* tile_a */ 0, /* tile_b */ 0, cb_dL_dgamma_components);
     // We can pop_front cb_a_over_rms_a, since we do not need it anymore.
-    cb_pop_front(cb_a_over_rms_a, onetile);
-
-    // cb_wait_front(cb_dL_dgamma_components, onetile);
-    // // UNPACK(DPRINT << "cb_dL_dgamma_components" << ENDL());
-    // // printfull_tile(cb_dL_dgamma_components, col, true);
+    // cb_pop_front(cb_a_over_rms_a, onetile);
 }
 
 // Figure out why MAIN without ( )
 inline void MAIN {
-    prepare_sfpu_and_binary_ops();
-
-    // // UNPACK(DPRINT << "whatever" << ENDL());
-    // // UNPACK(DPRINT << Wt << " tiles in row " << ENDL());
-    // // UNPACK(DPRINT << "num_rows_per_core: " << num_rows_per_core << ENDL());
+    // prepare_sfpu_and_binary_ops();
 
     for (uint32_t row = 0; row < num_rows_per_core; ++row) {
         // 1. Wait for the input tensor, rms_a and dL_out to be ready.
-        cb_wait_front(cb_input_idx, Wt);
-        // RMS(a) is a scalar, so we wait for one tile only.
-        cb_wait_front(cb_rms_a_idx, onetile);
-        cb_wait_front(cb_dL_out_idx, Wt);
+        // cb_wait_front(cb_input_idx, Wt);
+        // // RMS(a) is a scalar, so we wait for one tile only.
+        // cb_wait_front(cb_rms_a_idx, onetile);
+        // cb_wait_front(cb_dL_out_idx, Wt);
 
-        for (uint32_t col = 0; col < Wt; ++col) {
-            compute_scaled_gain_and_gained_dL_dout(col);
-            compute_scale(col);
-        }
-        compute_ms_a_and_c_by_ms_a();
+        // // So if we have to mask the input cbs what should we do is to beofre we do ANY computations
+        // // we should apply mask to input, gamma, grad etc and save it inot another CB like cb_masked_input_idx or
+        // // sth like this. Do not reuse cb_input_idx.
 
-        // We need to store in registers scale and c_by_ms_a, and iterate over all tiles in cb_input_idx to calculate
-        // rhs for each tile.
-        for (uint32_t col = 0; col < Wt; ++col) {
-            compute_rhs(col);
-            // nop to check sync
-            // for (uint32_t i = 0; i < 100000; ++i) {
-            //     asm volatile("nop");
-            // }
+        // // Be careful masking should be applied tonly to the last tile.
 
-            compute_dL_da(col);
-            // compute_dL_dgamma_components(col);
-        }
+        // for (uint32_t col = 0; col < Wt; ++col) {
+        //     compute_scaled_gain_and_gained_dL_dout(col);
+        //     compute_scale(col);
+        // }
+        // compute_ms_a_and_c_by_ms_a();
+
+        // // We need to store in registers scale and c_by_ms_a, and iterate over all tiles in cb_input_idx to calculate
+        // // rhs for each tile.
+        // for (uint32_t col = 0; col < Wt; ++col) {
+        //     compute_rhs(col);
+        //     // nop to check sync
+        //     // for (uint32_t i = 0; i < 100000; ++i) {
+        //     //     asm volatile("nop");
+        //     // }
+
+        //     compute_dL_da(col);
+        //     compute_dL_dgamma_components(col);
+        // }
 
         // pop from the input CBs
 
