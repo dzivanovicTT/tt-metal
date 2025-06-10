@@ -23,6 +23,7 @@
 
 extern "C" void wzerorange(uint32_t *start, uint32_t *end);
 
+uint32_t cb_interface_mask;
 CBInterface cb_interface[NUM_CIRCULAR_BUFFERS];
 
 extern "C" [[gnu::section(".start")]] void _start(uint32_t) {

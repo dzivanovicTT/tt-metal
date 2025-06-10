@@ -56,6 +56,7 @@ int32_t bank_to_l1_offset[NUM_L1_BANKS] __attribute__((used));
 
 tt_l1_ptr mailboxes_t * const mailboxes = (tt_l1_ptr mailboxes_t *)(MEM_IERISC_MAILBOX_BASE);
 
+uint32_t cb_interface_mask __attribute__((used));
 CBInterface cb_interface[NUM_CIRCULAR_BUFFERS] __attribute__((used));
 
 #if defined(PROFILE_KERNEL)
