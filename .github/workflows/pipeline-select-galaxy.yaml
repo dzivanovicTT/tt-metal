@@ -32,7 +32,7 @@ on:
         required: false
         type: boolean
         default: false
-run-name: Galaxy 6U Health Tests Only
+run-name: Galaxy 6U Health Tests Only (${{ inputs.extra-tag }})
 jobs:
   build-artifact:
     uses: ./.github/workflows/build-artifact.yaml
