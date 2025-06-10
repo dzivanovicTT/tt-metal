@@ -55,6 +55,7 @@ std::tuple<tt::tt_metal::CBHandle, tt::tt_metal::CBHandle, tt::tt_metal::CBHandl
     const Tensor& input,
     CoreRange core,
     uint32_t num_cb0_tiles,
+    uint32_t cb0_reuse_tiles,
     uint32_t num_cb0_second_reader_tiles,
     uint32_t num_cb1_tiles,
     uint32_t num_cb0_tilized_tiles,
@@ -153,7 +154,8 @@ std::tuple<tt::tt_metal::CBHandle, tt::tt_metal::CBHandle, tt::tt_metal::CBHandl
                     act_tile_size);
             }
             cb_indices.act_cb = cb_indices.get_next_cb_index();
-            tt::tt_metal::create_cb(cb_indices.act_cb, program, core, act_tile_size, num_cb0_tiles, act_df);
+            tt::tt_metal::create_cb(
+                cb_indices.act_cb, program, core, act_tile_size, num_cb0_tiles + cb0_reuse_tiles, act_df);
             log_debug(LogOp, "Act CB: {}, npages: {}, pagesize: {}", cb_indices.act_cb, num_cb0_tiles, act_tile_size);
         }
     } else {
@@ -660,7 +662,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
     uint32_t num_blocks_act_h = act_matrix_height_ntiles / act_block_h_ntiles;
     uint32_t num_blocks_out_h = act_matrix_height_ntiles / out_block_h_ntiles;
-    uint32_t num_blocks_act_w = a.memory_config().memory_layout() == TensorMemoryLayout::BLOCK_SHARDED ? 1 : filter_h;
+    uint32_t num_blocks_act_w = 1;
     uint32_t num_blocks_weight_w = weight_matrix_width_ntiles / weight_block_w_ntiles;
 
     // act block info
@@ -1079,7 +1081,26 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool read_window_in_inner_loop = false;
     uint32_t num_weight_cb_tiles = weight_block_h_ntiles * weight_block_w_ntiles / conv_act_c_blocks;
     bool fully_buffer_weights = false;
-    uint32_t num_act_cb_tiles = act_block_h_ntiles * act_block_w_ntiles / conv_act_c_blocks;
+    uint32_t image_width = sliding_window_config.get_output_shape()[2];
+    uint32_t act_tiles_per_image_width = image_width / TILE_HEIGHT;
+    uint32_t num_act_cb_tiles = act_tiles_per_image_width * act_block_w_ntiles / conv_act_c_blocks;
+
+    uint32_t conv_act_c_read_bytes = conv_act_size_c * a.element_size() / conv_act_c_blocks;
+    uint32_t act_block_w_extra_align_bytes = (round_up(a_shard_spec.shape[1] * filter_h * filter_w, TILE_WIDTH) -
+                                              (a_shard_spec.shape[1] * filter_h * filter_w)) *
+                                             a.element_size();
+    const uint32_t act_block_w_extra_align_scalars = act_block_w_extra_align_bytes / a.element_size();
+
+    uint32_t reuse_loops = act_block_h_ntiles / act_tiles_per_image_width;
+    if (act_block_h_ntiles % act_tiles_per_image_width != 0) {
+        reuse_loops++;
+    }
+
+    uint32_t reuse_buffer_length = reuse_loops * conv_act_c_read_bytes * filter_w;
+    uint32_t reuse_buffer_length_tiles = reuse_buffer_length / tt_metal::detail::TileSize(act_df);
+    if (reuse_buffer_length % tt_metal::detail::TileSize(act_df) != 0) {
+        reuse_buffer_length_tiles++;
+    }
 
     if (block_sharded) {
         num_act_cb_tiles = act_block_h_ntiles * act_block_w_ntiles;
@@ -1099,7 +1120,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     } else if (num_blocks_act_h_per_core > 1) {
         fully_buffer_weights = true;
     }
-    uint32_t num_cb0_tilized_tiles = num_act_cb_tiles;
+    uint32_t num_cb0_tilized_tiles = (act_block_h_ntiles / act_tiles_per_image_width) * num_act_cb_tiles;
 
     if (fully_buffer_weights) {
         num_weight_cb_tiles *= window_outer;
@@ -1133,14 +1154,6 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     std::vector<uint32_t> reader_compile_time_args;
     std::vector<uint32_t> writer_compile_time_args;
 
-    uint32_t conv_act_c_read_bytes = conv_act_size_c * a.element_size() / conv_act_c_blocks;
-    uint32_t act_block_w_extra_align_bytes =
-        block_sharded ? (round_up(a_shard_spec.shape[1] * filter_h * filter_w, TILE_WIDTH) -
-                         (a_shard_spec.shape[1] * filter_h * filter_w)) *
-                            a.element_size()
-                      : (round_up(a_shard_spec.shape[1] * filter_w, TILE_WIDTH) - (a_shard_spec.shape[1] * filter_w)) *
-                            a.element_size();
-    const uint32_t act_block_w_extra_align_scalars = act_block_w_extra_align_bytes / a.element_size();
     // When using block float format, we must handle cases where the data doesn't align to 16-scalar boundaries.
     // If act_block_w_extra_align_bytes contains a number of scalars that isn't a multiple of 16,
     // we need to zero out the temporary circular buffers used during the tiling process.
@@ -1196,7 +1209,8 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
             program,
             a,
             all_cores,
-            num_act_cb_tiles,                // row major act cb
+            num_act_cb_tiles,  // row major act cb
+            reuse_buffer_length_tiles,
             num_act_cb_second_reader_tiles,  // row major act cb second reader
             num_weight_cb_tiles,             // tiled weight cb
             num_cb0_tilized_tiles,           // tiled act cb
@@ -1284,7 +1298,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
         } else {
             // Height sharded conv
-            TT_FATAL(act_block_w_datums == round_up(conv_act_size_c * filter_w, TILE_WIDTH), "Error");
+            TT_FATAL(act_block_w_datums == round_up(conv_act_size_c * filter_w * filter_h, TILE_WIDTH), "Error");
 
             reader_kernel =
                 "ttnn/cpp/ttnn/operations/conv/conv2d/device/kernels/"
@@ -1332,6 +1346,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         in0_block_w = act_block_w_ntiles;
         in0_num_blocks_w = 1 * conv_act_c_blocks;
     }
+
     reader_compile_time_args = {
         (uint32_t)dilation_h,
         (uint32_t)dilation_w,
@@ -1360,7 +1375,10 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         (uint32_t)cb_indices.cb_for_reader_indices,
         (uint32_t)cb_indices.tilize_mode_tilized_act_cb,
         (uint32_t)cb_indices.act_cb_row_major_bfloat16,
-        (uint32_t)cb_indices.cb_for_l1_array};
+        (uint32_t)cb_indices.cb_for_l1_array,
+        // conv 3.0
+        (uint32_t)reuse_loops,
+        (uint32_t)num_act_cb_tiles};
 
     // define for bias
     std::map<string, string> writer_defines;
@@ -1480,7 +1498,11 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
         cb_indices.out0_cb,
         cb_indices.temp_sum_cb,
-        partials_cb_uses_output};
+        partials_cb_uses_output,
+        2048 * (num_act_cb_tiles + reuse_buffer_length_tiles),
+        (filter_w * conv_act_c_read_bytes) / 16,  // diff
+        act_tiles_per_image_width,
+    };
 
     const tt::tt_metal::NOC writer_mcast_noc = tt::tt_metal::detail::GetPreferredNOCForDRAMRead(device->arch());
     ;

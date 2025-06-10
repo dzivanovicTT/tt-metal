@@ -412,7 +412,7 @@ OptimizedConvBlockConfig determine_per_core_conv_block_config(
     TT_ASSERT(padded_in_channels % act_c_num_blocks == 0);
     uint32_t act_block_w =
         parallel_config.shard_scheme == TensorMemoryLayout::HEIGHT_SHARDED
-            ? round_up(padded_in_channels * window_w, 32)
+            ? round_up(padded_in_channels * window_w * window_h, 32)
             : round_up((padded_in_channels / act_c_num_blocks) * window_h * window_w, tt::constants::TILE_WIDTH);
     if (parallel_config.shard_scheme == TensorMemoryLayout::WIDTH_SHARDED) {
         TT_ASSERT(padded_in_channels % (32 * parallel_config.grid.num_cores() * act_block_w_div) == 0);
@@ -905,7 +905,8 @@ Conv2dConfig determine_conv_config_for_auto_shard(
             input_datatype,
             conv_out_memory_config,
             enable_bias,
-            conv_is_1d_deptwise);
+            conv_is_1d_deptwise,
+            output_width);
 
         // Since we don't have L1 usage for halo output (input to conv2d)
         // use approx input tensor size per core as a proxy.
@@ -1010,7 +1011,8 @@ conv_op_l1_usage conv2d::calculate_L1_usage(
     const DataType input_datatype,
     const MemoryConfig& output_memory_config,
     const bool enable_bias,
-    bool is_1d_depthwise_conv) {
+    bool is_1d_depthwise_conv,
+    uint32_t image_width) {
     bool untilize_out = conv_config.output_layout == Layout::ROW_MAJOR;
 
     // Output of halo op is always ROW_MAJOR, so input for convs is either DataType::FLOAT32 or DataType::BFLOAT16
@@ -1035,6 +1037,7 @@ conv_op_l1_usage conv2d::calculate_L1_usage(
     uint32_t act_block_h_ntiles = block_config.act_block_h_ntiles;
     uint32_t act_block_num_tiles = block_config.act_block_h_ntiles * act_block_w_ntiles;
 
+    uint32_t in_channels = weights_shape[1];
     uint32_t weight_matrix_height = weights_shape[2];
     uint32_t weight_matrix_width = weights_shape[3];
     uint32_t weight_matrix_height_ntiles = weight_matrix_height / tt::constants::TILE_HEIGHT;
@@ -1131,10 +1134,24 @@ conv_op_l1_usage conv2d::calculate_L1_usage(
         uint32_t weight_block_w_ntiles = per_core_out_matrix_width_ntiles;
         uint32_t weight_block_h_ntiles = (is_1d_depthwise_conv) ? act_block_h_ntiles : act_block_w_ntiles;
 
-        uint32_t act_block_cb_ntiles = act_block_h_ntiles * act_block_w_ntiles;
+        uint32_t act_tiles_per_image_width = image_width / tt::constants::TILE_WIDTH;
+
+        uint32_t act_block_cb_ntiles = act_tiles_per_image_width * act_block_w_ntiles;
+        uint32_t reuse_loops = act_block_h_ntiles / act_tiles_per_image_width;
+        if (act_block_h_ntiles % act_tiles_per_image_width != 0) {
+            reuse_loops++;
+        }
+
+        uint32_t reuse_buffer_length =
+            reuse_loops * in_channels * kernel_size[1] * 2;  // f16 TODO(sjovic): use data format here
+        uint32_t reuse_buffer_length_tiles = reuse_buffer_length / input_tile_size;
+        if (reuse_buffer_length % input_tile_size != 0) {
+            reuse_buffer_length_tiles++;
+        }
 
         uint32_t act_block_cb_size = act_block_cb_ntiles * input_tile_size;
-        uint32_t tilzed_act_cb_size = act_block_cb_ntiles * output_tile_size;
+        uint32_t tilzed_act_cb_size =
+            (act_block_h_ntiles / act_tiles_per_image_width) * act_block_cb_ntiles * output_tile_size;
 
         uint32_t output_block_ntiles = out_block_h_ntiles_padded * per_core_out_matrix_width_ntiles;
 
@@ -1162,15 +1179,16 @@ conv_op_l1_usage conv2d::calculate_L1_usage(
             act_block_split_last_ntiles *= 2;
             act_block_split_ntiles *= 2;
         }
+
         // ACT CB
-        uint32_t act_cb_size = act_block_split_ntiles * input_tile_size;
+        uint32_t act_cb_size = (act_block_split_ntiles + reuse_buffer_length_tiles) * input_tile_size;
         log_debug(tt::LogOp, "Act CB Size: {}", act_cb_size);
 
         // WEIGHTS CB
         uint32_t weights_cb_size = weight_block_h_ntiles * weight_block_w_ntiles * weights_tile_size;
-        if (num_blocks_act_h > 1) {
-            weights_cb_size *= kernel_size[0];
-        }
+        // if (num_blocks_act_h > 1) {
+        //     weights_cb_size *= kernel_size[0];
+        // }
         if (num_blocks_act_h <= 1 && conv_config.enable_weights_double_buffer) {
             weights_cb_size *= 2;
         }

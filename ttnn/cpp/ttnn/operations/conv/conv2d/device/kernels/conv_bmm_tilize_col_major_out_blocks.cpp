@@ -9,7 +9,7 @@
 #include "compute_kernel_api/pack_untilize.h"
 #include "compute_kernel_api/tile_move_copy.h"
 #include "compute_kernel_api/matmul.h"
-// #include "debug/dprint.h"
+#include "debug/dprint_pages.h"
 #include "compute_kernel_api/untilize.h"
 
 #ifdef FUSE_BIAS
@@ -20,11 +20,40 @@
 
 #define DEBUG_PRINT 0
 
-inline void tilize_in(
-    uint32_t in_cb_id, uint32_t in_subblock_h, uint32_t in_block_w, uint32_t in_num_subblocks, uint32_t out_cb_id) {
+FORCE_INLINE void update_local_cb_rd_ptr(uint32_t cb_id, uint32_t val) {
+    LocalCBInterface& local_cb = get_local_cb_interface(cb_id);
+    local_cb.fifo_rd_ptr = val;
+}
+
+FORCE_INLINE uint32_t get_local_cb_rd_ptr(uint32_t cb_id) {
+    LocalCBInterface& local_cb = get_local_cb_interface(cb_id);
+    return local_cb.fifo_rd_ptr;
+}
+
+inline uint32_t tilize_in(
+    uint32_t in_cb_id,
+    uint32_t in_subblock_h,
+    uint32_t in_block_w,
+    uint32_t in_num_subblocks,
+    uint32_t out_cb_id,
+    uint32_t rows_read,
+    uint32_t diff,
+    uint32_t start_cb_addr,
+    uint32_t end_cb_addr,
+    uint32_t image_width_in_tiles) {
     tilize_init_short(in_cb_id, in_block_w, out_cb_id);
+    uint32_t counter = 0;
     for (uint32_t in_subblock = 0; in_subblock < in_num_subblocks; ++in_subblock) {
         for (uint32_t h = 0; h < in_subblock_h; ++h) {
+            // TODO(sjovic): move out these divisions somehow
+            if (counter + rows_read >= image_width_in_tiles && (counter + rows_read) % image_width_in_tiles == 0) {
+                uint32_t multiplier = (counter + rows_read) / image_width_in_tiles;
+                uint32_t new_read_ptr = 0;
+                UNPACK((new_read_ptr = start_cb_addr + multiplier * diff));
+                UNPACK((update_local_cb_rd_ptr(in_cb_id, new_read_ptr)));
+            }
+            counter++;
+
             cb_wait_front(in_cb_id, in_block_w);
             cb_reserve_back(out_cb_id, in_block_w);
             tilize_block(in_cb_id, in_block_w, out_cb_id);
@@ -33,6 +62,8 @@ inline void tilize_in(
         }
     }
     tilize_uninit(in_cb_id, out_cb_id);
+
+    return rows_read + counter;
 }  // tilize_in()
 
 template <uint32_t out_subblock_w, uint32_t out_block_w>
@@ -96,6 +127,9 @@ void MAIN {
     constexpr uint32_t tilized_in0_cb_id = get_compile_time_arg_val(23);
     constexpr uint32_t out_cb_id = get_compile_time_arg_val(24);
     constexpr bool partials_cb_uses_output = get_compile_time_arg_val(26);
+    constexpr uint32_t cb_size = get_compile_time_arg_val(27);
+    uint32_t diff = get_compile_time_arg_val(28);                  // 5*4; // kernel w * channel_in * 2b / 16
+    uint32_t image_width_in_tiles = get_compile_time_arg_val(29);  // 4;
 
 #ifdef WIDTH_SHARDED
     constexpr uint32_t in0_nblocks_w_tilize = get_compile_time_arg_val(27);
@@ -129,6 +163,11 @@ void MAIN {
 #ifdef SFPU_OP_INIT_ACTIVATION
     SFPU_OP_INIT_ACTIVATION
 #endif
+    uint32_t start_cb_addr = get_local_cb_interface(in0_cb_id).fifo_rd_ptr;
+
+    uint32_t end_cb_addr = start_cb_addr + cb_size;
+    uint32_t rows_read = 0;
+
     UNPACK(uint32_t partials_cb_read_ptr = get_local_cb_interface(matmul_partials_cb).fifo_rd_ptr;)
     PACK(uint32_t partials_cb_write_ptr = get_local_cb_interface(matmul_partials_cb).fifo_wr_ptr;)
     // in1 num blocks w is the outer loop. Output blocks are computed in col major order.
@@ -181,7 +220,17 @@ void MAIN {
 
                     reconfig_data_format_srca(in1_cb_id, in0_cb_id);
 
-                    tilize_in(in0_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks_read, tilized_in0_cb_id);
+                    rows_read = tilize_in(
+                        in0_cb_id,
+                        in0_subblock_h,
+                        in0_block_w,
+                        in0_num_subblocks_read,
+                        tilized_in0_cb_id,
+                        rows_read,
+                        diff,
+                        start_cb_addr,
+                        end_cb_addr,
+                        image_width_in_tiles);
 #ifdef SPLIT_READER
                     tilize_in(
                         in0_cb_second_reader_id,
@@ -266,6 +315,11 @@ void MAIN {
                                 out_subblock_w,
                                 out_subblock_h,
                                 in0_block_w);
+
+                            // for (uint32_t i = 0; i < out_subblock_w*out_subblock_h; i++) {
+                            //     dprint_tensix_dest_reg(i);
+                            // }
+
                             in0_index++;               // stride right by 1
                             in1_index += in1_block_w;  // to stride down by 1 need to stride by in_per_core_w (should be
                                                        // called in1_block_w)

@@ -45,7 +45,7 @@ std::pair<std::vector<uint32_t>, std::vector<uint32_t>> compute_opt_conv_activat
     uint32_t act_block_h_datums = act_block_h_ntiles * TILE_HEIGHT;
     uint32_t num_rows_padded = tt::round_up(num_rows, num_cores_nhw * act_block_h_datums);
     uint32_t num_cols = conv_activation_shape[3] * filter_h * filter_w;
-    uint32_t num_cols_padded = tt::round_up(conv_activation_shape[3] * filter_w, TILE_WIDTH) * filter_h;
+    uint32_t num_cols_padded = tt::round_up(conv_activation_shape[3] * filter_w * filter_h, TILE_WIDTH);
     return {{1, num_rows_padded, num_cols_padded}, {1, num_rows, num_cols}};
 }
 
@@ -293,7 +293,8 @@ operation::ProgramWithCallbacks OptimizedConvNew::create_program(
             output_channels,
             kernel_dims[1],
             sliding_window_config.get_output_shape()[2],
-            has_bias));
+            has_bias),
+        sliding_window_config.input_hw.second);
 
     TT_FATAL(
         actual_cb_size == l1_usage.CB_allocation_size,

@@ -4,6 +4,12 @@
 
 #include "dataflow_api.h"
 #include "height_sharded_reader_common.hpp"
+#include "debug/dprint.h"
+
+FORCE_INLINE void update_local_cb_wr_ptr(uint32_t cb_id, uint32_t val) {
+    LocalCBInterface& local_cb = get_local_cb_interface(cb_id);
+    local_cb.fifo_wr_ptr = val;
+}
 
 void kernel_main() {
     constexpr uint32_t dilation_h = get_compile_time_arg_val(0);
@@ -15,6 +21,7 @@ void kernel_main() {
     constexpr uint32_t window_outer = get_compile_time_arg_val(4);
     constexpr uint32_t window_inner = get_compile_time_arg_val(5);
     constexpr uint32_t act_block_num_tiles = get_compile_time_arg_val(6);
+    constexpr uint32_t weights_size_h = get_compile_time_arg_val(7);
     constexpr uint32_t weight_size_w = get_compile_time_arg_val(8);
     constexpr uint32_t conv_act_size_w_padded = get_compile_time_arg_val(9);
     constexpr uint32_t act_block_w_extra_align_bytes = get_compile_time_arg_val(10);
@@ -24,6 +31,9 @@ void kernel_main() {
     constexpr uint32_t cb_id_act = get_compile_time_arg_val(21);
     constexpr uint32_t cb_id_sharded_act = get_compile_time_arg_val(22);
     constexpr uint32_t cb_reader_indices = get_compile_time_arg_val(23);
+
+    constexpr uint32_t reuse_loops = get_compile_time_arg_val(27);
+    constexpr uint32_t act_cb_tiles = get_compile_time_arg_val(28);
 
     uint32_t i = 0;
     uint32_t noop = get_arg_val<uint32_t>(i);
@@ -65,13 +75,19 @@ void kernel_main() {
     noc_async_read_one_packet_set_state(get_noc_addr(act_l1_read_addr), coalesced_read_bytes);
 
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
-    uint32_t start_reader_idx = 0;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
-        uint32_t reader_offset = act_l1_read_addr;
-        for (uint32_t outer = 0; outer < window_outer; outer++) {
-            reader_idx = start_reader_idx;
+        uint32_t cb_start_addr, l1_write_addr_act, cb_end_addr;
+        for (uint32_t loop = 0; loop < reuse_loops; loop++) {
+            cb_reserve_back(cb_id_act, act_cb_tiles);
+            if (loop == 0 && bh == 0) {
+                cb_start_addr = get_write_ptr(cb_id_act);
+                cb_end_addr = cb_start_addr + (act_cb_tiles + 3) * 2048;
+                l1_write_addr_act = cb_start_addr;
+            } else {
+                l1_write_addr_act = cb_start_addr + (bh * reuse_loops + loop) * weight_size_w * conv_act_c_read_bytes;
+                update_local_cb_wr_ptr(cb_id_act, l1_write_addr_act);
+            }
 
-            cb_reserve_back(cb_id_act, act_block_num_tiles);
             uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
 
             read_sticks<
@@ -80,17 +96,22 @@ void kernel_main() {
                 conv_act_c_read_bytes,
                 act_block_w_extra_align_bytes,
                 stride_w_bytes,
+                stride_w,
+                window_outer_offset,
                 weight_size_w,
-                stride_w>(packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx);
+                weights_size_h>(
+                packed_reader_indices_ptr,
+                act_l1_read_addr,
+                l1_write_addr_act,
+                reader_idx,
+                loop == 0 && bh == 0,
+                cb_start_addr,
+                cb_end_addr);
 
             noc_async_read_barrier();
 
-            cb_push_back(cb_id_act, act_block_num_tiles);
-
-            reader_offset += window_outer_offset;
+            cb_push_back(cb_id_act, act_cb_tiles);
         }
-
-        start_reader_idx = reader_idx;
 #ifdef SPLIT_READER
         // Increment reader index for the next number of segments (number of segments for other reader)
         start_reader_idx += (static_cast<uint32_t>(packed_reader_indices_ptr[reader_idx] & 0xffff) + 1);

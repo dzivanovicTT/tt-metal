@@ -346,7 +346,8 @@ conv_op_l1_usage calculate_L1_usage(
     const tt::tt_metal::DataType input_datatype,
     const tt::tt_metal::MemoryConfig& output_memory_config,
     bool enable_bias,
-    bool is_1d_depthwise_conv);
+    bool is_1d_depthwise_conv,
+    uint32_t image_width);
 
 }  // namespace conv2d
 
