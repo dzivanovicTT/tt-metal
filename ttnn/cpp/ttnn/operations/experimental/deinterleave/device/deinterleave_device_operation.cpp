@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "deinterleave_device_operation.hpp"
+#include "tt-metalium/logger.hpp"
 #include "ttnn/operations/data_movement/common/common.hpp"
 
 namespace ttnn::operations::experimental::deinterleave {
@@ -67,10 +68,32 @@ DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::
     const auto& input = tensor_args.input;
     tt::log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs");
 
+    // auto tensor_spec = TensorSpec(
+    //     output_shape,
+    //     // tt::tt_metal::TensorLayout::fromPaddedShape(
+    //     //     input.get_dtype(),
+    //     //     tt::tt_metal::PageConfig(input.get_layout()),
+    //     //     input.memory_config(),
+    //     //     input.get_logical_shape(),
+    //     //     input.get_padded_shape()
+    //     // ));
+    //     tt::tt_metal::TensorLayout::fromPaddedShape(
+    //         input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), output_memory_config, output_shape,
+    //         output_padded_shape));
+
+    tt::log_warning(
+        tt::LogOp,
+        "DeinterleaveToBatchOperation::compute_output_specs logical shape: {} padded shape: {}",
+        input.get_logical_shape(),
+        input.get_padded_shape());
     auto tensor_spec = TensorSpec(
         input.get_logical_shape(),
-        tt::tt_metal::TensorLayout(
-            input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), input.memory_config()));
+        tt::tt_metal::TensorLayout::fromPaddedShape(
+            input.get_dtype(),
+            tt::tt_metal::PageConfig(input.get_layout()),
+            input.memory_config(),
+            input.get_logical_shape(),
+            input.get_padded_shape()));
     return tensor_spec;
 };
 
@@ -212,10 +235,30 @@ DeinterleaveLocalOperation::spec_return_value_t DeinterleaveLocalOperation::comp
          input.get_logical_shape()[2] / (operation_attributes.stride_hw[0] * operation_attributes.stride_hw[1]),
          input.get_logical_shape()[3]});
 
+    int logical_num_channels = input.get_logical_shape()[3];
+    int num_channels_padded = 32 * tt::div_up(logical_num_channels, 32);
+    tt::log_info(tt::LogOp, "Num channels padded: {} logical: {}", num_channels_padded, logical_num_channels);
+    auto output_padded_shape = ttnn::Shape(
+        {input.get_logical_shape()[0],
+         input.get_logical_shape()[1],
+         input.get_logical_shape()[2] / (operation_attributes.stride_hw[0] * operation_attributes.stride_hw[1]),
+         num_channels_padded});
+
     auto tensor_spec = TensorSpec(
         output_shape,
-        tt::tt_metal::TensorLayout(
-            input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), output_memory_config));
+        // tt::tt_metal::TensorLayout::fromPaddedShape(
+        //     input.get_dtype(),
+        //     tt::tt_metal::PageConfig(input.get_layout()),
+        //     input.memory_config(),
+        //     input.get_logical_shape(),
+        //     input.get_padded_shape()
+        // ));
+        tt::tt_metal::TensorLayout::fromPaddedShape(
+            input.get_dtype(),
+            tt::tt_metal::PageConfig(input.get_layout()),
+            output_memory_config,
+            output_shape,
+            output_padded_shape));
 
     return tensor_spec;
 };

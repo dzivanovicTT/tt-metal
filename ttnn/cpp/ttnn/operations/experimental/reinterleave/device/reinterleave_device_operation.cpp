@@ -59,17 +59,43 @@ void ReinterleaveFromBatchOperation::validate_on_program_cache_hit(
 ReinterleaveFromBatchOperation::spec_return_value_t ReinterleaveFromBatchOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    tt::log_warning(tt::LogOp, "ReinterleaveFromBatch::compute_output_specs");
+    tt::log_warning(
+        tt::LogOp,
+        "ReinterleaveFromBatch::compute_output_specs logical_shape: {}: padded_shape: {}",
+        input.get_logical_shape(),
+        input.get_padded_shape());
 
     // Untilize returns bad shard spec padded to tile width
     // We expect shard witdh to match the actual number of channels in the tensor
     // auto output_memory_config = input.memory_config();
     // output_memory_config.shard_spec->shape[1] = input.get_logical_shape()[3];
 
+    // TensorLayout::fromPaddedShape(
+    //     input_tensor.get_dtype(),
+    //     PageConfig(Layout::TILE),
+    //     mem_config,
+    //     input_tensor.get_logical_shape(),
+    //     input_tensor.get_padded_shape()))
+
+    // return {TensorSpec(
+    //     input_tensor.get_logical_shape(),
+    //     TensorLayout::fromPaddedShape(
+    //         input_tensor.get_dtype(),
+    //         PageConfig(Layout::TILE),
+    //         mem_config,
+    //         input_tensor.get_logical_shape(),
+    //         input_tensor.get_padded_shape()))};
+
     auto tensor_spec = TensorSpec(
         input.get_logical_shape(),
-        tt::tt_metal::TensorLayout(
-            input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), input.memory_config()));
+        tt::tt_metal::TensorLayout::fromPaddedShape(
+            input.get_dtype(),
+            tt::tt_metal::PageConfig(input.get_layout()),
+            input.memory_config(),
+            input.get_logical_shape(),
+            input.get_padded_shape()));
+    // tt::tt_metal::TensorLayout(
+    //     input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), input.memory_config()));
     return tensor_spec;
 };
 
