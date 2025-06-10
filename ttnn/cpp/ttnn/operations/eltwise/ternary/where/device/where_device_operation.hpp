@@ -33,10 +33,7 @@ struct WhereDeviceOperation {
             tt::tt_metal::KernelHandle reader_kernel_id;
             tt::tt_metal::KernelHandle writer_kernel_id;
             tt::tt_metal::KernelHandle compute_kernel_id;
-            tt::tt_metal::CBHandle cb_predicate;
-            tt::tt_metal::CBHandle cb_value_true;
-            tt::tt_metal::CBHandle cb_value_false;
-            tt::tt_metal::CBHandle cb_output;
+            CoreCoord compute_with_storage_grid_size;
         };
 
         using cached_program_t = ttnn::device_operation::CachedProgram<shared_variables_t>;
