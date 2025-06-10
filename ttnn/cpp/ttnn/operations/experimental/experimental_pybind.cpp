@@ -50,6 +50,8 @@
 #include "ttnn/operations/experimental/gather/gather_pybind.hpp"
 #include "ttnn/operations/experimental/gather/tosa/gather_tosa_pybind.hpp"
 #include "ttnn/operations/experimental/padded_slice/padded_slice_pybind.hpp"
+#include "ttnn/operations/experimental/deinterleave/deinterleave_pybind.hpp"
+#include "ttnn/operations/experimental/reinterleave/reinterleave_pybind.hpp"
 
 namespace py = pybind11;
 

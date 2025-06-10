@@ -28,13 +28,20 @@ class InputMode(Enum):
     Debug = 2
 
 
-def print_diff_to_file(torch_tensor, ttnn_tensor, filename):
+def print_diff_to_file(original_tensor, torch_tensor, ttnn_tensor, reinterleaved_tensor, filename):
     import numpy as np
 
     torch_tensor_fp32 = torch_tensor.to(torch.float32).cpu().numpy().reshape(-1, torch_tensor.shape[-1])
     ttnn_tensor_fp32 = ttnn_tensor.to(torch.float32).cpu().numpy().reshape(-1, torch_tensor.shape[-1])
+    original_tensor_fp32 = original_tensor.to(torch.float32).cpu().numpy().reshape(-1, original_tensor.shape[-1])
+    reinterleaved_tensor_fp32 = (
+        reinterleaved_tensor.to(torch.float32).cpu().numpy().reshape(-1, reinterleaved_tensor.shape[-1])
+    )
+
+    np.savetxt(f"{filename}_original.csv", original_tensor_fp32, delimiter=",")
     np.savetxt(f"{filename}_torch.csv", torch_tensor_fp32, delimiter=",")
     np.savetxt(f"{filename}_ttnn.csv", ttnn_tensor_fp32, delimiter=",")
+    np.savetxt(f"{filename}_reinterleaved.csv", reinterleaved_tensor_fp32, delimiter=",")
 
 
 def torch_deinterleave_to_batch(torch_input_nhwc, stride_hw):
@@ -68,6 +75,7 @@ def run_deinterleave(
     stride_hw,
     barrier_threshold=0,
     input_mode: InputMode = InputMode.Random,
+    print_out=False,
 ):
     input_dtype = "bfloat16"
 
@@ -115,6 +123,17 @@ def run_deinterleave(
             barrier_threshold=barrier_threshold,
         )
 
+        ttnn_reinterleaved = ttnn.experimental.reinterleave_from_batch(
+            ttnn_output,
+            compute_kernel_config=compute_kernel_options,
+            stride_hw=stride_hw,
+            input_height=shape_nhwc[1] * stride_hw[0],
+            input_width=shape_nhwc[2] // stride_hw[1],
+            barrier_threshold=barrier_threshold,
+        )
+
+        torch_reinterleaved = ttnn.to_torch(ttnn_reinterleaved)
+
         torch_output = ttnn.to_torch(ttnn_output)
 
         logger.info(f"----ttnn_output shape={ttnn_output.shape}")
@@ -129,10 +148,12 @@ def run_deinterleave(
         logger.info(f"----golden_shape={golden_output.shape}")
         logger.info(f"----torch_shape={torch_output.shape}")
 
-        if input_mode == InputMode.Debug:
+        if print_out == True:
             print_diff_to_file(
+                torch_input,
                 golden_output,
                 torch_output,
+                torch_reinterleaved,
                 f"deinterleave_to_batch_diff_{shape_nhwc[0]}_{shape_nhwc[1]}_{shape_nhwc[2]}_{shape_nhwc[3]}",
             )
 
