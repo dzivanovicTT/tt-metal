@@ -911,6 +911,8 @@ TEST_F(CommandQueueMultiDeviceProgramFixture, ActiveEthKernelsDirectSendAllConne
                 if (receiver_device->id() != device_id) {
                     continue;
                 }
+                std::cout << "Sender id " << sender_device->id() << " core " << sender_core.str() << " Receiver id "
+                          << receiver_device->id() << " core " << receiver_core.str() << std::endl;
                 ASSERT_TRUE(unit_tests::erisc::direct_send::eth_direct_sender_receiver_kernels(
                     static_cast<DispatchFixture*>(this),
                     sender_device,

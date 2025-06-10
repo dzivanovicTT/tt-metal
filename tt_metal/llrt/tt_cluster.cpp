@@ -157,6 +157,8 @@ ClusterType Cluster::get_cluster_type_from_cluster_desc(
                 cluster_type = ClusterType::P150_X2;
             } else if (cluster_desc->get_all_chips().size() == 4) {
                 cluster_type = ClusterType::P150_X4;
+            } else if (cluster_desc->get_all_chips().size() == 8) {
+                cluster_type = ClusterType::P150_X8;
             }
         } else if (board_type == BoardType::UBB) {
             cluster_type = ClusterType::GALAXY;
@@ -832,18 +834,23 @@ std::unordered_map<chip_id_t, std::vector<CoreCoord>> Cluster::get_ethernet_core
     if (all_eth_connections.find(chip_id) == all_eth_connections.end()) {
         return {};
     }
+    std::cout << "Getting eth cores grouped by connected chips for chip: " << chip_id << std::endl;
     for (const auto &[eth_chan, connected_chip_chan] : all_eth_connections.at(chip_id)) {
         const auto &other_chip_id = std::get<0>(connected_chip_chan);
         if (connected_chips.find(other_chip_id) == connected_chips.end()) {
             std::vector<CoreCoord> active_ethernet_cores;
 
+            std::cout << "Eth chan " << eth_chan << " "
+                      << "Connected chip: " << other_chip_id << std::endl;
             for (const auto &channel_pair :
                  this->cluster_desc_->get_directly_connected_ethernet_channels_between_chips(chip_id, other_chip_id)) {
                 ethernet_channel_t local_chip_chan = std::get<0>(channel_pair);
+                std::cout << "\tChannel pair: " << local_chip_chan << std::endl;
                 active_ethernet_cores.emplace_back(
                     get_soc_desc(chip_id).get_eth_core_for_channel(local_chip_chan, CoordSystem::LOGICAL));
             }
             connected_chips.insert({other_chip_id, active_ethernet_cores});
+
         } else {
             continue;
         }
