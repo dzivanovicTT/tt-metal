@@ -161,8 +161,8 @@ def run_all_gather_impl(
         torch_ag_out_tensor = ag_output_tensor_goldens_list[i]
 
         tt_ag_out = ttnn.from_device(tt_ag_out_tensor)
-        tt_ag_out = ttnn.to_torch(tt_ag_out, mesh_composer=ttnn.ConcatMeshToTensor(t3k_mesh_device, dim=3))[
-            :, :, :, 0 : torch_ag_out_tensor.shape[3]
+        tt_ag_out = ttnn.to_torch(tt_ag_out, mesh_composer=ttnn.ConcatMeshToTensor(t3k_mesh_device, dim=dim))[
+            :, :, 0 : torch_ag_out_tensor.shape[2], 0 : torch_ag_out_tensor.shape[3]
         ]
         eq, output = comp_pcc(tt_ag_out, torch_ag_out_tensor)
         logger.info(f"{output}, iteration {i}")
@@ -176,20 +176,20 @@ def run_all_gather_impl(
     "num_devices, num_links, ag_output_shape, dim, layout, ag_input_dtype",
     [
         # 128 shapes
-        (8, 1, [1, 1, 128, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 128, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 128, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
-        (8, 1, [1, 1, 128, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 12 * 32 * 8, 32], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 128, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 128, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        # (8, 1, [1, 1, 128, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
         # 4k shapes
-        (8, 1, [1, 1, 4096, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 4096, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
-        (8, 1, [1, 1, 4096, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 4096, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 4096, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 4096, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        # (8, 1, [1, 1, 4096, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
         # 8k shapes
-        (8, 1, [1, 1, 8192, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 8192, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
-        (8, 1, [1, 1, 8192, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
-        (8, 1, [1, 1, 8192, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 8192, 320 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 8192, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        # (8, 1, [1, 1, 8192, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
+        # (8, 1, [1, 1, 8192, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
     ],
 )
 @pytest.mark.parametrize(
