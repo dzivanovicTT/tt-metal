@@ -59,7 +59,12 @@ jobs:
           TT_METAL_WATCHER: 5
           TT_METAL_WATCHER_TEST_MODE: 1
         run: |
-          /usr/bin/tt-metalium-validation-smoke
+          set -euo pipefail
+          for i in {1..10}; do
+            echo "::group::Iteration $i"
+            /usr/bin/tt-metalium-validation-smoke
+            echo "::endgroup::"
+          done
 
       - name: workaround
         run: |
