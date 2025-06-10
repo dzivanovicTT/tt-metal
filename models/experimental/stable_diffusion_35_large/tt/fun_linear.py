@@ -77,18 +77,22 @@ class TtLinearParameters:
             bias = bias.unsqueeze(0)
 
         if shard_dim in [0, -2]:
-            bias_mm = _ShardBias(device)
+            bias_mm = _ShardBias(device, parallel_config)
         elif shard_dim in [1, -1]:
-            bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=[None, shard_dim])
+            bias_dims = [None, None]
+            bias_dims[parallel_config.tensor_parallel.mesh_axis] = shard_dim
+            bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=bias_dims)
         else:
             bias_mm = ttnn.ShardTensor2dMesh(device, mesh_shape=tuple(device.shape), dims=[None, None])
 
+        dims = [None, None]
+        dims[parallel_config.tensor_parallel.mesh_axis] = shard_dim
         return cls(
             weight=from_torch_fast_2d(
                 weight.transpose(0, 1),
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, shard_dim],
+                dims=dims,
                 layout=ttnn.TILE_LAYOUT,
                 dtype=dtype,
             ),
@@ -96,7 +100,7 @@ class TtLinearParameters:
                 bias,
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, shard_dim],
+                dims=dims,
                 dtype=dtype,
                 layout=ttnn.TILE_LAYOUT,
                 mesh_mapper=bias_mm,
@@ -153,12 +157,14 @@ class TtLinearParameters:
             tensor = tensor.reshape(in_dim, -1)  # [ID, ND*3*NLH*DH]
             return tensor
 
+        dims = [None, None]
+        dims[parallel_config.tensor_parallel.mesh_axis] = -1
         return cls(
             weight=from_torch_fast_2d(
                 shuffle_heads(torch_weight),
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, -1],
+                dims=dims,
                 layout=ttnn.TILE_LAYOUT,
                 dtype=dtype,
             ),
@@ -166,7 +172,7 @@ class TtLinearParameters:
                 shuffle_heads(torch_bias),
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, -1],
+                dims=dims,
                 layout=ttnn.TILE_LAYOUT,
                 dtype=dtype,
             )
@@ -223,12 +229,14 @@ class TtLinearParameters:
             # TODO: Once the issue is resolved, remove this workaround for https://github.com/tenstorrent/tt-metal/issues/16599
             torch_bias = torch_bias.unsqueeze(0)
 
+        dims = [None, None]
+        dims[parallel_config.tensor_parallel.mesh_axis] = -1
         return cls(
             weight=from_torch_fast_2d(
                 torch_weight,
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, -1],
+                dims=dims,
                 layout=ttnn.TILE_LAYOUT,
                 dtype=dtype,
             ),
@@ -236,7 +244,7 @@ class TtLinearParameters:
                 torch_bias,
                 mesh_device=device,
                 mesh_shape=tuple(device.shape),
-                dims=[None, -1],
+                dims=dims,
                 layout=ttnn.TILE_LAYOUT,
                 dtype=dtype,
             )
@@ -340,20 +348,22 @@ class _ShardBias(ttnn.TensorToMesh):
     shape so that the bias is not added multiple times after gathering.
     """
 
-    def __init__(self, mesh_device: ttnn.MeshDevice) -> None:
+    def __init__(self, mesh_device: ttnn.MeshDevice, parallel_config: DiTParallelConfig) -> None:
         super().__init__(mesh_device)
+        self.parallel_config = parallel_config
+        self.tp_factor = self.parallel_config.tensor_parallel.factor
+        self.sp_factor = self.parallel_config.sequence_parallel.factor
 
     def map(self, tensor: torch.Tensor) -> dict[int, ttnn.Tensor]:
-        mesh_height, mesh_width = self.mesh_device.shape
-
         zeros = torch.zeros_like(tensor)
-        return ([tensor] + [zeros] * (mesh_width - 1)) * mesh_height
+        return ([tensor] + [zeros] * (self.tp_factor - 1)) * self.sp_factor
 
     def config(self) -> dict[str, str]:
-        mesh_height, mesh_width = self.mesh_device.shape
-
+        dims = [None, None]
+        dims[self.parallel_config.tensor_parallel.mesh_axis] = self.tp_factor
+        dims[self.parallel_config.sequence_parallel.mesh_axis] = self.sp_factor
         return {
             "strategy": "shard_2d",
-            "mesh_shape_y": str(mesh_height),
-            "mesh_shape_x": str(mesh_width),
+            "mesh_shape_y": str(dims[0]),
+            "mesh_shape_x": str(dims[1]),
         }
