@@ -60,6 +60,8 @@ size_t get_tt_fabric_channel_buffer_size_bytes() {
     return control_plane->get_fabric_context().get_fabric_channel_buffer_size_bytes();
 }
 
+ControlPlane* get_control_plane() { return tt::tt_metal::MetalContext::instance().get_cluster().get_control_plane(); }
+
 void append_fabric_connection_rt_args(
     const chip_id_t src_chip_id,
     const chip_id_t dst_chip_id,

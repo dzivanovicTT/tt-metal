@@ -11,6 +11,7 @@
 #include <umd/device/types/cluster_descriptor_types.h>  // chip_id_t
 #include <vector>
 #include <umd/device/tt_core_coordinates.h>
+#include <tt-metalium/control_plane.hpp>
 
 namespace tt {
 namespace tt_metal {
@@ -53,5 +54,7 @@ void append_fabric_connection_rt_args(
     const CoreCoord& worker_core,
     std::vector<uint32_t>& worker_args,
     CoreType core_type = CoreType::WORKER);
+
+ControlPlane* get_control_plane();
 
 }  // namespace tt::tt_fabric
