@@ -7,6 +7,7 @@
 #include "ttnn/cpp/ttnn/operations/ccl/kernel_common/sharding_addrgen.hpp"
 
 void kernel_main() {
+    DPRINT << "writer_unary_start_id TESTED" << ENDL();
     uint32_t dst_addr = get_arg_val<uint32_t>(0);
     uint32_t num_tiles = get_arg_val<uint32_t>(1);
     uint32_t start_id = get_arg_val<uint32_t>(2);
@@ -15,6 +16,7 @@ void kernel_main() {
     constexpr bool dst_is_dram = get_compile_time_arg_val(1) == 1;
 
 #ifdef OUT_SHARDED
+    DPRINT << "writer_unary_start_id OUT_SHARDED" << ENDL();
     cb_wait_front(cb_id_out, num_tiles);
 #else
 
@@ -24,6 +26,7 @@ void kernel_main() {
     const DataFormat data_format = get_dataformat(cb_id_out);
 
 #ifdef SHARDED
+    DPRINT << "SHARDED" << ENDL();
     typedef ShardedInfo<
         get_compile_time_arg_val(2),
         get_compile_time_arg_val(3),

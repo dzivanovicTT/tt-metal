@@ -35,6 +35,7 @@ void kernel_main() {
     const auto [mapping_table, rt_increment] =
         experimental::shard_addr_gen_utils::get_shard_map<tensor_shard_info>(get_arg_addr(3));
     experimental::ShardedAddrGen<tensor_shard_info> s = {.bank_base_address = src_addr, .shard_array = mapping_table};
+    DPRINT << "SHARDED READER" << ENDL();
 #else
     const InterleavedAddrGenFast<src_is_dram> s = {
         .bank_base_address = src_addr, .page_size = tile_bytes, .data_format = data_format};

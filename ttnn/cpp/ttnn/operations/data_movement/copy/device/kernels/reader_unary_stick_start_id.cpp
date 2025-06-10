@@ -18,7 +18,15 @@ void kernel_main() {
     constexpr bool src0_is_dram = get_compile_time_arg_val(1) == 1;
     constexpr bool src_stick_size_is_pow2 = get_compile_time_arg_val(2) == 1;
     constexpr uint32_t src_log_base_2_of_page_size = get_compile_time_arg_val(3);
-
+    DPRINT << "reader tensor test: " << ENDL();
+    // DPRINT << TSLICE(tt::CBIndex::c_0, 0, SliceRange{.h0 = 0, .h1 = 1, .hs = 1, .w0 = 0, .w1 = 64, .ws = 4}, true,
+    // true) << ENDL(); DPRINT << TSLICE(tt::CBIndex::c_0, 0, SliceRange{.h0 = 0, .h1 = 32, .hs = 1, .w0 = 32, .w1 = 64,
+    // .ws = 1}, true, true) << ENDL(); DPRINT << TSLICE(tt::CBIndex::c_0, 0, SliceRange{.h0 = 0, .h1 = 1, .hs = 1, .w0
+    // = 64, .w1 = 96, .ws = 1}, true, true) << ENDL();
+    for (uint8_t r = 0; r < 32; ++r) {
+        SliceRange sr = SliceRange{.h0 = r, .h1 = static_cast<uint8_t>(r + 1), .hs = 1, .w0 = 0, .w1 = 32, .ws = 4};
+        DPRINT << TSLICE(tt::CBIndex::c_0, 0, sr, true, true) << ENDL();
+    }
     typedef ShardedInfo<
         get_compile_time_arg_val(4),
         get_compile_time_arg_val(5),
