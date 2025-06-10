@@ -115,6 +115,8 @@ def create_tt_model(
         max_seq_len=max_seq_len,
     )
 
+    tt_model_args.n_layers = 1
+
     # Avoid loading state_dict for every DP model
     if not state_dict:
         state_dict = tt_model_args.load_state_dict()
