@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include <gtest/gtest.h>
-#include <tt-metalium/logger.hpp>
+// #include <tt-metalium/logger.hpp>
 #include "impl/context/metal_context.hpp"
 #include <iomanip>
 #include <sstream>
@@ -24,20 +24,23 @@ TEST(IntermeshAPIs, BasicQueries) {
     for (const auto& chip_id : cluster.user_exposed_chip_ids()) {
         bool has_links = cluster.has_intermesh_links(chip_id);
         auto chip_links = cluster.get_intermesh_eth_links(chip_id);
-        
+        std::cout << chip_id << " has intermesh links: " << has_links << std::endl;
+
         // Verify consistency
         if (has_links) {
             EXPECT_GT(chip_links.size(), 0) << "Chip " << chip_id << " reports having links but returned empty vector";
         } else {
             EXPECT_EQ(chip_links.size(), 0) << "Chip " << chip_id << " reports no links but returned non-empty vector";
         }
-        
+        std::cout << "Links" << std::endl;
         // Test is_intermesh_eth_link for each link
         for (const auto& [eth_core, channel] : chip_links) {
+            std::cout << channel << " ";
             bool is_intermesh = cluster.is_intermesh_eth_link(chip_id, eth_core);
             EXPECT_TRUE(is_intermesh) << "Eth core " << eth_core.str() << " on chip " << chip_id 
                                      << " was returned by get_intermesh_eth_links but is_intermesh_eth_link returned false";
         }
+        std::cout << std::endl;
     }
     
     // If cluster supports intermesh, at least one chip should have links
