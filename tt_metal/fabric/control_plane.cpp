@@ -251,7 +251,7 @@ std::vector<chip_id_t> ControlPlane::get_mesh_physical_chip_ids(
                     paths.at(connected_chip_id)[paths.at(connected_chip_id).size() - 1].push_back(connected_chip_id);
                 }
             } else {
-                log_debug(
+                log_info(
                     tt::LogFabric,
                     "Number of eth ports {} does not match num ports specified in Mesh graph descriptor {}",
                     eth_ports.size(),
@@ -262,7 +262,9 @@ std::vector<chip_id_t> ControlPlane::get_mesh_physical_chip_ids(
 
     std::vector<chip_id_t> physical_chip_ids;
     // TODO: if square mesh, we might need to pin another corner chip, or potentially have multiple possible orientations
+    std::cout << "Paths size " << paths.size() << std::endl;
     for (const auto& [dest_id, equal_dist_paths] : paths) {
+        std::cout << "Equal dist paths for chip " << dest_id << " size: " << equal_dist_paths.size() << std::endl;
         // TODO: can change this to not check for corner?
         // Look for size of equal dist paths == mesh_ew_size and num paths == 1
         if (equal_dist_paths.size() == 1) {
@@ -278,8 +280,9 @@ std::vector<chip_id_t> ControlPlane::get_mesh_physical_chip_ids(
 
     TT_FATAL(
         physical_chip_ids.size() == mesh_ew_size,
-        "Did not find edge with expected number of East-West chips {}",
-        mesh_ew_size);
+        "Did not find edge with expected number of East-West chips {} - physical chips size {}",
+        mesh_ew_size,
+        physical_chip_ids.size());
 
     // Loop over edge and populate entire mesh with physical chip ids
     // reset and reuse the visited set of physical chip ids
@@ -360,7 +363,8 @@ std::map<FabricNodeId, chip_id_t> ControlPlane::get_physical_chip_mapping_from_m
         mesh_graph_desc_filename == "p100_mesh_graph_descriptor.yaml" ||
         mesh_graph_desc_filename == "p150_mesh_graph_descriptor.yaml" ||
         mesh_graph_desc_filename == "p150_x2_mesh_graph_descriptor.yaml" ||
-        mesh_graph_desc_filename == "p150_x4_mesh_graph_descriptor.yaml") {
+        mesh_graph_desc_filename == "p150_x4_mesh_graph_descriptor.yaml" ||
+        mesh_graph_desc_filename == "p150_x8_mesh_graph_descriptor.yaml") {
         // TODO: update to pick out chip automatically
         nw_chip_physical_id = 0;
         auto mesh_shape = routing_table_generator_->mesh_graph->get_mesh_shape(MeshId{0});
