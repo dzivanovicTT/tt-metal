@@ -40,8 +40,8 @@ void set_or_update_runtime_arguments(
         tt::tt_metal::split_work_to_cores(compute_with_storage_grid_size, num_output_tiles, row_major);
 
     auto cores = grid_to_cores(num_cores_total, num_cores_x, num_cores_y, row_major);
-    constexpr size_t num_reader_args = 3;
-    constexpr size_t num_writer_args = 1;
+    constexpr size_t num_reader_args = 5;
+    constexpr size_t num_writer_args = 3;
     constexpr size_t num_kernel_args = 1;
     for (uint32_t i = 0, start_tile_id = 0; i < num_cores_total; i++) {
         const auto& core = cores[i];
@@ -61,14 +61,16 @@ void set_or_update_runtime_arguments(
         std::array reader_runtime_args = {
             predicate_tensor.buffer()->address(),
             value_true_tensor.buffer()->address(),
-            value_false_tensor.buffer()->address()
-            // TODO : Add args required for reader file and update the count in num_reader_args
+            value_false_tensor.buffer()->address(),
+            num_tiles_per_core,
+            start_tile_id,
         };
         handle_args(program, reader_kernel_id, core, reader_runtime_args);
 
         std::array writer_runtime_args = {
-            output.buffer()->address()
-            // TODO : Add args required for writer file and update the count in num_writer_args
+            output.buffer()->address(),
+            num_tiles_per_core,
+            start_tile_id,
         };
         handle_args(program, writer_kernel_id, core, writer_runtime_args);
 
@@ -166,25 +168,20 @@ WhereDeviceOperation::WhereProgramFactory::cached_program_t WhereDeviceOperation
         program,
         "ttnn/cpp/ttnn/operations/eltwise/ternary/where/device/kernels/dataflow/eltwise_ternary_reader_sfpu.cpp",
         all_device_cores,
-        tt_metal::ReaderDataMovementConfig({
-            predicate_is_dram,
-            predicate_tensor_cb,
-            value_true_is_dram,
-            value_true_tensor_cb,
-            value_false_is_dram,
-            value_false_tensor_cb
-            // TODO : Replace with required compile time args
-        }));
+        tt_metal::ReaderDataMovementConfig(
+            {predicate_is_dram,
+             predicate_tensor_cb,
+             value_true_is_dram,
+             value_true_tensor_cb,
+             value_false_is_dram,
+             value_false_tensor_cb}));
 
     // WRITER KERNEL
     auto writer_kernel_id = tt_metal::CreateKernel(
         program,
-        "",  // TODO : Replace with necessaary file
+        "ttnn/cpp/ttnn/operations/eltwise/unary/device/kernels/dataflow/writer_unary_interleaved_start_id.cpp",
         all_device_cores,
-        tt_metal::WriterDataMovementConfig({
-            output_tensor_cb, output_is_dram
-            // TODO : Replace with required compile time args
-        }));
+        tt_metal::WriterDataMovementConfig({output_tensor_cb, output_is_dram}));
 
     // COMPUTE KERNEL
     bool fp32_dest_acc_en = value_false_data_format == tt::DataFormat::UInt32 ||
