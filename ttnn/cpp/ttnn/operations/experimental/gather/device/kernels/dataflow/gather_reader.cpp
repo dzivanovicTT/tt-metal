@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "dataflow_api.h"
-#include <tt-metalium/constants.hpp>
-#include "debug/dprint.h"
 
 #include "gather_common.hpp"
 
@@ -32,6 +30,7 @@ void kernel_main() {
     constexpr uint32_t compute_with_storage_grid_size_x = get_compile_time_arg_val(8);
     constexpr uint32_t compute_with_storage_grid_size_y = get_compile_time_arg_val(9);
     constexpr uint32_t number_of_available_cores = get_compile_time_arg_val(10);
+    constexpr uint32_t index_tiles_per_core = get_compile_time_arg_val(11);
 
     constexpr uint32_t one_tile = 1;
 
@@ -56,17 +55,34 @@ void kernel_main() {
         const uint32_t core_start =
             get_absolute_logical_y() * compute_with_storage_grid_size_x + get_absolute_logical_x();
 
-        uint32_t currently_processed_output_tile = core_start;
         for (uint32_t index_loop = 0; index_loop < index_loop_count; index_loop++) {
-            // Get output tile
-            cb_reserve_back(output_tensor_cb_index, one_tile);
+            // Read index tiles
+            uint32_t currently_read_index_tile =
+                core_start * index_tiles_per_core + index_loop * number_of_available_cores * index_tiles_per_core;
 
-            // Read index tile
-            cb_reserve_back(index_tensor_cb_index, one_tile);
-            const uint32_t l1_index_write_addr = get_write_ptr(index_tensor_cb_index);
-            noc_async_read_tile(
-                h * Wt_index + currently_processed_output_tile, index_tensor_addr_gen, l1_index_write_addr);
-            noc_async_read_barrier();
+            uint32_t current_iteration_tile_count = 0;
+
+            for (uint32_t widx = 0; widx < index_tiles_per_core; widx++) {
+                cb_reserve_back(index_tensor_cb_index, one_tile);
+                const uint32_t l1_index_write_addr = get_write_ptr(index_tensor_cb_index);
+                noc_async_read_tile(
+                    h * Wt_index + currently_read_index_tile, index_tensor_addr_gen, l1_index_write_addr);
+                noc_async_read_barrier();
+                current_iteration_tile_count++;
+
+                cb_push_back(index_tensor_cb_index, one_tile);
+
+                currently_read_index_tile++;
+                if (currently_read_index_tile >= Wt_index) {
+                    break;  // No more index tiles to read
+                }
+            }  // widx loop
+
+            // Get output tile
+            cb_reserve_back(
+                output_tensor_cb_index, current_iteration_tile_count);  // index_tiles_per_core = output_tiles_per_core
+
+            cb_wait_front(index_tensor_cb_index, current_iteration_tile_count);
 
             for (uint32_t wi = 0; wi < Wt_input; wi++) {
                 // Reserve space for input tile
@@ -74,12 +90,20 @@ void kernel_main() {
 
                 // Indicate to the coordinator that the core is ready
                 noc_semaphore_inc(coordinator_core_addr, 1);
-                noc_semaphore_wait(semaphore_ptr, 0);     // Wait for coordinator to signal to start
+                noc_semaphore_wait(semaphore_ptr, INVALID);  // Wait for coordinator to signal to start
                 noc_semaphore_set(semaphore_ptr, VALID);  // Reset the semaphore
 
                 // Process tile
-                process_input_tile(
-                    input_tensor_cb_index, index_tensor_cb_index, output_tensor_cb_index, wi, tile_width);
+                for (uint32_t index_tile_offset = 0; index_tile_offset < current_iteration_tile_count;
+                     index_tile_offset++) {
+                    process_input_tile(
+                        input_tensor_cb_index,
+                        index_tensor_cb_index,
+                        output_tensor_cb_index,
+                        wi,
+                        tile_width,
+                        index_tile_offset);
+                }
 
                 // Reset input buffer
                 cb_push_back(input_tensor_cb_index, one_tile);   // Push tile to the writer
@@ -87,14 +111,9 @@ void kernel_main() {
                 cb_pop_front(input_tensor_cb_index, one_tile);   // Remove data from local buffer
             }  // wi loop
 
-            cb_push_back(output_tensor_cb_index, one_tile);  // Push tile to the writer
+            cb_push_back(output_tensor_cb_index, current_iteration_tile_count);  // Push tile to the writer
 
-            // Reset index buffer
-            cb_push_back(index_tensor_cb_index, one_tile);   // Push tile to the writer
-            cb_wait_front(index_tensor_cb_index, one_tile);  // Wait for the writer to finish
-            cb_pop_front(index_tensor_cb_index, one_tile);   // Remove data from local buffer
-
-            currently_processed_output_tile += number_of_available_cores;
+            cb_pop_front(index_tensor_cb_index, current_iteration_tile_count);  // Remove data from local buffer
         }  // index_loop loop
 
         if (additional_index_loop) {
@@ -104,9 +123,9 @@ void kernel_main() {
 
                 // Indicate to the coordinator that the core is ready
                 noc_semaphore_inc(coordinator_core_addr, 1);
-                noc_semaphore_wait(semaphore_ptr, 0);     // Wait for coordinator to signal to start
+                noc_semaphore_wait(semaphore_ptr, INVALID);  // Wait for coordinator to signal to start
                 noc_semaphore_set(semaphore_ptr, VALID);  // Reset the semaphore
-                DPRINT << "READER: In additional_index_loop: " << U32(wi) << ENDL();  // TODO: Remove
+
                 // Reset input buffer
                 cb_push_back(input_tensor_cb_index, one_tile);   // Push tile to the writer
                 cb_wait_front(input_tensor_cb_index, one_tile);  // Wait for the writer to finish

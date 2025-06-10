@@ -526,10 +526,18 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
 
     const uint32_t number_of_available_cores = total_number_of_cores - 1;  // One core for coordinator
 
-    // Calculate how many iterations of outer loop - index loop we need
-    const auto all_core_utilization_loop_count = Wt_index / number_of_available_cores;  // Ile rdzenie potrzeba
-    const auto all_core_utilization_loop_residuum = Wt_index % number_of_available_cores;
+    // How many work unit do we need
+    const uint32_t tiles_per_core = 10;
+    const uint32_t number_of_work_units = (Wt_index + tiles_per_core - 1) / tiles_per_core;
+    // const uint32_t number_of_tiles_in_additional_core = Wt_index % tiles_per_core;
 
+    // Calculate how many iterations of outer loop - index loop we need
+    const auto all_core_utilization_loop_count =
+        number_of_work_units / number_of_available_cores;  // Ile rdzenie potrzeba
+    const auto all_core_utilization_loop_residuum = number_of_work_units % number_of_available_cores;
+    std::cout << "number_of_work_units: " << number_of_work_units
+              << ", all_core_utilization_loop_count: " << all_core_utilization_loop_count
+              << ", all_core_utilization_loop_residuum: " << all_core_utilization_loop_residuum << std::endl;
     // Calculate core range
     /**
 // TODO: Fill
@@ -543,9 +551,10 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
             {0, compute_with_storage_grid_size.y - 1},
             {compute_with_storage_grid_size.x - 2, compute_with_storage_grid_size.y - 1})));
     } else {
-        const uint32_t core_grid_calculated_rows_number = Wt_index / compute_with_storage_grid_size.x;
-        const uint32_t core_grid_calculated_columns_number = Wt_index % compute_with_storage_grid_size.x;
-
+        const uint32_t core_grid_calculated_rows_number = number_of_work_units / compute_with_storage_grid_size.x;
+        const uint32_t core_grid_calculated_columns_number = number_of_work_units % compute_with_storage_grid_size.x;
+        std::cout << "core_grid_calculated_rows_number: " << core_grid_calculated_rows_number
+                  << ", core_grid_calculated_columns_number: " << core_grid_calculated_columns_number << std::endl;
         if (core_grid_calculated_rows_number == 0 && core_grid_calculated_columns_number == 0) {
             core_range = CoreRangeSet(CoreCoord({0, 0}));
         } else if (core_grid_calculated_rows_number == 0) {
@@ -556,7 +565,7 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
             if (core_grid_calculated_columns_number != 0) {
                 const CoreRange additional_range(
                     {0, core_grid_calculated_rows_number},
-                    {core_grid_calculated_columns_number, core_grid_calculated_rows_number});
+                    {core_grid_calculated_columns_number - 1, core_grid_calculated_rows_number});
                 core_range = core_range.merge(CoreRangeSet(additional_range));
             }
         }
@@ -565,25 +574,30 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
     all_core_set = all_core_set.merge<CoreRangeSet>(core_range);
 
     // Circular buffers
-    constexpr uint32_t buffer_scale_factor = 2;
+    constexpr uint32_t input_tensor_buffer_scale_factor = 2;
+    constexpr uint32_t index_tensor_buffer_scale_factor = tiles_per_core + 1;
+
     constexpr uint32_t input_tensor_cb_index = tt::CBIndex::c_0;
     const tt::tt_metal::CircularBufferConfig input_tensor_cb_config =
         tt::tt_metal::CircularBufferConfig(
-            buffer_scale_factor * input_tensor_tile_size, {{input_tensor_cb_index, input_tensor_cb_data_format}})
+            input_tensor_buffer_scale_factor * input_tensor_tile_size,
+            {{input_tensor_cb_index, input_tensor_cb_data_format}})
             .set_page_size(input_tensor_cb_index, input_tensor_tile_size);
     auto cb_input_tensor = tt::tt_metal::CreateCircularBuffer(program, all_core_set, input_tensor_cb_config);
 
     constexpr uint32_t input_index_tensor_cb_index = tt::CBIndex::c_1;
     const tt::tt_metal::CircularBufferConfig input_index_tensor_cb_config =
         tt::tt_metal::CircularBufferConfig(
-            input_index_tensor_tile_size, {{input_index_tensor_cb_index, input_index_tensor_cb_data_format}})
+            index_tensor_buffer_scale_factor * input_index_tensor_tile_size,
+            {{input_index_tensor_cb_index, input_index_tensor_cb_data_format}})
             .set_page_size(input_index_tensor_cb_index, input_index_tensor_tile_size);
     auto cb_input_index_tensor = tt::tt_metal::CreateCircularBuffer(program, core_range, input_index_tensor_cb_config);
 
     constexpr uint32_t output_tensor_cb_index = tt::CBIndex::c_2;
     const tt::tt_metal::CircularBufferConfig output_tensor_cb_config =
         tt::tt_metal::CircularBufferConfig(
-            output_tensor_tile_size, {{output_tensor_cb_index, output_tensor_cb_data_format}})
+            index_tensor_buffer_scale_factor * output_tensor_tile_size,
+            {{output_tensor_cb_index, output_tensor_cb_data_format}})
             .set_page_size(output_tensor_cb_index, output_tensor_tile_size);
     auto cb_output_tensor = tt::tt_metal::CreateCircularBuffer(program, core_range, output_tensor_cb_config);
 
@@ -592,11 +606,32 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
     const uint32_t cores_to_coordinator_semaphore_id = CreateSemaphore(program, all_core_set, 0);
     const auto coordinator_core_physical_coord = device->worker_core_from_logical_core(coordinator_core);
 
-    const auto start_core_logical = core_range.ranges()[0].start_coord;
-    const auto end_core_logical = core_range.ranges()[core_range.ranges().size() - 1].end_coord;
-    const auto start_core_physical_coord = device->worker_core_from_logical_core(start_core_logical);
-    // const auto end_core_physical_coord = device->worker_core_from_logical_core(coordinator_core);
-    const auto end_core_physical_coord = device->worker_core_from_logical_core(end_core_logical);
+    // Core ranges
+    const auto core_ranges_vector = core_range.ranges();
+    TT_FATAL(!core_ranges_vector.empty(), "Wrong core range, no cores available for gather operation");
+
+    // Base core range
+    const auto start_core_logical_base = core_ranges_vector[0].start_coord;
+    const auto end_core_logical_base = core_ranges_vector[0].end_coord;
+    const auto start_core_physical_coord_base = device->worker_core_from_logical_core(start_core_logical_base);
+    const auto end_core_physical_coord_base = device->worker_core_from_logical_core(end_core_logical_base);
+    const auto base_dest_number = core_ranges_vector[0].size();
+
+    // Residuum core range
+    auto start_core_logical_residuum = CoreCoord({0, 0});
+    auto end_core_logical_residuum = CoreCoord({0, 0});
+    size_t residuum_dest_number = 0;
+    if (core_ranges_vector.size() > 1) {
+        const auto& last_core_range = core_ranges_vector[core_ranges_vector.size() - 1];
+        start_core_logical_residuum = last_core_range.start_coord;
+        end_core_logical_residuum = last_core_range.end_coord;
+        residuum_dest_number = core_ranges_vector[core_ranges_vector.size() - 1].size();
+    }
+    const auto start_core_physical_coord_residuum = device->worker_core_from_logical_core(start_core_logical_residuum);
+    const auto end_core_physical_coord_residuum = device->worker_core_from_logical_core(end_core_logical_residuum);
+    // const auto end_core_physical_coord = device->worker_core_from_logical_core(end_core_logical);
+    std::cout << "core_range.num_cores(): " << core_range.num_cores() << " core_range: " << core_range.str()
+              << std::endl;
 
     // Kernels
     const std::vector<uint32_t> coordinator_compile_time_args = {
@@ -616,13 +651,18 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
         program,
         coordinator_kernel_id,
         coordinator_core,
-        {start_core_physical_coord.x,
-         start_core_physical_coord.y,
-         end_core_physical_coord.x,
-         end_core_physical_coord.y,
+        {start_core_physical_coord_base.x,
+         start_core_physical_coord_base.y,
+         end_core_physical_coord_base.x,
+         end_core_physical_coord_base.y,
+         start_core_physical_coord_residuum.x,
+         start_core_physical_coord_residuum.y,
+         end_core_physical_coord_residuum.x,
+         end_core_physical_coord_residuum.y,
          coordinator_to_cores_semaphore_id,
          cores_to_coordinator_semaphore_id,
-         core_range.num_cores(),
+         base_dest_number,
+         residuum_dest_number,
          input_tensor_buffer->address(),
          index_loop_count});
 
@@ -637,7 +677,8 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
         static_cast<uint32_t>(input_index_tensor_is_dram),
         compute_with_storage_grid_size.x,
         compute_with_storage_grid_size.y,
-        core_range.num_cores()};
+        core_range.num_cores(),
+        tiles_per_core};
     const std::string gather_reader_kernel_path =
         "ttnn/cpp/ttnn/operations/experimental/gather/device/kernels/dataflow/gather_reader.cpp";
     tt::tt_metal::KernelHandle gather_reader_kernel_id = tt::tt_metal::CreateKernel(
@@ -665,7 +706,8 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
         output_tensor_is_dram,
         compute_with_storage_grid_size.x,
         compute_with_storage_grid_size.y,
-        core_range.num_cores()};
+        core_range.num_cores(),
+        tiles_per_core};
     const std::string gather_writer_kernel_path =
         "ttnn/cpp/ttnn/operations/experimental/gather/device/kernels/dataflow/gather_writer.cpp";
     tt::tt_metal::KernelHandle gather_writer_kernel_id = tt::tt_metal::CreateKernel(
@@ -688,8 +730,11 @@ GatherProgramFactoryMulticast::cached_program_t GatherProgramFactoryMulticast::c
                 uint32_t new_loop_count = all_core_utilization_loop_count;
                 if (residuum_count < all_core_utilization_loop_residuum) {
                     new_loop_count++;
+                    std::cout << "New loop count: " << new_loop_count << " for core: " << core.str() << std::endl;
                 } else {
                     additional_loop_count = 1;
+                    std::cout << "Additional loop count: " << additional_loop_count << " for core: " << core.str()
+                              << std::endl;
                 }
                 SetRuntimeArgs(
                     program,

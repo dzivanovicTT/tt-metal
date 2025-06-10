@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "dataflow_api.h"
-#include "debug/dprint.h"
-#include <tt-metalium/constants.hpp>
 
 #include <cstdint>
 
@@ -22,6 +20,7 @@ void kernel_main() {
     constexpr uint32_t compute_with_storage_grid_size_x = get_compile_time_arg_val(5);
     constexpr uint32_t compute_with_storage_grid_size_y = get_compile_time_arg_val(6);
     constexpr uint32_t number_of_available_cores = get_compile_time_arg_val(7);
+    constexpr uint32_t index_tiles_per_core = get_compile_time_arg_val(8);
 
     constexpr uint32_t one_tile = 1;
 
@@ -38,19 +37,26 @@ void kernel_main() {
         const uint32_t core_start =
             get_absolute_logical_y() * compute_with_storage_grid_size_x + get_absolute_logical_x();
 
-        uint32_t currently_processed_output_tile = core_start;
+        // uint32_t currently_processed_output_tile = core_start;
         for (uint32_t index_loop = 0; index_loop < index_loop_count; index_loop++) {
-            // Save output tile
-            cb_wait_front(output_tensor_cb_index, one_tile);
-            DPRINT << "WRITER: index_tile: " << U32(currently_processed_output_tile) << ENDL();
-            const uint32_t l1_output_read_addr = get_read_ptr(output_tensor_cb_index);
-            noc_async_write_tile(
-                h * Wt_index + currently_processed_output_tile, output_tensor_addr_gen, l1_output_read_addr);
-            noc_async_write_barrier();
-            cb_pop_front(output_tensor_cb_index, one_tile);
+            uint32_t currently_processed_output_tile =
+                core_start * index_tiles_per_core + index_loop * number_of_available_cores * index_tiles_per_core;
 
-            // Increment the output tile
-            currently_processed_output_tile += number_of_available_cores;
-        }
-    }
+            for (uint32_t widx = 0; widx < index_tiles_per_core; widx++) {
+                cb_wait_front(output_tensor_cb_index, one_tile);
+                const uint32_t l1_output_read_addr = get_read_ptr(output_tensor_cb_index);
+
+                noc_async_write_tile(
+                    h * Wt_index + currently_processed_output_tile, output_tensor_addr_gen, l1_output_read_addr);
+                noc_async_write_barrier();
+
+                cb_pop_front(output_tensor_cb_index, one_tile);
+
+                currently_processed_output_tile++;
+                if (currently_processed_output_tile >= Wt_index) {
+                    break;  // No more index tiles to save
+                }
+            }  // widx loop
+        }  // index_loop loop
+    }  // h loop
 }

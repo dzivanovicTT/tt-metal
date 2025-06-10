@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2025 Tenstorrent Inc.
+// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -70,9 +70,13 @@ FORCE_INLINE void process_input_tile(
     const uint32_t input_index_tensor_cb_index,
     const uint32_t output_tensor_cb_index,
     const uint32_t current_processed_input_tile_id,
-    const uint32_t tile_width) {
+    const uint32_t tile_width,
+    const uint32_t index_tile_offset = 0) {
     // Constants
     const uint32_t tile_width_mask = tile_width - 1;
+
+    // Calculate offset in index tile value
+    const uint32_t index_value_offset = index_tile_offset * get_tile_hw(input_index_tensor_cb_index);
 
     // Dataformats size
     const uint32_t input_tensor_data_format_size =
@@ -82,9 +86,9 @@ FORCE_INLINE void process_input_tile(
     const uint32_t output_tensor_data_format_size =
         get_tile_size(output_tensor_cb_index) / get_tile_hw(output_tensor_cb_index);
 
-    uint32_t input_tensor_l1_read_addr = get_read_ptr(input_tensor_cb_index);
+    const uint32_t input_tensor_l1_read_addr = get_read_ptr(input_tensor_cb_index);
     const uint32_t input_index_tensor_l1_read_addr = get_read_ptr(input_index_tensor_cb_index);
-    const uint32_t output_tensor_l1_read_addr = get_read_ptr(output_tensor_cb_index);
+    const uint32_t output_tensor_l1_read_addr = get_write_ptr(output_tensor_cb_index);
 
     uint32_t count = 0;
     constexpr uint32_t tile_faces = 2;
@@ -97,7 +101,9 @@ FORCE_INLINE void process_input_tile(
                 for (uint32_t l = 0; l < face_size; l++) {
                     // Read global index
                     const uint32_t global_index = get_value_from_tile(
-                        input_index_tensor_l1_read_addr, count, input_index_tensor_data_format_size);
+                        input_index_tensor_l1_read_addr,
+                        count + index_value_offset,
+                        input_index_tensor_data_format_size);
 
                     // Calculate local index
                     const uint32_t tile_idx = global_index >> __builtin_ctz(tile_width);
@@ -119,7 +125,8 @@ FORCE_INLINE void process_input_tile(
                     const uint32_t value =
                         get_value_from_tile(input_tensor_l1_read_addr, local_index, input_tensor_data_format_size);
 
-                    write_value_to_tile(output_tensor_l1_read_addr, count, output_tensor_data_format_size, value);
+                    write_value_to_tile(
+                        output_tensor_l1_read_addr, count + index_value_offset, output_tensor_data_format_size, value);
                     count++;
                 }  // l loop
             }  // k loop
