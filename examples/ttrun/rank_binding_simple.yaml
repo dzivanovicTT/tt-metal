@@ -1,0 +1,11 @@
+# Simple rank binding configuration
+# Two ranks on mesh 0
+
+bindings:
+  - rank: 0
+    mesh_id: 0
+    host_rank_id: 0
+
+  - rank: 1
+    mesh_id: 0
+    host_rank_id: 1
