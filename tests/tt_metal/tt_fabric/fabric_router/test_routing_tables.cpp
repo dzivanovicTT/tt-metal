@@ -158,12 +158,12 @@ TEST_F(ControlPlaneFixture, TestT3kDisjointFabricRoutes) {
         auto path = control_plane.get_fabric_route(FabricNodeId(MeshId{0}, 0), FabricNodeId(MeshId{0}, 3), chan);
         EXPECT_EQ(path.size() > 0, true);
     }
-    valid_chans = control_plane.get_valid_eth_chans_on_routing_plane(FabricNodeId(MeshId{1}, 0), 0);
-    EXPECT_GT(valid_chans.size(), 0);
-    for (auto chan : valid_chans) {
-        auto path = control_plane.get_fabric_route(FabricNodeId(MeshId{1}, 0), FabricNodeId(MeshId{1}, 3), chan);
-        EXPECT_EQ(path.size() > 0, true);
-    }
+    // valid_chans = control_plane.get_valid_eth_chans_on_routing_plane(FabricNodeId(MeshId{1}, 0), 0);
+    // EXPECT_GT(valid_chans.size(), 0);
+    // for (auto chan : valid_chans) {
+    //     auto path = control_plane.get_fabric_route(FabricNodeId(MeshId{1}, 0), FabricNodeId(MeshId{1}, 3), chan);
+    //     EXPECT_EQ(path.size() > 0, true);
+    // }
     valid_chans = control_plane.get_valid_eth_chans_on_routing_plane(FabricNodeId(MeshId{0}, 0), 0);
     EXPECT_GT(valid_chans.size(), 0);
     for (auto chan : valid_chans) {

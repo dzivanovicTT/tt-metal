@@ -253,9 +253,10 @@ void MetalContext::set_custom_control_plane_mesh_graph(
     TT_FATAL(
         !DevicePool::is_initialized() || DevicePool::instance().get_all_active_devices().size() == 0,
         "Modifying control plane requires no devices to be active");
-
+    std::cout << "Create custom control plane" << std::endl;
     global_control_plane_ = std::make_unique<tt::tt_fabric::GlobalControlPlane>(
         mesh_graph_desc_file, logical_mesh_chip_id_to_physical_chip_id_mapping);
+    std::cout << "Done create custom control plane" << std::endl;
     this->initialize_fabric_config(fabric_config_);
 }
 

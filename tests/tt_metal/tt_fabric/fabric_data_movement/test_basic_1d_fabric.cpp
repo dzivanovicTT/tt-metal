@@ -112,7 +112,7 @@ void RunTestLineMcast(
     for (const auto& mesh : user_meshes) {
         auto mesh_shape = control_plane.get_physical_mesh_shape(mesh);
         // Need at least 8 chips for all mcast tests
-        if (mesh_shape.mesh_size() >= 8) {
+        if (mesh_shape.mesh_size() >= 4) {
             system_accomodates_mcast = true;
             break;
         }
@@ -346,6 +346,7 @@ void RunTestUnicastRaw(
         auto num_devices = devices.size();
         // create a list of available deive ids in a random order
         // In 2D routing the source and desitnation devices can be anywhere on the mesh.
+        std::cout << "Picking random devices from: " << 0 << " " << devices.size() << std::endl;
         auto random_dev_list = get_random_numbers_from_range(0, devices.size() - 1, devices.size());
 
         // pick the first two in the list to be src and dst devices for the test.
@@ -515,10 +516,10 @@ void RunTestUnicastRaw(
         worker_mem_map.test_results_size_bytes,
         receiver_status,
         CoreType::WORKER);
-
+    std::cout << "Verify results" << std::endl;
     EXPECT_EQ(sender_status[TT_FABRIC_STATUS_INDEX], TT_FABRIC_STATUS_PASS);
     EXPECT_EQ(receiver_status[TT_FABRIC_STATUS_INDEX], TT_FABRIC_STATUS_PASS);
-
+    std::cout << "Done verify results" << std::endl;
     uint64_t sender_bytes =
         ((uint64_t)sender_status[TT_FABRIC_WORD_CNT_INDEX + 1] << 32) | sender_status[TT_FABRIC_WORD_CNT_INDEX];
     uint64_t receiver_bytes =
