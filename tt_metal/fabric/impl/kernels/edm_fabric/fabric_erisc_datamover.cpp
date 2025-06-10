@@ -1279,7 +1279,8 @@ void run_fabric_edm_main_loop(
                 }
             }
             if constexpr (enable_ring_support && !dateline_connection) {
-                if constexpr (is_sender_channel_serviced[NUM_SENDER_CHANNELS - 1]) {
+                if constexpr (
+                    is_sender_channel_serviced[NUM_SENDER_CHANNELS - 1] && !skip_sender_vc1_channel_connection) {
                     run_sender_channel_step<
                         enable_packet_header_recording,
                         enable_fabric_counters,
