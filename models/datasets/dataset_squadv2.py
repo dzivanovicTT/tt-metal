@@ -9,7 +9,7 @@ from datasets import load_dataset
 from loguru import logger
 from torch.utils.data import Dataset
 
-from conftest import model_location_generator2
+from conftest import model_location_generator2_
 
 
 class SQUADV2Dataset(Dataset):
