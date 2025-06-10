@@ -408,12 +408,16 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
                                            .get_target_out_path("");
                         const ll_api::memory& binary_mem = llrt::get_risc_binary(fw_path);
                         uint32_t fw_size = binary_mem.get_text_size();
-                        log_debug(tt::LogMetal, "ERISC fw binary size: {} in bytes", fw_size);
+                        log_info(
+                            tt::LogMetal,
+                            "{} ERISC DM{} fw {} binary size: {} in bytes",
+                            is_active_eth ? "Active" : "Idle",
+                            eriscv_id,
+                            fw_path,
+                            fw_size);
                         llrt::test_load_write_read_risc_binary(
                             binary_mem, this->id(), virtual_core, core_type_idx, processor_class, eriscv_id);
-                    }
 
-                    for (uint32_t eriscv_id = 0; eriscv_id < num_build_states; eriscv_id++) {
                         // Launching DM0 uses PC or ETH FW API
                         // Other DMs use PC only, but deassert reset are handled by DM0
                         auto jit_build_config = hal.get_jit_build_config(core_type_idx, 0 /* Eth */, eriscv_id);
@@ -460,9 +464,11 @@ void Device::initialize_firmware(const HalProgrammableCoreType &core_type, CoreC
         launch_msg_buffer_num_entries * sizeof(launch_msg_t),
         tt_cxy_pair(this->id(), virtual_core),
         this->get_dev_addr(virtual_core, HalL1MemAddrType::LAUNCH));
-    uint32_t go_addr = this->get_dev_addr(virtual_core, HalL1MemAddrType::GO_MSG);
-    tt::tt_metal::MetalContext::instance().get_cluster().write_core(
-        go_msg, sizeof(go_msg_t), tt_cxy_pair(this->id(), virtual_core), go_addr);
+    if (core_type != HalProgrammableCoreType::ACTIVE_ETH && !hal.get_eth_fw_is_cooperative()) {
+        int32_t go_addr = this->get_dev_addr(virtual_core, HalL1MemAddrType::GO_MSG);
+        tt::tt_metal::MetalContext::instance().get_cluster().write_core(
+            go_msg, sizeof(go_msg_t), tt_cxy_pair(this->id(), virtual_core), go_addr);
+    }
     uint64_t launch_msg_buffer_read_ptr_addr = this->get_dev_addr(virtual_core, HalL1MemAddrType::LAUNCH_MSG_BUFFER_RD_PTR);
     uint32_t zero = 0;
     tt::tt_metal::MetalContext::instance().get_cluster().write_core(
@@ -847,14 +853,13 @@ void Device::initialize_and_launch_firmware() {
     // Deassert the first risc of all cores
     // The first risc is the one responsible for deasserting other riscs on the same core
     for (const auto& worker_core : not_done_cores) {
+        TensixSoftResetOptions reset_val = TENSIX_DEASSERT_SOFT_RESET;
         if (is_active_ethernet_core(worker_core) && !hal.get_eth_fw_is_cooperative()) {
-            log_info(
-                tt::LogMetal,
-                "Skipping deassert of active ethernet core {} because it's cooperative",
-                worker_core.str());
+            reset_val =
+                reset_val & static_cast<TensixSoftResetOptions>(
+                                ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::BRISC));
             continue;
         }
-        TensixSoftResetOptions reset_val = TENSIX_DEASSERT_SOFT_RESET;
         tt::tt_metal::MetalContext::instance().get_cluster().deassert_risc_reset_at_core(
             tt_cxy_pair(this->id(), worker_core), reset_val);
     }

@@ -97,27 +97,12 @@ int main() {
     mailboxes->go_message.signal = RUN_MSG_DONE;
 
     // TODO Break out of this loop when signalled from the host to return to base FW
-    while (1) {
+    while (routing_info->routing_enabled) {
         // Wait...
         WAYPOINT("GW");
 
-        uint8_t go_message_signal = RUN_MSG_DONE;
-        while ((go_message_signal = mailboxes->go_message.signal) != RUN_MSG_GO) {
-            invalidate_l1_cache();
-            // While the go signal for kernel execution is not sent, check if the worker was signalled
-            // to reset its launch message read pointer.
-            if (go_message_signal == RUN_MSG_RESET_READ_PTR) {
-                // Set the rd_ptr on workers to specified value
-                mailboxes->launch_msg_rd_ptr = 0;
-                uint64_t dispatch_addr = calculate_dispatch_addr(&mailboxes->go_message);
-                mailboxes->go_message.signal = RUN_MSG_DONE;
-                // Notify dispatcher that this has been done
-                internal_::notify_dispatch_core_done(dispatch_addr);
-            }
-        }
-        WAYPOINT("GD");
-
-        {
+        uint8_t go_message_signal = mailboxes->go_message.signal;
+        if (go_message_signal == RUN_MSG_GO) {
             // Only include this iteration in the device profile if the launch message is valid. This is because all
             // workers get a go signal regardless of whether they're running a kernel or not. We don't want to profile
             // "invalid" iterations.
@@ -165,7 +150,17 @@ int main() {
                 internal_::notify_dispatch_core_done(dispatch_addr);
                 mailboxes->launch_msg_rd_ptr = (launch_msg_rd_ptr + 1) & (launch_msg_buffer_num_entries - 1);
             }
+
+            WAYPOINT("GD");
+        } else if (go_message_signal == RUN_MSG_RESET_READ_PTR) {
+            // Reset the launch message buffer read ptr
+            mailboxes->launch_msg_rd_ptr = 0;
+            uint64_t dispatch_addr = calculate_dispatch_addr(&mailboxes->go_message);
+            mailboxes->go_message.signal = RUN_MSG_DONE;
+            internal_::notify_dispatch_core_done(dispatch_addr);
         }
+
+        invalidate_l1_cache();
     }
 
     return 0;

@@ -1369,6 +1369,8 @@ void Cluster::set_internal_routing_info_for_ethernet_cores(bool enable_internal_
             for (const auto& eth_core : this->get_active_ethernet_cores(chip_id, false)) {
                 tt_cxy_pair virtual_eth_core(chip_id, get_virtual_coordinate_from_logical_coordinates(chip_id, eth_core, CoreType::ETH));
                 // Disable internal ethernet routing for mmio devices
+                log_info(
+                    tt::LogMetal, "Disabling internal ethernet routing for mmio device {} {}", chip_id, eth_core.str());
                 write_core((void*)&routing_info_disabled, sizeof(routing_info_t), virtual_eth_core, routing_info_addr_);
             }
         }
