@@ -364,9 +364,21 @@ autograd::TensorPtr rmsnorm_composite(
         tensor->add_grad(dL_da);
 
         // dL_dgamma = (a / rms(a)) * dL_dout -> requires sum over batch due to broadcasting
+        auto a_over_rms_a = ttnn::divide(
+            a,
+            rms_a,
+            std::nullopt,
+            std::nullopt,
+            std::nullopt,
+            none,
+            none,
+            none,
+            false);  // [B,1,S,C] x [B,1,S,1] -> [B,1,S,C] (bcast)
+        std::cout << "a_over_rms_a: " << std::endl;
+        a_over_rms_a.print();
         auto dL_dg_components = ttnn::multiply(
             dL_dout,
-            ttnn::divide(a, rms_a, std::nullopt, std::nullopt, std::nullopt, none, none, none, false),
+            a_over_rms_a,
             std::nullopt,
             std::nullopt,
             std::nullopt,
@@ -374,12 +386,16 @@ autograd::TensorPtr rmsnorm_composite(
             none,
             none,
             false);  // [B,1,S,C] x [B,1,S,1] -> [B,1,S,C] (bcast); checked by add_grad
+        std::cout << "dL_dg_components: " << std::endl;
+        dL_dg_components.print();
         auto dL_dg = ttnn::sum(
             dL_dg_components,
             /* dim_arg */ ttnn::SmallVector<int>{0, 1, 2},
             /* keep_dim */ true,
             /* output_mem_config */ std::nullopt,
             /*compute_kernel_config */ core::ComputeKernelConfig::precise());  // [B,1,S,C] -> [1,1,1,C]
+        std::cout << "dL_dg: " << std::endl;
+        dL_dg.print();
         gamma->add_grad(dL_dg);
     };
 
