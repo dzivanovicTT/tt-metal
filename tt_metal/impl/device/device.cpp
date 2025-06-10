@@ -1050,7 +1050,7 @@ bool Device::initialize(
     this->num_hw_cqs_ = num_hw_cqs;
     const auto& hal = MetalContext::instance().hal();
     if (worker_l1_size == 0) {
-        worker_l1_size = hal.get_dev_size(HalProgrammableCoreType::TENSIX, HalL1MemAddrType::DEFAULT_UNRESERVED);
+        worker_l1_size = hal.get_dev_size(HalProgrammableCoreType::TENSIX, HalL1MemAddrType::DEFAULT_UNRESERVED) -8192;
     }
 
     size_t max_worker_l1_size = hal.get_dev_addr(HalProgrammableCoreType::TENSIX, HalL1MemAddrType::BASE) +

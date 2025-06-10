@@ -267,7 +267,7 @@ void worker_compute(
     uint64_t in0_sender_semaphore_noc_addr,
     uint32_t worker_id,
     uint32_t reduce_core_noc_x,
-    uint32_t reduce_core_noc_y) {
+    uint32_t reduce_core_noc_y, bool have_intermed_out) {
     uint32_t out_tile_id = 0;
 
     // Wait for compute to deliver output chunk
@@ -281,7 +281,7 @@ void worker_compute(
     constexpr uint32_t o_write_size = out_chunk_tiles * tile_bytes;
     constexpr uint32_t ml_write_size = PNHt * tile_bytes;
     uint64_t output_write_addr =
-        get_noc_addr(reduce_core_noc_x, reduce_core_noc_y, get_write_ptr(cb_intermed_out)) + worker_offset;
+        get_noc_addr(reduce_core_noc_x, reduce_core_noc_y, have_intermed_out ? get_write_ptr(cb_intermed_out) : 0) + worker_offset;
     noc_async_write(get_read_ptr(cb_out), output_write_addr, o_write_size);
     output_write_addr += o_write_size;
     noc_async_write(get_read_ptr(cb_out_m), output_write_addr, ml_write_size);

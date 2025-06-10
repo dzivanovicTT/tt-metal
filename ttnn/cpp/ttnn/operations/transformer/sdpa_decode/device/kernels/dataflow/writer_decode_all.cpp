@@ -33,6 +33,7 @@ void kernel_main() {
     constexpr uint32_t ELEMENT_SIZE = get_compile_time_arg_val(19);
     constexpr bool is_causal = get_compile_time_arg_val(20) == 1;
     constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(21);
+    constexpr uint32_t have_intermed_out = get_compile_time_arg_val(22);
 
     uint32_t arg_idx = 0;
     const uint32_t out_addr = get_arg_val<uint32_t>(arg_idx++);
@@ -128,7 +129,7 @@ void kernel_main() {
         ASSERT(num_heads_per_core == 1);  // if there are workers, then head must be split across workers so there
                                           // should not be more than one head per core
         worker_compute<out_chunk_tiles, cb_out_worker, cb_out_m, cb_out_l, cb_intermed_out, PNHt>(
-            in0_sender_semaphore_noc_addr, worker_id_for_reduce, reduce_core_noc_x, reduce_core_noc_y);
+            in0_sender_semaphore_noc_addr, worker_id_for_reduce, reduce_core_noc_x, reduce_core_noc_y, have_intermed_out);
         noc_async_atomic_barrier();
         return;
     }
@@ -141,7 +142,7 @@ void kernel_main() {
     const InterleavedAddrGenFast<is_dram> out_writer = {
         .bank_base_address = out_addr, .page_size = tile_bytes, .data_format = data_format};
 
-    uint64_t intermed_l1_read_addr = get_noc_addr(get_read_ptr(cb_intermed_out));
+    uint64_t intermed_l1_read_addr = have_intermed_out ? get_noc_addr(get_read_ptr(cb_intermed_out)) : 0;
 
     volatile tt_l1_ptr uint32_t* in0_receiver_semaphore_addr_ptr =
         reinterpret_cast<volatile tt_l1_ptr uint32_t*>(reducer_semaphore_addr);

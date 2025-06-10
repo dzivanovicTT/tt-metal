@@ -9,6 +9,7 @@
 #include "circular_buffer_constants.h"
 #include "risc_attribs.h"
 #include "debug/assert.h"
+#include "debug/ring_buffer.h"
 
 constexpr static std::uint32_t REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE = L1_ALIGNMENT;
 
@@ -96,8 +97,16 @@ extern uint32_t cb_interface_mask;
 // Named this way for compatibility with existing code where existing code references local_cb_interface as cb_interface
 extern CBInterface cb_interface[NUM_CIRCULAR_BUFFERS];
 
+void validate_cb_interface(uint32_t cb_id) {
+    if ((cb_interface_mask & (1 << cb_id)) == 0) {
+        WAYPOINT("QQQQ");
+         WATCHER_RING_BUFFER_PUSH(cb_id);
+        while (1) {}
+    }
+    // ASSERT((cb_interface_mask & (1 << cb_id)) != 0);
+}
 FORCE_INLINE LocalCBInterface& get_local_cb_interface(uint32_t cb_id) {
-    ASSERT((cb_interface_mask & (1 << cb_id)) != 0);
+    validate_cb_interface(cb_id);
      return cb_interface[cb_id].local_cb_interface; }
 
 FORCE_INLINE RemoteSenderCBInterface& get_remote_sender_cb_interface(uint32_t cb_id) {

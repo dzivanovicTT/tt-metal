@@ -662,6 +662,7 @@ operation::ProgramWithCallbacks sdpa_decode_multi_core(
         output_tensor.element_size(),
         is_causal,
         max_dynamic_chunk_size,
+        intermed_output_tiles,
     };
 
     std::vector<uint32_t> compute_compile_time_args_common = {
@@ -807,7 +808,8 @@ operation::ProgramWithCallbacks sdpa_decode_multi_core(
             cur_batch,
             core_num_in_reduce,
             core_num_in_output,
-            cur_pos};
+            cur_pos
+        };
         writer_rt_args.insert(writer_rt_args.end(), reduce_core_physical_xs.begin(), reduce_core_physical_xs.end());
         writer_rt_args.insert(writer_rt_args.end(), reduce_core_physical_ys.begin(), reduce_core_physical_ys.end());
         writer_rt_args.insert(writer_rt_args.end(), output_core_physical_xs.begin(), output_core_physical_xs.end());
