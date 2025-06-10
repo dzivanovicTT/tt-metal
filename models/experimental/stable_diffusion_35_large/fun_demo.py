@@ -16,6 +16,10 @@ from .tt.parallel_config import create_dit_parallel_config, ParallelConfig
 
 
 @pytest.mark.parametrize(
+    "no_prompt",
+    [{"1": True, "0": False}.get(os.environ.get("NO_PROMPT"), False)],
+)
+@pytest.mark.parametrize(
     "mesh_device",
     [
         {"N150": (1, 1), "N300": (1, 2), "T3K": (1, 8), "TG": (8, 4)}.get(
@@ -25,7 +29,7 @@ from .tt.parallel_config import create_dit_parallel_config, ParallelConfig
     indirect=True,
 )
 @pytest.mark.parametrize(
-    "model_name, image_w, image_h, guidance_scale, num_inference_steps",  # "prompt_sequence_length", "spatial_sequence_length",
+    "model_version, image_w, image_h, guidance_scale, num_inference_steps",  # "prompt_sequence_length", "spatial_sequence_length",
     [
         #        ("medium", 512, 512, 4.5, 40, 333, 1024),
         #        ("medium", 1024, 1024, 4.5, 40, 333, 4096),
@@ -36,7 +40,15 @@ from .tt.parallel_config import create_dit_parallel_config, ParallelConfig
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 8192, "trace_region_size": 15210496}], indirect=True)
 @pytest.mark.usefixtures("use_program_cache")
 def test_sd3(
-    *, mesh_device: ttnn.MeshDevice, model_name, image_w, image_h, guidance_scale, num_inference_steps
+    *,
+    mesh_device: ttnn.MeshDevice,
+    model_version,
+    image_w,
+    image_h,
+    guidance_scale,
+    num_inference_steps,
+    no_prompt,
+    model_location_generator,
 ) -> None:  # , prompt_sequence_length, spatial_sequence_length,) -> None:
     mesh_shape = tuple(mesh_device.shape)
     cfg_parallel = ParallelConfig(mesh_shape=mesh_shape, factor=1, mesh_axis=0)
@@ -51,11 +63,12 @@ def test_sd3(
         guidance_cond = 1
 
     pipeline = TtStableDiffusion3Pipeline(
-        checkpoint=f"stabilityai/stable-diffusion-3.5-{model_name}",
+        checkpoint_name=f"stabilityai/stable-diffusion-3.5-{model_version}",
         device=mesh_device,
         enable_t5_text_encoder=mesh_device.get_num_devices() >= 4,
         guidance_cond=guidance_cond,
         parallel_config=dit_parallel_config,
+        model_location_generator=model_location_generator,
     )
 
     pipeline.prepare(
