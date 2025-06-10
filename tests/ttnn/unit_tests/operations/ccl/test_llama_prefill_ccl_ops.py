@@ -176,7 +176,7 @@ def run_all_gather_impl(
     "num_devices, num_links, ag_output_shape, dim, layout, ag_input_dtype",
     [
         # 128 shapes
-        (8, 1, [1, 1, 12 * 32 * 8, 32], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
+        (8, 1, [1, 1, 15 * 32 * 8, 32], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
         # (8, 1, [1, 1, 128, 256 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),
         # (8, 1, [1, 1, 128, 32 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat16),
         # (8, 1, [1, 1, 128, 896 * 8], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b),

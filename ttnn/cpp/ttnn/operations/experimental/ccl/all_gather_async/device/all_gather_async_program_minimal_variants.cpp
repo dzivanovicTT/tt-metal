@@ -539,11 +539,11 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         // batch_head_size needs to be 1 for now
         uint32_t batch_head_size = input_tensor_shape[0] * input_tensor_shape[1];
 
-#uint32_t single_batch_head_num_pages = input_tensor_num_pages / batch_head_size;
-#uint32_t base_pages_per_worker = single_batch_head_num_pages / num_links;
-#uint32_t remainder = single_batch_head_num_pages % num_links;
-#uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
-#uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
+        // uint32_t single_batch_head_num_pages = input_tensor_num_pages / batch_head_size;
+        // uint32_t base_pages_per_worker = single_batch_head_num_pages / num_links;
+        // uint32_t remainder = single_batch_head_num_pages % num_links;
+        // uint32_t input_tile_id_start = link * base_pages_per_worker + std::min(link, remainder);
+        // uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
 
         uint32_t NUM_BANKS = 12;
 
@@ -623,7 +623,7 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             sender_forward_worker_core.x,       // out_ready_sem_noc0_x
             sender_forward_worker_core.y,       // out_ready_sem_noc0_y
             ring_size,                          // ring_size
-            semaphore.at(1).address()           // out_ready_semaphore_forward
+            semaphore.at(1).address(),          // out_ready_semaphore_forward
             num_pages_per_bank,
             banks_with_extra_page,
         };
@@ -657,7 +657,7 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             sender_backward_worker_core.x,      // out_ready_sem_noc0_x
             sender_backward_worker_core.y,      // out_ready_sem_noc0_y
             ring_size,                          // ring_size
-            semaphore.at(0).address()           // out_ready_semaphore_backward
+            semaphore.at(0).address(),          // out_ready_semaphore_backward
             num_pages_per_bank,
             banks_with_extra_page,
         };
