@@ -13,6 +13,11 @@ target_sources(
         sdpa/device/sdpa_op.cpp
         sdpa/device/sdpa_program_factory.cpp
         sdpa/sdpa.cpp
+        sdpa_mla/device/joint_sdpa_op.cpp
+        sdpa_mla/device/joint_sdpa_program_factory.cpp
+        sdpa_mla/device/sdpa_op.cpp
+        sdpa_mla/device/sdpa_program_factory.cpp
+        sdpa_mla/sdpa.cpp
         sdpa_decode/device/sdpa_decode_op.cpp
         sdpa_decode/device/sdpa_decode_program_factory.cpp
         sdpa_decode/sdpa_decode.cpp
