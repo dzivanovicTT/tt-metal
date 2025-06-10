@@ -259,9 +259,9 @@ TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_W32) {
     mse_result->backward();
 
     auto example_tensor_grad = core::to_xtensor(example_tensor->get_grad());
-    std::cerr << "RMSNorm example tensor grad: " << example_tensor_grad << std::endl;
+    // std::cerr << "RMSNorm example tensor grad: " << example_tensor_grad << std::endl;
     auto gamma_grad = core::to_xtensor(gamma->get_grad());
-    // std::cerr << "RMSNorm gamma grad: " << gamma_grad << std::endl;
+    std::cerr << "RMSNorm gamma grad: " << gamma_grad << std::endl;
 
     // Compute expected gradients using the composite op
     auto example_tensor2 = autograd::create_tensor(core::from_xtensor(example_xtensor, &autograd::ctx().get_device()));
@@ -276,11 +276,12 @@ TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_W32) {
     mse_result2->backward();
 
     auto expected_example_tensor_grad = core::to_xtensor(example_tensor2->get_grad());
-    std::cerr << "RMSNorm composite example tensor grad: " << expected_example_tensor_grad << std::endl;
+    // std::cerr << "RMSNorm composite example tensor grad: " << expected_example_tensor_grad << std::endl;
     auto expected_gamma_grad = core::to_xtensor(gamma2->get_grad());
+    std::cerr << "RMSNorm composite gamma grad: " << expected_gamma_grad << std::endl;
 
     EXPECT_TRUE(xt::allclose(example_tensor_grad, expected_example_tensor_grad, 1.0e-3F, 1e-2F));
-    // EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
+    EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
 }
 
 TEST_F(RMSNormOpTest, CompositeRMSNorm_Forward_Batch) {

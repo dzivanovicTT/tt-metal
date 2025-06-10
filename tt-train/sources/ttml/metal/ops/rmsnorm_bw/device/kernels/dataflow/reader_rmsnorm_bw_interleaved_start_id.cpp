@@ -6,7 +6,6 @@
 
 #include <cstdint>
 
-#include "dataflow_api.h"
 #include "debug/dprint.h"
 
 // inline void print_loop(uint32_t count) {

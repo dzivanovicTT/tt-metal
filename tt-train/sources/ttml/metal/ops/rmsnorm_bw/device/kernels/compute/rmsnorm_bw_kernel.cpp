@@ -7,7 +7,6 @@
 // #include <compute_kernel_api/common_globals.h>
 #include <compute_kernel_api/pack.h>
 #include <compute_kernel_api/reg_api.h>
-#include <dataflow_api.h>
 #include <debug/dprint.h>
 
 #include <cstdint>
@@ -383,7 +382,7 @@ inline void compute_dL_dgamma_components(uint32_t col) {
     // We can use tile idx 0 for all cols as we do not need to store all of the a over rms_a values, but only the
     // current tile value.
     // NOTE: is 0, 0 ok in tiles nums?
-    // cb_wait_front(cb_a_over_rms_a, onetile);
+    cb_wait_front(cb_a_over_rms_a, onetile);
     compute_and_pack_mul(cb_dL_out_idx, cb_a_over_rms_a, /* tile_a */ 0, /* tile_b */ 0, cb_dL_dgamma_components);
     // We can pop_front cb_a_over_rms_a, since we do not need it anymore.
     // cb_pop_front(cb_a_over_rms_a, onetile);
@@ -391,46 +390,45 @@ inline void compute_dL_dgamma_components(uint32_t col) {
 
 // Figure out why MAIN without ( )
 inline void MAIN {
-    // prepare_sfpu_and_binary_ops();
+    prepare_sfpu_and_binary_ops();
 
     for (uint32_t row = 0; row < num_rows_per_core; ++row) {
         // 1. Wait for the input tensor, rms_a and dL_out to be ready.
-        // cb_wait_front(cb_input_idx, Wt);
-        // // RMS(a) is a scalar, so we wait for one tile only.
-        // cb_wait_front(cb_rms_a_idx, onetile);
-        // cb_wait_front(cb_dL_out_idx, Wt);
+        cb_wait_front(cb_input_idx, Wt);
+        // RMS(a) is a scalar, so we wait for one tile only.
+        cb_wait_front(cb_rms_a_idx, onetile);
+        cb_wait_front(cb_dL_out_idx, Wt);
 
-        // // So if we have to mask the input cbs what should we do is to beofre we do ANY computations
-        // // we should apply mask to input, gamma, grad etc and save it inot another CB like cb_masked_input_idx or
-        // // sth like this. Do not reuse cb_input_idx.
+        // So if we have to mask the input cbs what should we do is to beofre we do ANY computations
+        // we should apply mask to input, gamma, grad etc and save it inot another CB like cb_masked_input_idx or
+        // sth like this. Do not reuse cb_input_idx.
 
-        // // Be careful masking should be applied tonly to the last tile.
+        // Be careful masking should be applied tonly to the last tile.
 
-        // for (uint32_t col = 0; col < Wt; ++col) {
-        //     compute_scaled_gain_and_gained_dL_dout(col);
-        //     compute_scale(col);
-        // }
-        // compute_ms_a_and_c_by_ms_a();
+        for (uint32_t col = 0; col < Wt; ++col) {
+            compute_scaled_gain_and_gained_dL_dout(col);
+            compute_scale(col);
+        }
+        compute_ms_a_and_c_by_ms_a();
 
-        // // We need to store in registers scale and c_by_ms_a, and iterate over all tiles in cb_input_idx to calculate
-        // // rhs for each tile.
-        // for (uint32_t col = 0; col < Wt; ++col) {
-        //     compute_rhs(col);
-        //     // nop to check sync
-        //     // for (uint32_t i = 0; i < 100000; ++i) {
-        //     //     asm volatile("nop");
-        //     // }
+        // We need to store in registers scale and c_by_ms_a, and iterate over all tiles in cb_input_idx to calculate
+        // rhs for each tile.
+        for (uint32_t col = 0; col < Wt; ++col) {
+            compute_rhs(col);
+            // nop to check sync
+            // for (uint32_t i = 0; i < 100000; ++i) {
+            //     asm volatile("nop");
+            // }
 
-        //     compute_dL_da(col);
-        //     compute_dL_dgamma_components(col);
-        // }
+            compute_dL_da(col);
+            compute_dL_dgamma_components(col);
+        }
 
         // pop from the input CBs
 
         // TODO Make sure that we wait and resever for all necessary data in buffers! (probably not)
         // TODO2 Make sure if we do not need to reconfigure data format for any calculation. I neglected it for now.
     }
-    // UNPACK(DPRINT << "compute kernel done" << ENDL());
 }
 
 }  // namespace NAMESPACE

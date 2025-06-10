@@ -199,9 +199,10 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     uint32_t single_tile_size_bytes = tt::tt_metal::detail::TileSize(data_format);
 
     auto padded_tensor_shape = input.padded_shape();
-    auto padded_tensor_volume = input.padded_volume();
-    TT_FATAL(
-        padded_tensor_volume % tt::constants::TILE_HW == 0, "Padded input tensor volume must be divisible by TILE_HW");
+    // auto padded_tensor_volume = input.padded_volume();
+    // TT_FATAL(
+    //     padded_tensor_volume % tt::constants::TILE_HW == 0, "Padded input tensor volume must be divisible by
+    //     TILE_HW");
     TT_FATAL(padded_tensor_shape.rank() == 4U, "Input tensor must be 4D");
     uint32_t Wt = padded_tensor_shape[-1] / tt::constants::TILE_WIDTH;
     uint32_t Ht = padded_tensor_shape[-2] / tt::constants::TILE_HEIGHT;
