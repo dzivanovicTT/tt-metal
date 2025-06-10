@@ -1424,6 +1424,10 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
             writer_compile_time_args.end(), split_reader_args.begin(), split_reader_args.end());
     }
 
+    bool no_float32 = act_df != tt::DataFormat::Float32 && weight_df != tt::DataFormat::Float32 &&
+                      out_df != tt::DataFormat::Float32 && bias_df != tt::DataFormat::Float32;
+    bool fast_tilize_mode = !untilize_out && !fp32_dest_acc_en && no_float32 && in0_block_w != 1;
+    log_info(tt::LogOp, "fast_tilize_mode: {}", fast_tilize_mode);
     std::vector<uint32_t> compute_kernel_args = {
         in0_block_w,
         act_num_subblocks,
@@ -1458,7 +1462,9 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
         cb_indices.out0_cb,
         cb_indices.temp_sum_cb,
-        partials_cb_uses_output};
+        partials_cb_uses_output,
+        0,
+        fast_tilize_mode};
 
     const tt::tt_metal::NOC writer_mcast_noc = tt::tt_metal::detail::GetPreferredNOCForDRAMRead(device->arch());
     ;

@@ -20,7 +20,7 @@
 
 #define DEBUG_PRINT 0
 
-inline void tilize_in(
+inline void tilize_in_fast(
     uint32_t in_cb_id, uint32_t in_subblock_h, uint32_t in_block_w, uint32_t in_num_subblocks, uint32_t out_cb_id) {
     fast_tilize_init_short_with_dt(in_cb_id, in_block_w, out_cb_id);
     for (uint32_t in_subblock = 0; in_subblock < in_num_subblocks; ++in_subblock) {
@@ -33,6 +33,21 @@ inline void tilize_in(
         }
     }
     fast_tilize_uninit(in_cb_id, out_cb_id);
+}  // tilize_in()
+
+inline void tilize_in(
+    uint32_t in_cb_id, uint32_t in_subblock_h, uint32_t in_block_w, uint32_t in_num_subblocks, uint32_t out_cb_id) {
+    tilize_init_short(in_cb_id, in_block_w, out_cb_id);
+    for (uint32_t in_subblock = 0; in_subblock < in_num_subblocks; ++in_subblock) {
+        for (uint32_t h = 0; h < in_subblock_h; ++h) {
+            cb_wait_front(in_cb_id, in_block_w);
+            cb_reserve_back(out_cb_id, in_block_w);
+            tilize_block(in_cb_id, in_block_w, out_cb_id);
+            cb_push_back(out_cb_id, in_block_w);
+            cb_pop_front(in_cb_id, in_block_w);
+        }
+    }
+    tilize_uninit(in_cb_id, out_cb_id);
 }  // tilize_in()
 
 template <uint32_t out_subblock_w, uint32_t out_block_w>
@@ -100,6 +115,7 @@ void MAIN {
 #ifdef WIDTH_SHARDED
     constexpr uint32_t in0_nblocks_w_tilize = get_compile_time_arg_val(27);
 #endif
+    constexpr bool tilize_in_fast_enabled = get_compile_time_arg_val(28);
 
     constexpr uint32_t out_block_num_tiles = in0_num_subblocks * in1_num_subblocks * out_subblock_num_tiles;
     constexpr uint32_t out_block_w = in1_block_w;
@@ -135,9 +151,13 @@ void MAIN {
     for (uint32_t in1_block_w_i = 0; in1_block_w_i < in1_num_blocks_w; ++in1_block_w_i) {
         for (uint32_t in0_block_h_i = 0; in0_block_h_i < in0_num_blocks_h; ++in0_block_h_i) {
 #ifdef PRE_TILIZE
-            tilize_in(in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
-
-            mm_block_init_short_with_dt(
+            if constexpr (tilize_in_fast_enabled) {
+                tilize_in_fast(in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
+            } else {
+                reconfig_data_format_srca(in1_cb_id, in0_pretilize_cb_id);
+                tilize_in(in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
+            }
+            mm_block_init_short_with_dt2(
                 in0_cb_id,
                 in1_cb_id,
                 in0_pretilize_cb_id,
@@ -161,19 +181,27 @@ void MAIN {
             uint32_t curr_matmul_out_cb = matmul_partials_cb;
             for (uint32_t in0_block_w_i = 0; in0_block_w_i < in0_num_blocks_w; ++in0_block_w_i) {
 #ifdef WIDTH_SHARDED
-                if (in0_block_w_i % in0_nblocks_w_tilize == 0) {
-                    tilize_in(in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
 
-                    mm_block_init_short_with_dt(
-                        in0_cb_id,
-                        in1_cb_id,
-                        in0_pretilize_cb_id,
-                        in0_pretilize_cb_id,
-                        false,
-                        out_subblock_w,
-                        out_subblock_h,
-                        in0_block_w);
+                if (in0_block_w_i % in0_nblocks_w_tilize == 0) {
+                    if constexpr (tilize_in_fast_enabled) {
+                        tilize_in_fast(
+                            in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
+                    } else {
+                        reconfig_data_format_srca(in1_cb_id, in0_pretilize_cb_id);
+                        tilize_in(
+                            in0_pretilize_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks, tilized_in0_cb_id);
+                    }
                 }
+
+                mm_block_init_short_with_dt2(
+                    in0_cb_id,
+                    in1_cb_id,
+                    in0_pretilize_cb_id,
+                    in0_pretilize_cb_id,
+                    false,
+                    out_subblock_w,
+                    out_subblock_h,
+                    in0_block_w);
 #endif
                 bool last_out = (in0_block_w_i == in0_num_blocks_w - 1);
                 if constexpr (tilize_in0) {
@@ -187,17 +215,31 @@ void MAIN {
                     pack_reconfig_data_format(curr_matmul_out_cb, tilized_in0_cb_id);
                     pack_reconfig_l1_acc(0);
 #endif
-                    tilize_in(in0_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks_read, tilized_in0_cb_id);
+                    if constexpr (tilize_in_fast_enabled) {
+                        tilize_in_fast(
+                            in0_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks_read, tilized_in0_cb_id);
 #ifdef SPLIT_READER
-                    tilize_in(
-                        in0_cb_second_reader_id,
-                        in0_subblock_h,
-                        in0_block_w,
-                        in0_num_subblocks_read_last,
-                        tilized_in0_cb_id);
+                        tilize_in_fast(
+                            in0_cb_second_reader_id,
+                            in0_subblock_h,
+                            in0_block_w,
+                            in0_num_subblocks_read_last,
+                            tilized_in0_cb_id);
 #endif
+                    } else {
+                        reconfig_data_format_srca(in1_cb_id, in0_cb_id);
 
-                    mm_block_init_short_with_dt(
+                        tilize_in(in0_cb_id, in0_subblock_h, in0_block_w, in0_num_subblocks_read, tilized_in0_cb_id);
+#ifdef SPLIT_READER
+                        tilize_in(
+                            in0_cb_second_reader_id,
+                            in0_subblock_h,
+                            in0_block_w,
+                            in0_num_subblocks_read_last,
+                            tilized_in0_cb_id);
+#endif
+                    }
+                    mm_block_init_short_with_dt2(
                         mm_in0_cb_id,
                         in1_cb_id,
                         in0_cb_id,
@@ -240,7 +282,7 @@ void MAIN {
 
                             cb_pop_front(matmul_partials_cb, out_subblock_num_tiles);
                             // Reconfigure srcA back
-                            mm_block_init_short_with_dt(
+                            mm_block_init_short_with_dt2(
                                 mm_in0_cb_id,
                                 in1_cb_id,
                                 mm_in0_cb_id,
