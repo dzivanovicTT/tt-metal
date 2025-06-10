@@ -226,7 +226,8 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
 
     // compile arguments
     uint32_t packed_scaler = pack_two_bfloat16_to_uint32(1.F / static_cast<float>(num_inner));  // scalar is 1/c not c!
-    uint32_t mask_w = false;  // num_inner % tt::constants::TILE_WIDTH;
+    uint32_t mask_w = num_inner % tt::constants::TILE_WIDTH;
+    std::cerr << "mask_w: " << mask_w << std::endl;
     uint32_t block_size = get_block_size(Wt);
 
     // 2) Create and configure circular buffers
@@ -266,6 +267,9 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
 
     // TODO: Configue defines like masking and fits in L1 etc.
     std::map<std::string, std::string> defines;  // Add defines as needed
+    if (mask_w != 0) {
+        defines[kMaskWDefineKey] = "1";
+    }
 
     // Setup defines for reduce.
     // Compute kernel does not compile without these defines.

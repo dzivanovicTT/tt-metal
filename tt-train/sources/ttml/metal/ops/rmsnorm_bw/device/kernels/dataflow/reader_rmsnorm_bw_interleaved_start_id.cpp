@@ -79,7 +79,7 @@ void kernel_main() {
     uint32_t start_row = get_arg_val<uint32_t>(runtime_args_counter++);
 
     constexpr uint32_t cb_input_idx = tt::CBIndex::c_0;
-    constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;  // Unused atm
+    constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;
     constexpr uint32_t cb_scaler_idx = tt::CBIndex::c_2;
     constexpr uint32_t cb_gamma_idx = tt::CBIndex::c_3;
     constexpr uint32_t cb_rms_a_idx = tt::CBIndex::c_4;
@@ -87,20 +87,32 @@ void kernel_main() {
 
     constexpr uint32_t packed_scaler = get_compile_time_arg_val(0);
     constexpr uint32_t block_size = get_compile_time_arg_val(1);
-    constexpr uint32_t mask_w = get_compile_time_arg_val(2);  // Unused atm
+    constexpr uint32_t mask_w = get_compile_time_arg_val(2);
     constexpr uint32_t Wt = get_compile_time_arg_val(3);
 
     constexpr uint32_t onetile = 1U;
 
 #ifdef DO_MASK_W
-    constexpt bool do_mask_w = true;
+    constexpr bool do_mask_w = true;
 #else
     constexpr bool do_mask_w = false;
 #endif
 
     // generate mask tile
     if constexpr (do_mask_w) {
-        // TODO
+        // cb_reserve_back(cb_mask_w_idx, onetile);
+        // uint16_t* ptr = reinterpret_cast<uint16_t*>(get_write_ptr(cb_mask_w_idx));
+        // constexpr uint16_t one = 0x00003F80;  // (bfloat16)1.0 -> uint16_t
+        // constexpr uint16_t zero = 0x0;
+        // for (uint32_t face = 0; face < 4; ++face) {
+        //     uint32_t offset = (face & 1U) << 4U;
+        //     for (uint32_t h = 0; h < 16; ++h) {
+        //         for (uint32_t w = 0; w < 16; ++w, ++ptr) {
+        //             *ptr = (offset + w < mask_w) ? one : zero;
+        //         }
+        //     }
+        // }
+        // cb_push_back(cb_mask_w_idx, onetile);
     }
 
     // generate tiles to include scalar and epsilon
