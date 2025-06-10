@@ -45,6 +45,7 @@
 #include "ttnn/operations/experimental/unary_backward/gelu_backward/gelu_backward_pybind.hpp"
 #include "ttnn/operations/experimental/reduction/sort/sort_pybind.hpp"
 #include "ttnn/operations/experimental/deinterleave/deinterleave_pybind.hpp"
+#include "ttnn/operations/experimental/reinterleave/reinterleave_pybind.hpp"
 
 namespace ttnn::operations::experimental {
 
@@ -106,6 +107,7 @@ void py_module(py::module& module) {
     ccl::py_module(m_experimental_ccl);
 
     deinterleave::bind_deinterleave_operation(module);
+    reinterleave::bind_reinterleave_operation(module);
 }
 
 }  // namespace ttnn::operations::experimental
