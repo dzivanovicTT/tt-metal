@@ -228,6 +228,16 @@ struct Tanhshrink {
         const std::optional<Tensor>& optional_output_tensor = std::nullopt);
 };
 
+struct Selu {
+    static Tensor invoke(
+        QueueId queue_id,
+        const Tensor& input_tensor,
+        float scale = 1.0507,
+        float alpha = 1.67326,
+        const std::optional<MemoryConfig>& memory_config = std::nullopt,
+        const std::optional<Tensor>& optional_output_tensor = std::nullopt);
+};
+
 struct Tanh {
     static Tensor invoke(
         QueueId queue_id,
@@ -352,6 +362,7 @@ constexpr auto abs = ttnn::register_operation<"ttnn::abs", ttnn::operations::una
 constexpr auto eqz = ttnn::register_operation<"ttnn::eqz", ttnn::operations::unary::Eqz>();
 constexpr auto mish = ttnn::register_operation<"ttnn::mish", ttnn::operations::unary::Mish>();
 constexpr auto tanhshrink = ttnn::register_operation<"ttnn::tanhshrink", ttnn::operations::unary::Tanhshrink>();
+constexpr auto selu = ttnn::register_operation<"ttnn::selu", ttnn::operations::unary::Selu>();
 
 constexpr auto softplus = ttnn::register_operation<"ttnn::softplus", ttnn::operations::unary::Softplus>();
 constexpr auto tanh = ttnn::register_operation<"ttnn::tanh", ttnn::operations::unary::Tanh>();

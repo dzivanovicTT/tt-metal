@@ -299,6 +299,17 @@ std::pair<std::string, std::string> get_op_init_and_func_parameterized(
                 "unary_min_tile_init();",
                 fmt::format("unary_min_tile({}, {:#x}u);", idst, std::bit_cast<uint32_t>(param0))};
             break;
+        case UnaryOpType::SELU:
+            std::cout << "It comes to utils file";
+            TT_ASSERT(params.size() == 2, "Expected selu to take 2 parameters");
+            op_init_and_name = {
+                "selu_tile_init();",
+                fmt::format(
+                    "selu_tile({}, {:#x}u), {:#x}u);",
+                    idst,
+                    std::bit_cast<uint32_t>(params[0]),
+                    std::bit_cast<uint32_t>(params[1]))};
+            break;
         default: TT_THROW("unexpected parameterized op type {}", op_type);
     };
     return op_init_and_name;
@@ -583,6 +594,7 @@ std::string get_compute_kernel_path(UnaryOpType op_type, const std::string& comp
     switch (op_type) {
         case UnaryOpType::MISH: return fmt::format("{}/{}", compute_root, "mish_kernel.cpp");
         case UnaryOpType::TANHSHRINK: return fmt::format("{}/{}", compute_root, "tanhshrink_kernel.cpp");
+        case UnaryOpType::SELU: return fmt::format("{}/{}", compute_root, "selu_kernel.cpp");
         default: return fmt::format("{}/{}", compute_root, "eltwise_sfpu.cpp");
     }
 }
