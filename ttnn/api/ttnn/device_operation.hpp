@@ -535,6 +535,14 @@ void launch_operation_with_adapter(
     }
 }
 
+template <class T, class... Args>
+using has_mesh_device_t = decltype(std::declval<T>().mesh_device(std::declval<Args>()...));
+
+template <class T>
+constexpr bool implements_mesh_device() {
+    return std::experimental::is_detected_v<has_mesh_device_t, T>;
+}
+
 template <DeviceOperationConcept device_operation_t>
 typename device_operation_t::tensor_return_value_t launch_on_single_device(
     QueueId cq_id,
