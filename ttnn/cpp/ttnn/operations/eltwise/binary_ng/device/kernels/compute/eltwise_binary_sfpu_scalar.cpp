@@ -47,6 +47,8 @@ void MAIN {
     for (uint32_t tile_id = 0; tile_id < num_tiles; ++tile_id) {
         PREPROCESS(LHS, cb_pre_lhs, cb_post_lhs, cb_out, num_tiles_per_cycle);
         cb_wait_front(cb_post_lhs, num_tiles_per_cycle);
+        DPRINT << "cb_in: " << ENDL();
+        DPRINT << TSLICE(cb_post_lhs, 0, SliceRange::h0_w0_32()) << ENDL();
 
         cb_reserve_back(cb_out, num_tiles_per_cycle);
 
@@ -72,7 +74,8 @@ void MAIN {
             pack_tile(i * 2, cb_out);
         }
         tile_regs_release();
-
+        DPRINT << "cb_out: " << ENDL();
+        DPRINT << TSLICE(cb_out, 0, SliceRange::h0_w0_32()) << ENDL();
         cb_pop_front(cb_post_lhs, num_tiles_per_cycle);
         cb_push_back(cb_out, num_tiles_per_cycle);
     }

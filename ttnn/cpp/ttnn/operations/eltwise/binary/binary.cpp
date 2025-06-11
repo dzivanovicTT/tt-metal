@@ -101,6 +101,8 @@ inline Tensor binary_impl(
     const std::optional<ttnn::MemoryConfig>& memory_config = std::nullopt,
     const std::optional<Tensor>& output = std::nullopt) {
     auto output_tensor = lhs;
+    log_info(tt::LogOp, " ****** using legacy {}", binary_op_type);
+    std::cout << " ****** using binary_impl " << static_cast<int>(binary_op_type) << std::endl;
     if (binary_op_type == BinaryOpType::GT) {
         output_tensor = ttnn::gt_unary(queue_id, lhs, rhs, memory_config, output);
     } else if (binary_op_type == BinaryOpType::LT) {
@@ -516,7 +518,7 @@ Tensor RelationalBinary<binary_op_type>::invoke(
                    : binary::is_legacy_only(lhs, rhs, memory_config, output, lhs_activations, rhs_activations)) {
         return detail::binary_impl(DefaultQueueId, binary_op_type, lhs, rhs, dtype, memory_config, output);
     }
-
+    // return detail::binary_impl(DefaultQueueId, binary_op_type, lhs, rhs, dtype, memory_config, output);
     return detail::invoke_binary_ng(
         queue_id,
         lhs,
