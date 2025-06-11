@@ -4,6 +4,8 @@
 
 #include <tt-metalium/host_api.hpp>
 #include <tt-metalium/device.hpp>
+#include "tt-metalium/data_types.hpp"
+#include "tt-metalium/kernel_types.hpp"
 
 int main() {
     using namespace tt;
@@ -28,23 +30,19 @@ int main() {
     KernelHandle void_dataflow_kernel_noc1_id = CreateKernel(
         program,
         "tt_metal/programming_examples/hello_world_datamovement_kernel/kernels/dataflow/void_dataflow_kernel.cpp",
-        core,
-        DataMovementConfig{.processor = DataMovementProcessor::RISCV_1, .noc = NOC::RISCV_1_default});
+        CoreCoord{0, 4},
+        EthernetConfig{.eth_mode = Eth::SENDER, .processor = DataMovementProcessor::RISCV_0});
 
     // Configure Program and Start Program Execution on Device
 
     SetRuntimeArgs(program, void_dataflow_kernel_noc0_id, core, {});
-    SetRuntimeArgs(program, void_dataflow_kernel_noc1_id, core, {});
     EnqueueProgram(cq, program, false);
     printf("Hello, Core {0, 0} on Device 0, I am sending you some data. Standby awaiting communication.\n");
 
     // Wait Until Program Finishes, Print "Hello World!", and Close Device
 
     Finish(cq);
-    while (true) {
-        printf("Thank you, Core {0, 0} on Device 0, for the completed task.\n");
-        sleep(1);
-    }
+    printf("Thank you, Core {0, 0} on Device 0, for the completed task.\n");
     CloseDevice(device);
 
     return 0;

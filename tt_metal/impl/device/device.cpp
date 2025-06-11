@@ -1191,6 +1191,9 @@ bool Device::close() {
         }
     }
 
+    // HACK to exit active erisc
+    tt::tt_metal::MetalContext::instance().get_cluster().set_internal_routing_info_for_ethernet_cores(false);
+
     tt::tt_metal::MetalContext::instance().get_cluster().l1_barrier(id_);
 
     this->compute_cores_.clear();

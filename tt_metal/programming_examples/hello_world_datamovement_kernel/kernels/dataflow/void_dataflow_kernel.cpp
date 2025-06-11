@@ -12,4 +12,7 @@ void kernel_main() {
            << (uint32_t)get_absolute_logical_y() << ENDL();
     DPRINT_DATA0(DPRINT << "Hello, Master, I am running a void data movement kernel on NOC 0." << ENDL());
     DPRINT_DATA1(DPRINT << "Hello, Master, I am running a void data movement kernel on NOC 1." << ENDL());
+
+    ((volatile uint32_t*)(80000))[0] = 0xdeadbeef;
+    ((volatile uint32_t*)(80016))[0] = 0x12341234;
 }

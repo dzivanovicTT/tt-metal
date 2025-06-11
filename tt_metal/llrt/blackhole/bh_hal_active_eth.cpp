@@ -103,7 +103,7 @@ HalCoreInfoType create_active_eth_mem_map() {
 
             switch (static_cast<EthProcessorTypes>(processor_type_idx)) {
                 case EthProcessorTypes::DM0: {
-                    fw_base = 0x36b8;  // MEM_AERISC_FIRMWARE_BASE;
+                    fw_base = MEM_AERISC_FIRMWARE_BASE;  // 0x36b8;
                     local_init = MEM_AERISC_INIT_LOCAL_L1_BASE_SCRATCH;
                     fw_launch = 0;  // This is not used for DM0. The ETH FW API will be used instead.
                     fw_launch_value = fw_base;
