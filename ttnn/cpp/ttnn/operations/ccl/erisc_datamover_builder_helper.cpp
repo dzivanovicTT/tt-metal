@@ -140,7 +140,7 @@ EdmLineFabricOpInterface::EdmLineFabricOpInterface(
                     src_device_edm_type = tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDevice;
                     dest_device_edm_type = tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstream;
                 } else if (
-                    src_device->id() == device_sequence.at(1)->id() &&
+                    device_sequence.size() >= 2 && src_device->id() == device_sequence.at(1)->id() &&
                     dest_device->id() != device_sequence.front()->id()) {
                     src_device_edm_type =
                         tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDeviceUpstream;
@@ -148,14 +148,12 @@ EdmLineFabricOpInterface::EdmLineFabricOpInterface(
                         dest_device_edm_type =
                             tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDeviceUpstream;
                     }
-                } else {
-                    if (device_sequence.size() > 4) {
-                        if (src_device->id() == device_sequence.at(device_sequence.size() - 3)->id() &&
-                            dest_device->id() == device_sequence.at(device_sequence.size() - 2)->id()) {
-                            dest_device_edm_type =
-                                tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDeviceUpstream;
-                        }
-                    }
+                } else if (
+                    device_sequence.size() >= 3 &&
+                    src_device->id() == device_sequence.at(device_sequence.size() - 3)->id() &&
+                    dest_device->id() == device_sequence.at(device_sequence.size() - 2)->id()) {
+                    dest_device_edm_type =
+                        tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDeviceUpstream;
                 }
             }
             // if ring topology set extra buffer on dateline edms.

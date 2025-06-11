@@ -2663,7 +2663,7 @@ void Run1DFabricPacketSendTest(
         // HalfRing test is more optimal with extra recv buffer on upstream edm.
         en_dateline_sender_extra_buffer = true;
         en_dateline_receiver_extra_buffer = true;
-        en_dateline_upstream_sender_extra_buffer = false;
+        en_dateline_upstream_sender_extra_buffer = true;
         en_dateline_upstream_receiver_extra_buffer = true;
     } else if (fabric_mode == FabricTestMode::FullRing) {
         // FullRing is more optimal with extra buffer on both send/recv channels.

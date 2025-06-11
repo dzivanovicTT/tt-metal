@@ -66,6 +66,8 @@ private:
     std::unique_ptr<tt::tt_fabric::FabricEriscDatamoverConfig> dateline_router_config_ = nullptr;
     std::unique_ptr<tt::tt_fabric::FabricEriscDatamoverConfig> dateline_upstream_router_config_ = nullptr;
     std::unique_ptr<tt::tt_fabric::FabricEriscDatamoverConfig> dateline_upstream_adjcent_router_config_ = nullptr;
+    std::unique_ptr<tt::tt_fabric::FabricEriscDatamoverConfig> dateline_upstream_adjcent_upstream_router_config_ =
+        nullptr;
     std::unordered_map<chip_id_t, chan_id_t> master_router_chans_{};
     std::unordered_map<chip_id_t, uint32_t> num_initialized_routers_{};
 };
