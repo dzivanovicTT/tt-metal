@@ -21,6 +21,11 @@
 #include <impl/context/metal_context.hpp>
 #include <tt-metalium/control_plane.hpp>
 #include <tt-metalium/distributed_context.hpp>
+
+#ifdef __linux__
+#include <execinfo.h>
+#include <cstdlib>
+#endif
 namespace tt::tt_metal::distributed {
 namespace {
 using ::testing::ElementsAre;
@@ -38,26 +43,50 @@ using ::tt::tt_metal::distributed::MeshShape;
 
 std::map<tt_fabric::FabricNodeId, chip_id_t> get_physical_chip_mapping() {
     const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
+    auto dctx = tt::tt_metal::distributed::multihost::DistributedContext::get_current_world();
+    auto mpi_rank = dctx->rank();
+    auto mpi_size = dctx->size();
+
+    fmt::print("MPI rank: {}\n", *mpi_rank);
+    fmt::print("MPI size: {}\n", *mpi_size);
+
     std::map<tt_fabric::FabricNodeId, chip_id_t> physical_chip_ids_mapping;
+
+
 
     // This should match the mesh descriptor: Mesh 0 has 8 chips (2x4 layout)
     // The dual host configuration has host rank 0 controlling chips 0-3 and host rank 1 controlling chips 4-7
-    std::vector<eth_coord_t> mesh_0_eth_coords = {
+
+    auto rank0_eth_coords = std::vector<eth_coord_t>{
         eth_coord_t{0, 0, 0, 0, 0},
         eth_coord_t{0, 1, 0, 0, 0},
-        eth_coord_t{0, 2, 0, 0, 0},
-        eth_coord_t{0, 3, 0, 0, 0},  // Row 0
         eth_coord_t{0, 0, 1, 0, 0},
         eth_coord_t{0, 1, 1, 0, 0},
+    };
+
+    /* seems rank 1 also seems same eth coords as rank 0
+    auto rank1_eth_coords = std::vector<eth_coord_t>{
+        eth_coord_t{0, 2, 0, 0, 0},
+        eth_coord_t{0, 3, 0, 0, 0},  // Row 0
         eth_coord_t{0, 2, 1, 0, 0},
         eth_coord_t{0, 3, 1, 0, 0}  // Row 1
     };
+    */
+    auto chip_ids_rank0 = std::vector<chip_id_t>{
+        0, 1, 4, 5
+    };
+    auto chip_ids_rank1 = std::vector<chip_id_t>{
+        2, 3, 6, 7
+    };
+    auto eth_coords = rank0_eth_coords;
+    auto chip_ids = *mpi_rank == 0 ? chip_ids_rank0 : chip_ids_rank1;
 
     std::uint32_t mesh_id = 0;
-    for (std::uint32_t chip_id = 0; chip_id < mesh_0_eth_coords.size(); chip_id++) {
-        const auto& eth_coord = mesh_0_eth_coords[chip_id];
+    for (std::uint32_t chip_id = 0; chip_id < eth_coords.size(); chip_id++) {
+        const auto& eth_coord = eth_coords[chip_id];
+        auto chip = chip_ids.at(chip_id);
         physical_chip_ids_mapping.insert(
-            {tt_fabric::FabricNodeId(tt_fabric::MeshId{mesh_id}, chip_id),
+            {tt_fabric::FabricNodeId(tt_fabric::MeshId{mesh_id}, chip),
              cluster.get_physical_chip_id_from_eth_coord(eth_coord)});
     }
 
@@ -72,36 +101,41 @@ protected:
             multihost::DistributedContext::create(0, nullptr);
         }
 
-        try {
-            fmt::print("Setting up test with mesh graph descriptor...\n");
-            auto physical_chip_mapping = get_physical_chip_mapping();
-            fmt::print("Physical chip mapping size: {}\n", physical_chip_mapping.size());
-            for (const auto& [fabric_node_id, chip_id] : physical_chip_mapping) {
-                fmt::print(
-                    "  FabricNodeId(mesh={}, chip={}) -> physical chip {}\n",
-                    *fabric_node_id.mesh_id,
-                    fabric_node_id.chip_id,
-                    chip_id);
-            }
-
-            tt::tt_metal::MetalContext::instance().set_custom_control_plane_mesh_graph(
-                "tests/tt_metal/tt_fabric/custom_mesh_descriptors/t3k_dual_host_mesh_graph_descriptor.yaml",
-                physical_chip_mapping);
-
-            auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
-            mesh_id_ = control_plane.get_local_mesh_id();
-            host_rank_id_ = control_plane.get_local_host_rank_id();
-
-            fmt::print("SetUp complete: mesh_id={}, host_rank_id={}\n", *mesh_id_, *host_rank_id_);
-        } catch (const std::exception& e) {
-            fmt::print("Exception in SetUp: {}\n", e.what());
-            throw;
+        fmt::print("Setting up test with mesh graph descriptor...\n");
+        auto physical_chip_mapping = get_physical_chip_mapping();
+        fmt::print("Physical chip mapping size: {}\n", physical_chip_mapping.size());
+        for (const auto& [fabric_node_id, chip_id] : physical_chip_mapping) {
+            fmt::print(
+                "  FabricNodeId(mesh={}, chip={}) -> physical chip {}\n",
+                *fabric_node_id.mesh_id,
+                fabric_node_id.chip_id,
+                chip_id);
         }
+
+        tt::tt_metal::MetalContext::instance().set_custom_control_plane_mesh_graph(
+            "tests/tt_metal/tt_fabric/custom_mesh_descriptors/t3k_dual_host_mesh_graph_descriptor.yaml",
+            physical_chip_mapping);
+
+        auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+        mesh_id_ = control_plane.get_local_mesh_id();
+        auto host_rank_opt = control_plane.get_local_host_rank_id();
+        ASSERT_TRUE(host_rank_opt.has_value()) << "Local host rank ID not available";
+        host_rank_id_ = *host_rank_opt;
+
+        fmt::print("SetUp complete: mesh_id={}, host_rank_id={}\n", *mesh_id_, *host_rank_id_);
     }
 
     MeshId mesh_id_;
     HostRankId host_rank_id_;
 };
+
+TEST_F(ControlPlaneMultihostTest, ValidateMPIWorldSize) {
+    auto context = multihost::DistributedContext::get_current_world();
+    auto mpi_size = context->size();
+    fmt::print("MPI size: {}\n", *mpi_size);
+    EXPECT_EQ(*mpi_size, 2);
+}
+
 
 TEST_F(ControlPlaneMultihostTest, ValidateMPIRankToMeshIdHostRankId) {
     // Validate MPI rank maps to correct mesh and host rank

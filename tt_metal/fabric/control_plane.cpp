@@ -125,15 +125,6 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
 ControlPlane::ControlPlane(
     const std::string& mesh_graph_desc_file,
     const std::map<FabricNodeId, chip_id_t>& logical_mesh_chip_id_to_physical_chip_id_mapping) {
-    this->mesh_graph_ = std::make_shared<MeshGraph>(mesh_graph_desc_file);
-    this->routing_table_generator_ = std::make_unique<RoutingTableGenerator>(this->mesh_graph_);
-    // Printing, only enabled with log_debug
-    this->mesh_graph_->print_connectivity();
-    // Printing, only enabled with log_debug
-    this->routing_table_generator_->print_routing_tables();
-
-    // Initialize the control plane routers based on mesh graph
-    this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
 
     // Initialize local mesh info from environment variables (if running under tt-run)
     const char* mesh_id_env = std::getenv("TT_METAL_MESH_ID");
@@ -155,27 +146,70 @@ ControlPlane::ControlPlane(
                 e.what());
         }
     }
+
+    this->mesh_graph_ = std::make_shared<MeshGraph>(mesh_graph_desc_file);
+    this->routing_table_generator_ = std::make_unique<RoutingTableGenerator>(this->mesh_graph_);
+    // Printing, only enabled with log_debug
+    this->mesh_graph_->print_connectivity();
+    // Printing, only enabled with log_debug
+    this->routing_table_generator_->print_routing_tables();
+
+    // Initialize the control plane routers based on mesh graph
+    this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
+
 }
 
 void ControlPlane::load_physical_chip_mapping(
     const std::map<FabricNodeId, chip_id_t>& logical_mesh_chip_id_to_physical_chip_id_mapping) {
     this->logical_mesh_chip_id_to_physical_chip_id_mapping_ = logical_mesh_chip_id_to_physical_chip_id_mapping;
+    log_info(tt::LogFabric, "Control Plane: Loaded physical chip mapping");
     this->validate_mesh_connections();
+    log_info(tt::LogFabric, "Control Plane: Validated mesh connections");
 }
 
 void ControlPlane::validate_mesh_connections(MeshId mesh_id) const {
-    MeshShape mesh_shape = routing_table_generator_->mesh_graph_->get_mesh_shape(mesh_id);
-    std::uint32_t mesh_ns_size = mesh_shape[0];
-    std::uint32_t mesh_ew_size = mesh_shape[1];
+    MeshShape global_mesh_shape = routing_table_generator_->mesh_graph_->get_mesh_shape(mesh_id);
+    MeshShape local_mesh_shape = routing_table_generator_->mesh_graph_->get_mesh_shape(mesh_id, this->get_local_host_rank_id());
+    std::uint32_t global_mesh_ns_size = global_mesh_shape[0];
+    std::uint32_t global_mesh_ew_size = global_mesh_shape[1];
+    std::uint32_t local_mesh_ns_size = local_mesh_shape[0];
+    std::uint32_t local_mesh_ew_size = local_mesh_shape[1];
     std::uint32_t num_ports_per_side =
         routing_table_generator_->mesh_graph_->get_chip_spec().num_eth_ports_per_direction;
-    for (std::uint32_t i = 0; i < mesh_ns_size; i++) {
-        for (std::uint32_t j = 0; j < mesh_ew_size - 1; j++) {
-            chip_id_t logical_chip_id = i * mesh_ew_size + j;
+    MeshCoordinateRange local_mesh_coordinate_range = routing_table_generator_->mesh_graph_->get_coord_range(mesh_id, this->get_local_host_rank_id());
+
+    std::uint32_t local_mesh_ns_start = local_mesh_coordinate_range.start_coord()[0];
+    std::uint32_t local_mesh_ew_start = local_mesh_coordinate_range.start_coord()[1];
+    std::uint32_t local_mesh_ns_end = local_mesh_coordinate_range.end_coord()[0];
+    std::uint32_t local_mesh_ew_end = local_mesh_coordinate_range.end_coord()[1];
+
+    for (std::uint32_t i = local_mesh_ns_start; i < local_mesh_ns_end; i++) {
+        for (std::uint32_t j = local_mesh_ew_start; j < local_mesh_ew_end - 1; j++) {
+
+            chip_id_t logical_chip_id = routing_table_generator_->mesh_graph_->coordinate_to_chip(mesh_id, MeshCoordinate{i, j});
             FabricNodeId fabric_node_id{mesh_id, logical_chip_id};
             FabricNodeId fabric_node_id_next{mesh_id, logical_chip_id + 1};
-            chip_id_t physical_chip_id = logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
-            chip_id_t physical_chip_id_next = logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id_next);
+            
+            chip_id_t physical_chip_id, physical_chip_id_next;
+            try {
+                physical_chip_id = logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
+                log_debug(tt::LogFabric, "Found physical_chip_id {} for fabric_node_id (mesh_id={}, chip_id={})", 
+                         physical_chip_id, *mesh_id, logical_chip_id);
+            } catch (const std::out_of_range& e) {
+                log_error(tt::LogFabric, "Failed to find physical_chip_id for fabric_node_id (mesh_id={}, chip_id={}): {}", 
+                         *mesh_id, logical_chip_id, e.what());
+                throw;
+            }
+            
+            try {
+                physical_chip_id_next = logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id_next);
+                log_debug(tt::LogFabric, "Found physical_chip_id_next {} for fabric_node_id_next (mesh_id={}, chip_id={})", 
+                         physical_chip_id_next, *mesh_id, logical_chip_id + 1);
+            } catch (const std::out_of_range& e) {
+                log_error(tt::LogFabric, "Failed to find physical_chip_id_next for fabric_node_id_next (mesh_id={}, chip_id={}): {}", 
+                         *mesh_id, logical_chip_id + 1, e.what());
+                throw;
+            }
 
             const auto& eth_links = get_ethernet_cores_grouped_by_connected_chips(physical_chip_id);
             auto eth_links_to_next = eth_links.find(physical_chip_id_next);
@@ -184,29 +218,64 @@ void ControlPlane::validate_mesh_connections(MeshId mesh_id) const {
                 "Chip {} not connected to chip {}",
                 physical_chip_id,
                 physical_chip_id_next);
+            
+            size_t eth_links_size;
+            try {
+                eth_links_size = eth_links.at(physical_chip_id_next).size();
+                log_debug(tt::LogFabric, "Found {} eth links from chip {} to chip {}", 
+                         eth_links_size, physical_chip_id, physical_chip_id_next);
+            } catch (const std::out_of_range& e) {
+                log_error(tt::LogFabric, "Failed to find eth_links from chip {} to chip {}: {}", 
+                         physical_chip_id, physical_chip_id_next, e.what());
+                throw;
+            }
+            
             TT_FATAL(
                 eth_links_to_next->second.size() >= num_ports_per_side,
                 "Chip {} to chip {} has {} links but expecting {}",
                 physical_chip_id,
                 physical_chip_id_next,
-                eth_links.at(physical_chip_id_next).size(),
+                eth_links_size,
                 num_ports_per_side);
-            if (i != mesh_ns_size - 1) {
-                FabricNodeId fabric_node_id_next_row{mesh_id, logical_chip_id + mesh_ew_size};
-                chip_id_t physical_chip_id_next_row =
-                    logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id_next_row);
+                
+            if (i != local_mesh_ns_size - 1) {
+                FabricNodeId fabric_node_id_next_row{mesh_id, logical_chip_id + global_mesh_ew_size};
+                chip_id_t physical_chip_id_next_row;
+                
+                try {
+                    physical_chip_id_next_row = logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id_next_row);
+                    log_debug(tt::LogFabric, "Found physical_chip_id_next_row {} for fabric_node_id_next_row (mesh_id={}, chip_id={})", 
+                             physical_chip_id_next_row, *mesh_id, logical_chip_id + global_mesh_ew_size);
+                } catch (const std::out_of_range& e) {
+                    log_error(tt::LogFabric, "Failed to find physical_chip_id_next_row for fabric_node_id_next_row (mesh_id={}, chip_id={}): {}", 
+                             *mesh_id, logical_chip_id + global_mesh_ew_size, e.what());
+                    throw;
+                }
+                
                 auto eth_links_to_next_row = eth_links.find(physical_chip_id_next_row);
                 TT_FATAL(
                     eth_links_to_next_row != eth_links.end(),
                     "Chip {} not connected to chip {}",
                     physical_chip_id,
                     physical_chip_id_next_row);
+                
+                size_t eth_links_next_row_size;
+                try {
+                    eth_links_next_row_size = eth_links.at(physical_chip_id_next_row).size();
+                    log_debug(tt::LogFabric, "Found {} eth links from chip {} to chip {} (next row)", 
+                             eth_links_next_row_size, physical_chip_id, physical_chip_id_next_row);
+                } catch (const std::out_of_range& e) {
+                    log_error(tt::LogFabric, "Failed to find eth_links from chip {} to chip {} (next row): {}", 
+                             physical_chip_id, physical_chip_id_next_row, e.what());
+                    throw;
+                }
+                
                 TT_FATAL(
                     eth_links_to_next_row->second.size() >= num_ports_per_side,
                     "Chip {} to chip {} has {} links but expecting {}",
                     physical_chip_id,
                     physical_chip_id_next_row,
-                    eth_links.at(physical_chip_id_next_row).size(),
+                    eth_links_next_row_size,
                     num_ports_per_side);
             }
         }
@@ -696,12 +765,20 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
 
     for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
         for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
+            if (!this->logical_mesh_chip_id_to_physical_chip_id_mapping_.contains(FabricNodeId(MeshId{mesh_id}, chip_id))) {
+                continue;
+            }
+
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
             const auto& connected_chips_and_eth_cores =
                 tt::tt_metal::MetalContext::instance().get_cluster().get_ethernet_cores_grouped_by_connected_chips(
                     physical_chip_id);
             for (const auto& [logical_connected_chip_id, edge] : intra_mesh_connectivity[mesh_id][chip_id]) {
+                if (!this->logical_mesh_chip_id_to_physical_chip_id_mapping_.contains(FabricNodeId(MeshId{mesh_id}, logical_connected_chip_id))) {  
+                    continue;
+                }
+
                 const auto& physical_connected_chip_id = this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(
                     FabricNodeId(MeshId{mesh_id}, logical_connected_chip_id));
                 const auto& connected_eth_cores = connected_chips_and_eth_cores.at(physical_connected_chip_id);
@@ -722,6 +799,9 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
     }
     for (std::uint32_t mesh_id = 0; mesh_id < inter_mesh_connectivity.size(); mesh_id++) {
         for (std::uint32_t chip_id = 0; chip_id < inter_mesh_connectivity[mesh_id].size(); chip_id++) {
+            if (!this->logical_mesh_chip_id_to_physical_chip_id_mapping_.contains(FabricNodeId(MeshId{mesh_id}, chip_id))) {
+                continue;
+            }
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
             const auto& connected_chips_and_eth_cores =
@@ -734,6 +814,9 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
                 // chip id
                 std::unordered_set<chip_id_t> visited_chip_ids;
                 for (const auto& logical_connected_chip_id : edge.connected_chip_ids) {
+                    if (!this->logical_mesh_chip_id_to_physical_chip_id_mapping_.contains(FabricNodeId(connected_mesh_id, logical_connected_chip_id))) {
+                        continue;
+                    }
                     if (visited_chip_ids.count(logical_connected_chip_id)) {
                         continue;
                     }
@@ -1221,8 +1304,10 @@ MeshId ControlPlane::get_local_mesh_id() const {
     return local_mesh_info_->mesh_id;
 }
 
-HostRankId ControlPlane::get_local_host_rank_id() const {
-    TT_FATAL(local_mesh_info_.has_value(), "Local mesh info not available");
+std::optional<HostRankId> ControlPlane::get_local_host_rank_id() const {
+    if (!local_mesh_info_.has_value()) {
+        return std::nullopt;
+    }
     return local_mesh_info_->host_rank;
 }
 

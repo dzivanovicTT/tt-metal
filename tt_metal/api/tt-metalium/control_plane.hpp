@@ -100,7 +100,7 @@ public:
     // Interim APIs used to retrieve information about locally owned devices
     MeshShape get_mesh_shape(ControlPlaneMode mode) const;
     MeshId get_local_mesh_id() const;
-    HostRankId get_local_host_rank_id() const;
+    std::optional<HostRankId> get_local_host_rank_id() const;
     MeshCoordinateRange get_coord_range(ControlPlaneMode mode) const;
     MeshContainer<chip_id_t> get_chip_ids(ControlPlaneMode mode) const;
     MeshCoordinate chip_to_global_coordinate(chip_id_t chip_id) const;
