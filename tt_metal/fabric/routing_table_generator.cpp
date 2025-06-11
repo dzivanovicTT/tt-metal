@@ -38,11 +38,19 @@ std::ostream& operator<<(std::ostream& os, const FabricNodeId& fabric_node_id) {
     return os;
 }
 
-RoutingTableGenerator::RoutingTableGenerator(const std::string& mesh_graph_desc_yaml_file) {
-    this->mesh_graph = std::make_unique<MeshGraph>(mesh_graph_desc_yaml_file);
+RoutingTableGenerator::RoutingTableGenerator(std::shared_ptr<MeshGraph> mesh_graph) : mesh_graph_(mesh_graph) {
     // Use IntraMeshConnectivity to size all variables
-    const auto& intra_mesh_connectivity = this->mesh_graph->get_intra_mesh_connectivity();
-    const auto& inter_mesh_connectivity = this->mesh_graph->get_inter_mesh_connectivity();
+    const auto& intra_mesh_connectivity = this->mesh_graph_->get_intra_mesh_connectivity();
+    const auto& inter_mesh_connectivity = this->mesh_graph_->get_inter_mesh_connectivity();
+    this->intra_mesh_table_.resize(intra_mesh_connectivity.size());
+    this->inter_mesh_table_.resize(intra_mesh_connectivity.size());
+}
+
+RoutingTableGenerator::RoutingTableGenerator(const std::string& mesh_graph_desc_yaml_file) :
+    mesh_graph_(std::make_shared<MeshGraph>(mesh_graph_desc_yaml_file)) {
+    // Use IntraMeshConnectivity to size all variables
+    const auto& intra_mesh_connectivity = this->mesh_graph_->get_intra_mesh_connectivity();
+    const auto& inter_mesh_connectivity = this->mesh_graph_->get_inter_mesh_connectivity();
     this->intra_mesh_table_.resize(intra_mesh_connectivity.size());
     this->inter_mesh_table_.resize(intra_mesh_connectivity.size());
     for (std::uint32_t mesh_id_val = 0; mesh_id_val < intra_mesh_connectivity.size(); mesh_id_val++) {
@@ -69,7 +77,7 @@ void RoutingTableGenerator::generate_intramesh_routing_table(const IntraMeshConn
         MeshId mesh_id{mesh_id_val};
         for (chip_id_t src_chip_id = 0; src_chip_id < this->intra_mesh_table_[mesh_id_val].size(); src_chip_id++) {
             for (chip_id_t dst_chip_id = 0; dst_chip_id < this->intra_mesh_table_[mesh_id_val].size(); dst_chip_id++) {
-                int row_size = this->mesh_graph->get_mesh_shape(mesh_id)[1];
+                int row_size = this->mesh_graph_->get_mesh_shape(mesh_id)[1];
                 uint32_t src_x = src_chip_id / row_size;
                 uint32_t src_y = src_chip_id % row_size;
                 uint32_t dst_x = dst_chip_id / row_size;
@@ -182,7 +190,7 @@ void RoutingTableGenerator::generate_intermesh_routing_table(
     for (std::uint32_t src_mesh_id_val = 0; src_mesh_id_val < this->inter_mesh_table_.size(); src_mesh_id_val++) {
         MeshId src_mesh_id{src_mesh_id_val};
         auto paths = get_paths_to_all_meshes(src_mesh_id, inter_mesh_connectivity);
-        MeshShape mesh_shape = this->mesh_graph->get_mesh_shape(src_mesh_id);
+        MeshShape mesh_shape = this->mesh_graph_->get_mesh_shape(src_mesh_id);
         std::uint32_t ns_size = mesh_shape[0];
         std::uint32_t ew_size = mesh_shape[1];
         for (chip_id_t src_chip_id = 0; src_chip_id < this->inter_mesh_table_[src_mesh_id_val].size(); src_chip_id++) {

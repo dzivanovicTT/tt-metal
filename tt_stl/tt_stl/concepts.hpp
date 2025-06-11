@@ -13,6 +13,6 @@ inline constexpr bool always_false_v = false;
 
 template <typename T>
 concept Reflectable =
-    (std::is_aggregate_v<std::decay_t<T>> and requires { reflect::for_each([](auto I) {}, std::declval<T>()); });
+    (std::is_aggregate_v<std::decay_t<T>> and requires { reflect::for_each([](auto) {}, std::declval<T>()); });
 
 }  // namespace tt::stl::concepts

@@ -15,6 +15,17 @@ namespace tt::tt_fabric {
 
 class FabricContext;
 
+enum class ControlPlaneMode {
+    LOCAL_MESH,
+    GLOBAL_MESH,
+};
+
+// If using `tt-run` with multihost, this will be used to store the mesh id and host rank of the local mesh
+struct LocalMeshInfo {
+    MeshId mesh_id;
+    HostRankId host_rank;
+};
+
 class ControlPlane {
 public:
     explicit ControlPlane(const std::string& mesh_graph_desc_yaml_file);
@@ -86,9 +97,20 @@ public:
 
     void clear_fabric_context();
 
+    // Interim APIs used to retrieve information about locally owned devices
+    MeshShape get_mesh_shape(ControlPlaneMode mode) const;
+    MeshId get_local_mesh_id() const;
+    HostRankId get_local_host_rank_id() const;
+    MeshCoordinateRange get_coord_range(ControlPlaneMode mode) const;
+    MeshContainer<chip_id_t> get_chip_ids(ControlPlaneMode mode) const;
+    MeshCoordinate chip_to_global_coordinate(chip_id_t chip_id) const;
+    chip_id_t global_coordinate_to_chip(MeshCoordinate coordinate) const;
+
 private:
     uint16_t routing_mode_ = 0;  // ROUTING_MODE_UNDEFINED
     // TODO: remove this from local node control plane. Can get it from the global control plane
+    std::optional<LocalMeshInfo> local_mesh_info_;
+    std::shared_ptr<MeshGraph> mesh_graph_;
     std::unique_ptr<RoutingTableGenerator> routing_table_generator_;
 
     std::map<FabricNodeId, chip_id_t> logical_mesh_chip_id_to_physical_chip_id_mapping_;

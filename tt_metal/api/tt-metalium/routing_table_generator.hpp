@@ -40,6 +40,7 @@ std::ostream& operator<<(std::ostream& os, const FabricNodeId& fabric_node_id);
 class RoutingTableGenerator {
 public:
     explicit RoutingTableGenerator(const std::string& mesh_graph_desc_yaml_file);
+    explicit RoutingTableGenerator(std::shared_ptr<MeshGraph> mesh_graph);
     ~RoutingTableGenerator() = default;
 
     void dump_to_yaml();
@@ -50,7 +51,7 @@ public:
 
     void print_routing_tables() const;
 
-    std::unique_ptr<MeshGraph> mesh_graph;
+    std::shared_ptr<MeshGraph> mesh_graph_;
 
 private:
     // configurable in future architectures

@@ -20,23 +20,23 @@ Features:
 
 Quick Start:
     # Launch with rank binding configuration (defaults to localhost)
-    tt-run --binding rank_binding.yaml ./my_app
+    tt-run --rank-binding rank_binding.yaml ./my_app
 
     # Launch on multiple hosts with rankfile
-    tt-run --rankfile hosts.txt --binding binding.yaml ./my_app
+    tt-run --rankfile hosts.txt --rank-binding binding.yaml ./my_app
 
     # Dry run to see generated command
-    tt-run --binding binding.yaml --dry-run ./my_app
+    tt-run --rank-binding binding.yaml --dry-run ./my_app
 
     # Deploy binaries and run
-    tt-run --rankfile hosts.txt --binding binding_with_deployment.yaml ./my_app
+    tt-run --rankfile hosts.txt --rank-binding binding_with_deployment.yaml ./my_app
 
     # Deploy only (useful for testing deployment)
-    tt-run --rankfile hosts.txt --binding binding.yaml --deploy-only
+    tt-run --rankfile hosts.txt --rank-binding binding.yaml --deploy-only
 
 Configuration Example:
     # rank_binding.yaml
-    bindings:
+    rank_bindings:
       - rank: 0
         mesh_id: 0
         host_rank_id: 0
@@ -156,13 +156,13 @@ class TTRunConfig(BaseModel):
     and what environment variables should be set for the distributed execution.
 
     Attributes:
-        bindings: List of rank-to-fabric mappings (must have at least one)
+        rank_bindings: List of rank-to-fabric mappings (must have at least one)
         global_env: Environment variables applied to all ranks
         mesh_graph_path: Path to mesh graph descriptor YAML file
         deployment: Optional remote deployment configuration
 
     Example YAML format:
-        bindings:
+        rank_bindings:
           - rank: 0
             mesh_id: 0
             host_rank_id: 0
@@ -197,12 +197,12 @@ class TTRunConfig(BaseModel):
               destination: "/home/ttuser/tt-metal/configs/training.yaml"
     """
 
-    bindings: List[RankBinding] = Field(..., min_length=1, description="Rank to fabric bindings")
+    rank_bindings: List[RankBinding] = Field(..., min_length=1, description="Rank to fabric bindings")
     global_env: Dict[str, str] = Field(default_factory=dict, description="Global environment variables")
     mesh_graph_path: Optional[str] = Field(None, description="Path to mesh graph descriptor")
     deployment: Optional[DeploymentConfig] = Field(None, description="Remote deployment configuration")
 
-    @field_validator("bindings")
+    @field_validator("rank_bindings")
     def validate_unique_ranks(cls, bindings):
         """Ensure all ranks are unique"""
         ranks = [b.rank for b in bindings]
@@ -210,7 +210,7 @@ class TTRunConfig(BaseModel):
             raise ValueError("Duplicate ranks found in bindings")
         return bindings
 
-    @field_validator("bindings")
+    @field_validator("rank_bindings")
     def validate_contiguous_ranks(cls, bindings):
         """Ensure ranks are contiguous starting from 0"""
         ranks = sorted([b.rank for b in bindings])
@@ -404,7 +404,7 @@ def parse_binding_config(yaml_path: str) -> TTRunConfig:
     """Parse YAML configuration file with schema validation.
 
     Expected YAML format:
-        bindings:
+        rank_bindings:
           - rank: 0
             mesh_id: 0
             host_rank_id: 0
@@ -490,7 +490,7 @@ def build_mpi_command(
     }
 
     # Build per-rank application contexts
-    for i, binding in enumerate(sorted(config.bindings, key=lambda b: b.rank)):
+    for i, binding in enumerate(sorted(config.rank_bindings, key=lambda b: b.rank)):
         if i > 0:
             cmd.append(":")
 
@@ -548,7 +548,7 @@ def validate_mpi_args(ctx, param, value):
 )
 @click.option("--rankfile", type=click.Path(exists=True, path_type=Path), help="OpenMPI rankfile for host placement")
 @click.option(
-    "--binding",
+    "--rank-binding",
     type=click.Path(exists=True, path_type=Path),
     required=True,
     help="Rank binding configuration file (YAML)",
@@ -560,7 +560,7 @@ def validate_mpi_args(ctx, param, value):
 @click.option("--deploy/--no-deploy", default=None, help="Enable/disable remote deployment (overrides config)")
 @click.option("--deploy-only", is_flag=True, help="Only deploy files, don't run MPI job")
 @click.pass_context
-def main(ctx, rankfile, binding, mesh_graph, dry_run, verbose, mpi_args, deploy, deploy_only):
+def main(ctx, rankfile, rank_binding, mesh_graph, dry_run, verbose, mpi_args, deploy, deploy_only):
     """tt-run - MPI process launcher for TT-Metal and TTNN distributed applications
 
     tt-run simplifies launching distributed TT-Metal applications by automatically
@@ -569,36 +569,36 @@ def main(ctx, rankfile, binding, mesh_graph, dry_run, verbose, mpi_args, deploy,
     Common Use Cases:
 
     Big Mesh (2x4 mesh across two hosts):
-        tt-run --rankfile hosts.txt --binding big_mesh.yaml ./my_app
+        tt-run --rankfile hosts.txt --rank-binding big_mesh.yaml ./my_app
 
     Inter-Mesh (two separate 2x2 meshes):
-        tt-run --rankfile hosts.txt --binding inter_mesh.yaml ./my_app
+        tt-run --rankfile hosts.txt --rank-binding inter_mesh.yaml ./my_app
 
     Single Node Testing (simulating multi-host on one machine):
-        tt-run --binding single_node.yaml ./my_app
+        tt-run --rank-binding single_node.yaml ./my_app
 
     Examples:
 
         # Single host, multiple processes
-        tt-run --binding rank_binding.yaml ./my_app
+        tt-run --rank-binding rank_binding.yaml ./my_app
 
         # Multi-host with rankfile
-        tt-run --rankfile hosts.txt --binding binding.yaml ./my_app
+        tt-run --rankfile hosts.txt --rank-binding binding.yaml ./my_app
 
         # With additional MPI args
-        tt-run --binding binding.yaml --mpi-args "--bind-to core" ./my_app
+        tt-run --rank-binding binding.yaml --mpi-args "--bind-to core" ./my_app
 
         # Dry run to see command
-        tt-run --binding binding.yaml --dry-run ./my_app
+        tt-run --rank-binding binding.yaml --dry-run ./my_app
 
         # With remote deployment
-        tt-run --rankfile hosts.txt --binding deploy_config.yaml ./my_app
+        tt-run --rankfile hosts.txt --rank-binding deploy_config.yaml ./my_app
 
         # Deploy only mode
-        tt-run --rankfile hosts.txt --binding deploy_config.yaml --deploy-only
+        tt-run --rankfile hosts.txt --rank-binding deploy_config.yaml --deploy-only
 
         # Override deployment setting
-        tt-run --binding config.yaml --no-deploy ./my_app
+        tt-run --rank-binding config.yaml --no-deploy ./my_app
 
     Environment Variables:
         The following variables are automatically set for each rank:
@@ -615,14 +615,14 @@ def main(ctx, rankfile, binding, mesh_graph, dry_run, verbose, mpi_args, deploy,
 
     # Parse configuration
     try:
-        config = parse_binding_config(str(binding))
+        config = parse_binding_config(str(rank_binding))
     except (ValueError, ValidationError) as e:
         raise click.ClickException(f"Configuration error: {e}")
 
     # Validate program specification
     # Either a global program must be provided, or all ranks must have their own programs
-    ranks_with_programs = sum(1 for b in config.bindings if b.program is not None)
-    if not program and ranks_with_programs < len(config.bindings):
+    ranks_with_programs = sum(1 for b in config.rank_bindings if b.program is not None)
+    if not program and ranks_with_programs < len(config.rank_bindings):
         raise click.ClickException(
             "No program specified. Either provide a program as argument or specify programs for all ranks in the binding configuration."
         )
