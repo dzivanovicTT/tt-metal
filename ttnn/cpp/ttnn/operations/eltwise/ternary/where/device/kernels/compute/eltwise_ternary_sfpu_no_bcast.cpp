@@ -30,7 +30,6 @@ void MAIN {
 
         tile_regs_acquire();
 
-        tile_regs_commit();
         copy_tile_to_dst_init_short_with_dt(cb_pre_in1, cb_pre_in2);
         for (uint32_t i = 0; i < num_tiles_per_cycle; ++i) {
             copy_tile(cb_pre_in1, i, i * 2);  // Copy to dst reg 0
@@ -45,6 +44,7 @@ void MAIN {
             // TODO: Use the where op LLK API here
         }
 
+        tile_regs_commit();
         tile_regs_wait();
 
         for (uint32_t i = 0; i < num_tiles_per_cycle; ++i) {
