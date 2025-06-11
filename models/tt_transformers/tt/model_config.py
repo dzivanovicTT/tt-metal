@@ -483,6 +483,12 @@ class ModelArgs:
             self.TOKENIZER_PATH = LLAMA_DIR
             if not self.CACHE_PATH:
                 self.CACHE_PATH = os.path.join(LLAMA_DIR, self.device_name)
+            else:
+                logger.info("Arrived here, fixing path ...")
+                if self.CACHE_PATH.endswith("/TG"):
+                    self.CACHE_PATH = self.CACHE_PATH[:-3]
+                    logger.info("Fixed cache path")
+                self.CACHE_PATH = os.path.join(self.CACHE_PATH, self.device_name)
             self.model_name = os.path.basename(LLAMA_DIR.strip("/"))  # May be overridden by config
         elif HF_MODEL:
             self.CKPT_DIR = HF_MODEL
