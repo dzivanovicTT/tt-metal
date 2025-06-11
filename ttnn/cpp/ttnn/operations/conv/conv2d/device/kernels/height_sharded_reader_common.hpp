@@ -39,7 +39,10 @@ FORCE_INLINE void read_sticks(
     volatile tt_l1_ptr uint32_t* packed_reader_indices_ptr,
     uint32_t reader_offset,
     uint32_t& l1_write_addr_act,
-    uint32_t& reader_idx) {
+    uint32_t& reader_idx,
+    bool first_write,
+    uint32_t cb_start_addr,
+    uint32_t cb_end_addr) {
     for (uint32_t bhd = 0; bhd < act_block_h_datums_read_curr; bhd++) {
         // local read from reader_index + reader_offset;
         uint32_t two_reader_indices = packed_reader_indices_ptr[reader_idx];
@@ -48,17 +51,26 @@ FORCE_INLINE void read_sticks(
 
         if constexpr (dilation_w == 1) {
             uint32_t act_l1_offset = reader_offset + (reader_idx_1 * conv_act_c_read_bytes);
-            for (uint32_t outer = 0; outer < window_outer; outer++) {
+            uint32_t inner = first_write ? 0 : weight_size_w - 1;
+            for (uint32_t i = inner; i < weight_size_w; i++) {
                 noc_async_read_one_packet_with_state<true>(act_l1_offset, l1_write_addr_act);
                 l1_write_addr_act += (coalesced_read_bytes + act_block_w_extra_align_bytes);
                 act_l1_offset += stride_h_bytes;
+
+                if (l1_write_addr_act == cb_end_addr) {
+                    l1_write_addr_act = cb_start_addr;
+                }
             }
 
             act_l1_offset = reader_offset + (reader_idx_2 * conv_act_c_read_bytes);
-            for (uint32_t outer = 0; outer < window_outer; outer++) {
+            for (uint32_t i = inner; i < weight_size_w; i++) {
                 noc_async_read_one_packet_with_state<true>(act_l1_offset, l1_write_addr_act);
                 l1_write_addr_act += (coalesced_read_bytes + act_block_w_extra_align_bytes);
                 act_l1_offset += stride_h_bytes;
+
+                if (l1_write_addr_act == cb_end_addr) {
+                    l1_write_addr_act = cb_start_addr;
+                }
             }
         } else {
             // TODO(sjovic): Handle dilation_w > 1 for large width block

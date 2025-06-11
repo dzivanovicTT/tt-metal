@@ -5,6 +5,11 @@
 #include "dataflow_api.h"
 #include "height_sharded_reader_common.hpp"
 
+FORCE_INLINE void update_local_cb_wr_ptr(uint32_t cb_id, uint32_t val) {
+    LocalCBInterface& local_cb = get_local_cb_interface(cb_id);
+    local_cb.fifo_wr_ptr = val;
+}
+
 void kernel_main() {
     constexpr uint32_t dilation_h = get_compile_time_arg_val(0);
     constexpr uint32_t dilation_w = get_compile_time_arg_val(1);
@@ -77,9 +82,26 @@ void kernel_main() {
     constexpr uint32_t block_width = act_block_num_tiles / ntile_height;
 
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
+    uint32_t cb_start_addr, cb_current_start_addr, cb_end_addr;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
         for (uint32_t tile_h_index = 0; tile_h_index < ntile_height; tile_h_index++) {
             cb_reserve_back(cb_id_act, block_width);
+
+            if (tile_h_index == 0) {
+                cb_start_addr = get_write_ptr(cb_id_act);
+                cb_current_start_addr = cb_start_addr;
+                cb_end_addr = cb_start_addr + act_block_num_tiles * 2048;
+            } else {
+                cb_current_start_addr =
+                    cb_current_start_addr + (tile_h_index - 1) * window_inner * conv_act_c_read_bytes;
+
+                if (cb_current_start_addr == cb_end_addr) {
+                    cb_current_start_addr = cb_start_addr;
+                }
+
+                update_local_cb_wr_ptr(cb_id_act, cb_start_addr);
+            }
+
             uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
 
             read_sticks<
@@ -91,7 +113,14 @@ void kernel_main() {
                 window_outer_offset,
                 weight_size_w,
                 weights_size_h>(
-                TILE_HEIGHT / 2, packed_reader_indices_ptr, act_l1_read_addr, l1_write_addr_act, reader_idx);
+                TILE_HEIGHT / 2,
+                packed_reader_indices_ptr,
+                act_l1_read_addr,
+                l1_write_addr_act,
+                reader_idx,
+                tile_h_index == 0,
+                cb_start_addr,
+                cb_end_addr);
 
             noc_async_read_barrier();
             cb_push_back(cb_id_act, block_width);

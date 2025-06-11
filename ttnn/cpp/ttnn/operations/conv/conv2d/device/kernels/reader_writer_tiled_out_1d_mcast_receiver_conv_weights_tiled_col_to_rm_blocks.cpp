@@ -120,7 +120,10 @@ void kernel_main() {
                     packed_reader_indices_ptr,
                     reader_offset,
                     l1_write_addr_act,
-                    reader_idx);
+                    reader_idx,
+                    false,
+                    0,
+                    0);
                 noc_async_read_barrier();
                 cb_push_back(cb_id_act_second_reader, act_block_num_tiles);
 
