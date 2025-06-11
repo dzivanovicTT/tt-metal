@@ -646,7 +646,7 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
         if (fabric_router_channels_on_chip.contains(chan_id)) {
             this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)[direction].push_back(chan_id);
         } else {
-            log_debug(
+            log_info(
                 tt::LogFabric, "Control Plane: Disabling router on M{}D{} eth channel {}", mesh_id, chip_id, chan_id);
         }
     };
@@ -695,31 +695,16 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
         for (std::uint32_t chip_id = 0; chip_id < inter_mesh_connectivity[mesh_id].size(); chip_id++) {
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
-            std::cout << "Have physical chip: " << physical_chip_id << std::endl;
-            const auto& connected_chips_and_eth_cores =
-                tt::tt_metal::MetalContext::instance().get_cluster().get_ethernet_cores_grouped_by_connected_chips(
-                    physical_chip_id);
-            for (const auto& [connected_mesh_id, edge] : inter_mesh_connectivity[mesh_id][chip_id]) {
-                std::cout << "Connected Mesh ID: " << *connected_mesh_id << std::endl;
-                // Loop over edges connected chip ids, they could connect to different chips for intermesh traffic
-                // edge.connected_chip_ids is a vector of chip ids, that is populated per port. Since we push all
-                // connected ports into the map when we visit a chip id, we should skip if we have already visited this
-                // chip id
-                std::unordered_set<chip_id_t> visited_chip_ids;
-                for (const auto& logical_connected_chip_id : edge.connected_chip_ids) {
-                    if (visited_chip_ids.count(logical_connected_chip_id)) {
-                        continue;
-                    }
-                    visited_chip_ids.insert(logical_connected_chip_id);
-                    std::cout << "Get physical connected chip ID" << std::endl;
-                    const auto& physical_connected_chip_id = this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(
-                        FabricNodeId(connected_mesh_id, logical_connected_chip_id));
-                    std::cout << "Have physical connected chip ID" << std::endl;
-                    const auto& connected_eth_cores = connected_chips_and_eth_cores.at(physical_connected_chip_id);
-                    for (const auto& eth_core : connected_eth_cores) {
-                        add_ethernet_channel_to_router_mapping(MeshId{mesh_id}, chip_id, eth_core, edge.port_direction);
-                    }
-                }
+            std::cout << "Lookup intermesh links for: " << physical_chip_id << std::endl;
+            auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(physical_chip_id);
+            for (const auto& [eth_coord, eth_chan] : intermesh_links) {
+                std::cout << "Got Link: " << eth_chan << std::endl;
+                tt::umd::CoreCoord eth_core = tt::tt_metal::MetalContext::instance().get_cluster().get_soc_desc(physical_chip_id).get_eth_core_for_channel(eth_chan, CoordSystem::LOGICAL);
+                std::cout << "Eth coord: " << eth_coord.str() << std::endl;
+                std::cout << "Eth core: " << eth_core.str() << std::endl;
+                
+                FabricNodeId fabric_node_id{MeshId{mesh_id}, chip_id};
+                this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)[RoutingDirection::E].push_back(eth_chan);        
             }
         }
     }
