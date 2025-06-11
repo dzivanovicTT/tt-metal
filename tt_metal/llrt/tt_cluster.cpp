@@ -47,7 +47,7 @@
 #include <umd/device/types/cluster_descriptor_types.h>
 #include <umd/device/types/cluster_types.h>
 #include <umd/device/types/xy_pair.h>
-
+#include <tt-metalium/distributed_context.hpp>
 static constexpr uint32_t HOST_MEM_CHANNELS = 4;
 static constexpr uint32_t HOST_MEM_CHANNELS_MASK = HOST_MEM_CHANNELS - 1;
 
@@ -399,12 +399,14 @@ std::unordered_map<chip_id_t, eth_coord_t> Cluster::get_all_chip_ethernet_coordi
 }
 
 chip_id_t Cluster::get_physical_chip_id_from_eth_coord(const eth_coord_t& eth_coord) const {
+
     for (const auto& [physical_chip_id, coord] : this->get_all_chip_ethernet_coordinates()) {
+        fmt::print("MPI_RANK: {}, Physical chip id: {}, coord: {}\n", *tt::tt_metal::distributed::multihost::DistributedContext::get_current_world()->rank(), physical_chip_id, coord);
         if (coord == eth_coord) {
             return physical_chip_id;
         }
     }
-    TT_FATAL(false, "Physical chip id not found for eth coord");
+    TT_FATAL(false, "Physical chip id not found for eth coord: {}", eth_coord);
     return 0;
 }
 
