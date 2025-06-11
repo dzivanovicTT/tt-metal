@@ -161,7 +161,7 @@ def reference_sampling(input_tensor, sampling_params, num_devices, padded_vocab_
 @pytest.mark.parametrize(
     "sampling_params",
     (
-        {"top_k": 1, "top_p": 0.5, "seed": 42},  # argmax
+        {"top_k": 32, "top_p": 0.95, "seed": 42},  # argmax
         # {"top_k": 32, "top_p": 0.00, "seed": 42}, # argmax
         # {"top_k": 32, "top_p": 1.00, "seed": 42}, # multinomial sampling from all tok-k tokens
         # {"top_k": 32, "top_p": 0.95, "seed": 42}, # typical top-k top-p sampling
@@ -191,7 +191,7 @@ def reference_sampling(input_tensor, sampling_params, num_devices, padded_vocab_
     indirect=True,
 )
 def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_device, use_program_cache, reset_seeds):
-    use_tracing = True
+    use_tracing = False
     load_cached_outputs = True
     num_samples = 10
     num_compile_steps = 1
@@ -210,12 +210,7 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
 
     else:
         # Random inputs
-        # torch_input = torch.randn(1, 1, 32, model_args.padded_vocab_size)
         torch_input = torch.randn(1, 1, 32, 512)
-        # torch_input = torch.rand(1, 1, 32, 512)
-
-        # torch_input = torch.zeros(1, 1, 32, 512)
-        # torch_input[:, :, :, 1:33] = 1
 
     tt_input = ttnn.from_torch(
         torch_input,
@@ -231,8 +226,6 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
     )
 
     model_args.padded_vocab_size = torch_input.shape[-1]
-
-    # print("torch_input:", torch_input)
 
     # Reference output
     reference_outputs = []
@@ -266,16 +259,14 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
             logger.info("Compile Llama Sampling")
 
             for i in range(1):
-                tt_outputs = tt_sampling(tt_input)
+                tt_outputs = tt_sampling(tt_input, seed=sampling_params["seed"])
             logger.info("Done comiling Llama Sampling Trace")
-
-            # ttnn.synchronize_device(mesh_device)
 
             logger.info("Capture Llama Sampling Trace")
 
             trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
 
-            tt_outputs = tt_sampling(tt_input)
+            tt_outputs = tt_sampling(tt_input)  # Seed set to default 0 -> will not set a new seed
 
             ttnn.end_trace_capture(mesh_device, trace_id, cq_id=0)
 
@@ -319,7 +310,11 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
     else:  # No tracing
         tt_outputs_torch = []
         for i in range(num_samples):
-            tt_outputs = tt_sampling(tt_input)
+            if i == 0:
+                tt_outputs = tt_sampling(tt_input, seed=sampling_params["seed"])
+            else:
+                tt_outputs = tt_sampling(tt_input, seed=0)  # Seed set to default 0 -> will not set a new seed
+                # tt_outputs = tt_sampling(tt_input, seed=np.random.randint(0, 2**32 - 1))
             tt_output = ttnn.get_device_tensors(tt_outputs)[0]
             tt_output_torch = ttnn.to_torch(
                 tt_output,
@@ -367,6 +362,4 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
 
     tt_ccl.close()
 
-    assert (
-        passing
-    ), f"Llama Sampling output does not meet KL / PCC requirement {d_kl:.4f}/{kl_required} KL, {pcc_message}/{pcc_required} PCC."
+    assert passing, f"Llama Sampling output does not meet KL {d_kl:.4f}/{kl_required} KL."

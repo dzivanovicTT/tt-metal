@@ -25,7 +25,6 @@ class TTSampling(LightweightModule):
         self.max_batch_size = args.max_batch_size
         self.k = [sampling_params["top_k"]] * self.max_batch_size
         self.p = [sampling_params["top_p"]] * self.max_batch_size
-        self.seed = sampling_params["seed"]
 
         # Create indices tensor
         num_local_top_k = 32
@@ -46,7 +45,7 @@ class TTSampling(LightweightModule):
             memory_config=ttnn.DRAM_MEMORY_CONFIG,
         )
 
-    def forward(self, x: ttnn.Tensor, tt_out_tok: ttnn.Tensor = None):
+    def forward(self, x: ttnn.Tensor, seed: int | None = None, tt_out_tok: ttnn.Tensor = None):
         # Local top k
         topk_values, topk_indices = ttnn.topk(x, k=32, dim=-1, sub_core_grids=self.args.sub_core_grid_topk)
 
@@ -119,7 +118,7 @@ class TTSampling(LightweightModule):
             topk_global_indices_interleaved_untilised,
             k=self.k,
             p=self.p,
-            seed=self.seed,
+            seed=seed,
             # seed=np.random.randint(0, 2**32 - 1), # TODO: find solution for constant outputs for constant seed
             sub_core_grids=ttnn.num_cores_to_corerangeset_in_subcoregrids(
                 self.args.start_core, self.max_batch_size, self.args.sub_core_grids, row_wise=True
