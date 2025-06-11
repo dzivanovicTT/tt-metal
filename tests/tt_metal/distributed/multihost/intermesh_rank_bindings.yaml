@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: © 2025 Tenstorrent Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+# Inter-mesh rank binding configuration for testing
+# Configuration with 2 processes across 2 different meshes
+
+rank_bindings:
+  # Mesh 0
+  - rank: 0
+    mesh_id: 0
+    host_rank_id: 0
+    env_overrides:
+      TT_METAL_VISIBLE_DEVICES: "0,1"
+      TEST_RANK_SPECIFIC_VAR: "rank0_value"
+
+  # Mesh 1
+  - rank: 1
+    mesh_id: 1
+    host_rank_id: 0
+    env_overrides:
+      TT_METAL_VISIBLE_DEVICES: "2,3"
+      TEST_RANK_SPECIFIC_VAR: "rank1_value"
+
+global_env:
+  # Test configuration
+  EXPECTED_WORLD_SIZE: "2"
+  TEST_GLOBAL_VAR: "global_value"
+
+  # Logging configuration
+  TT_METAL_LOGGER_LEVEL: "Error"

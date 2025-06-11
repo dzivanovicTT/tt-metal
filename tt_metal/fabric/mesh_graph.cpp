@@ -270,15 +270,34 @@ void MeshGraph::initialize_from_yaml(const std::string& mesh_graph_desc_file_pat
         }
         // Fill in all host rank coordinate ranges
         for (const auto& [host_rank, coords] : host_rank_submesh_start_end_coords) {
+            MeshCoordinate start(
+                coords.first[0] * board_name_to_topology[mesh_board][0],
+                coords.first[1] * board_name_to_topology[mesh_board][1]);
+            MeshCoordinate end(
+                (coords.second[0] + 1) * board_name_to_topology[mesh_board][0] - 1,
+                (coords.second[1] + 1) * board_name_to_topology[mesh_board][1] - 1);
+
+            log_debug(
+                tt::LogFabric,
+                "Mesh {} Host Rank {}: board coords ({},{}) to ({},{}) -> chip coords {} to {}",
+                *mesh_id,
+                *host_rank,
+                coords.first[0],
+                coords.first[1],
+                coords.second[0],
+                coords.second[1],
+                start,
+                end);
+            log_debug(
+                tt::LogFabric,
+                "  Board topology: [{}, {}], Resulting shape: [{}, {}]",
+                board_name_to_topology[mesh_board][0],
+                board_name_to_topology[mesh_board][1],
+                end[0] - start[0] + 1,
+                end[1] - start[1] + 1);
+
             this->mesh_host_rank_coord_ranges_.emplace(
-                std::make_pair(*mesh_id, host_rank),
-                MeshCoordinateRange(
-                    MeshCoordinate(
-                        coords.first[0] * board_name_to_topology[mesh_board][0],
-                        coords.first[1] * board_name_to_topology[mesh_board][1]),
-                    MeshCoordinate(
-                        (coords.second[0] + 1) * board_name_to_topology[mesh_board][0] - 1,
-                        (coords.second[1] + 1) * board_name_to_topology[mesh_board][1] - 1)));
+                std::make_pair(*mesh_id, host_rank), MeshCoordinateRange(start, end));
         }
         this->mesh_host_ranks_[*mesh_id] =
             MeshContainer<HostRankId>(MeshShape(mesh_board_ns_size, mesh_board_ew_size), mesh_host_ranks_values);
@@ -404,10 +423,42 @@ void MeshGraph::print_connectivity() const {
 
 MeshShape MeshGraph::get_mesh_shape(MeshId mesh_id, std::optional<HostRankId> host_rank) const {
     if (host_rank.has_value()) {
-        return this->mesh_host_rank_coord_ranges_.at(std::make_pair(mesh_id, *host_rank)).shape();
+        auto key = std::make_pair(mesh_id, *host_rank);
+        auto it = this->mesh_host_rank_coord_ranges_.find(key);
+        if (it == this->mesh_host_rank_coord_ranges_.end()) {
+            log_error(
+                tt::LogFabric, "Host rank coord range not found for mesh_id: {}, host_rank: {}", *mesh_id, **host_rank);
+            log_error(tt::LogFabric, "Available host rank coord ranges:");
+            for (const auto& [k, v] : this->mesh_host_rank_coord_ranges_) {
+                log_error(
+                    tt::LogFabric,
+                    "  mesh_id: {}, host_rank: {} -> start: {}, end: {}",
+                    *k.first,
+                    *k.second,
+                    v.start_coord(),
+                    v.end_coord());
+            }
+            TT_FATAL(false, "Host rank coord range not found");
+        }
+        auto shape = it->second.shape();
+        log_debug(
+            tt::LogFabric,
+            "MeshGraph::get_mesh_shape for mesh_id: {}, host_rank: {} returning shape: [{}, {}]",
+            *mesh_id,
+            **host_rank,
+            shape[0],
+            shape[1]);
+        return shape;
     }
 
-    return this->mesh_to_chip_ids_.at(mesh_id).shape();
+    auto shape = this->mesh_to_chip_ids_.at(mesh_id).shape();
+    log_debug(
+        tt::LogFabric,
+        "MeshGraph::get_mesh_shape for mesh_id: {} (no host_rank) returning shape: [{}, {}]",
+        *mesh_id,
+        shape[0],
+        shape[1]);
+    return shape;
 }
 
 MeshCoordinateRange MeshGraph::get_coord_range(MeshId mesh_id, std::optional<HostRankId> host_rank) const {

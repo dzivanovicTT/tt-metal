@@ -150,6 +150,7 @@ public:
     static void create(int argc, char** argv);
     static const ContextPtr& get_current_world();
     static void set_current_world(const ContextPtr& ctx);
+    static bool is_initialized();
     //--- Topology ------------------------------------------------------------
     [[nodiscard]] virtual Rank rank() const = 0;
     [[nodiscard]] virtual Size size() const = 0;

@@ -70,3 +70,6 @@ set_target_properties(
         RUNTIME_OUTPUT_DIRECTORY
             ${PROJECT_BINARY_DIR}/test/tt_metal/distributed
 )
+
+# Add multihost subdirectory for tt-run tests
+add_subdirectory(multihost)
