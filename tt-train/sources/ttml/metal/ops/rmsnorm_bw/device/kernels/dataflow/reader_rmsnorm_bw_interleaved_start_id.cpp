@@ -7,6 +7,7 @@
 #include <cstdint>
 
 #include "debug/dprint.h"
+#include "tt-train/sources/ttml/metal/ops/common/dataflow_utils.hpp"
 
 // inline void print_loop(uint32_t count) {
 //     // UNPACK(DPRINT << "U-LOOP:" << (uint32_t)count << ENDL());
@@ -33,6 +34,7 @@ inline void print_full_tile(uint32_t cb_id, uint32_t tile_id = 0, bool untilize 
 
 // TODO: improve with a more efficient implementation
 // using noc_async_writes
+// THIS SHOULD BE REMOVED AND CALLED FROM COMMONS
 void generate_tile_with_value(uint32_t cb, uint32_t packed_value) {
     constexpr uint32_t onetile = 1U;
     cb_reserve_back(cb, onetile);
@@ -84,6 +86,7 @@ void kernel_main() {
     constexpr uint32_t cb_gamma_idx = tt::CBIndex::c_3;
     constexpr uint32_t cb_rms_a_idx = tt::CBIndex::c_4;
     constexpr uint32_t cb_dL_out_idx = tt::CBIndex::c_5;
+    // constexpr uint32_t cb_mask_garbage_idx = tt::CBIndex::c_25;
 
     constexpr uint32_t packed_scaler = get_compile_time_arg_val(0);
     constexpr uint32_t block_size = get_compile_time_arg_val(1);
@@ -97,22 +100,17 @@ void kernel_main() {
 #else
     constexpr bool do_mask_w = false;
 #endif
+    // generate scaler and mask tile
+    constexpr uint16_t one = 0x00003F80;  // (bfloat16)1.0 -> uint16_t
+    constexpr uint16_t zero = 0x0;
+    constexpr uint16_t minus_inf = 0xFF80;  // (bfloat16)-inf -> uint16_t
 
     // generate mask tile
     if constexpr (do_mask_w) {
-        // cb_reserve_back(cb_mask_w_idx, onetile);
-        // uint16_t* ptr = reinterpret_cast<uint16_t*>(get_write_ptr(cb_mask_w_idx));
-        // constexpr uint16_t one = 0x00003F80;  // (bfloat16)1.0 -> uint16_t
-        // constexpr uint16_t zero = 0x0;
-        // for (uint32_t face = 0; face < 4; ++face) {
-        //     uint32_t offset = (face & 1U) << 4U;
-        //     for (uint32_t h = 0; h < 16; ++h) {
-        //         for (uint32_t w = 0; w < 16; ++w, ++ptr) {
-        //             *ptr = (offset + w < mask_w) ? one : zero;
-        //         }
-        //     }
-        // }
-        // cb_push_back(cb_mask_w_idx, onetile);
+        DPRINT << "Generating mask tile with value: " << mask_w << ENDL();
+        generate_mask_tile(cb_mask_w_idx, one, zero, mask_w);
+        // generate_mask_tile(cb_mask_garbage_idx, zero, minus_inf, mask_w);
+        DPRINT << "Generated mask tile done" << ENDL();
     }
 
     // generate tiles to include scalar and epsilon

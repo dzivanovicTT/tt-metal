@@ -44,6 +44,10 @@ constexpr auto kCByMsACbIndex = tt::CBIndex::c_12;
 constexpr auto kRhsCbIndex = tt::CBIndex::c_13;
 constexpr auto kAOverRmsACbIndex = tt::CBIndex::c_14;
 constexpr auto kDLdgammaComponentsCbIndex = tt::CBIndex::c_15;
+// CBs with masked data (they should have max size of 1 tile)
+constexpr uint32_t cb_masked_input_idx = tt::CBIndex::c_16;
+constexpr uint32_t cb_masked_gamma_idx = tt::CBIndex::c_17;
+constexpr uint32_t cb_masked_dL_out_idx = tt::CBIndex::c_18;
 
 const std::string kMaskWDefineKey = "DO_MASK_W";
 const std::string kEverythingFitsInL1DefineKey = "EVERYTHING_FITS_IN_L1";
@@ -256,6 +260,12 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         create_circular_buffer(program, all_cores, kAOverRmsACbIndex, data_format, single_tile_size_bytes, Wt);  // 1?
     auto cb_dL_dgamma_components =
         create_circular_buffer(program, all_cores, kDLdgammaComponentsCbIndex, data_format, single_tile_size_bytes, Wt);
+    auto cb_masked_input =
+        create_circular_buffer(program, all_cores, cb_masked_input_idx, data_format, single_tile_size_bytes, Wt);  // 1
+    auto cb_masked_gamma =
+        create_circular_buffer(program, all_cores, cb_masked_gamma_idx, data_format, single_tile_size_bytes, Wt);  // 1
+    auto cb_masked_dL_out =
+        create_circular_buffer(program, all_cores, cb_masked_dL_out_idx, data_format, single_tile_size_bytes, Wt);  // 1
 
     // 3) Create reader/writer/compute kernels
     auto* input_buffer = input.buffer();

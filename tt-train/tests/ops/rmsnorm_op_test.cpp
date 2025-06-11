@@ -236,54 +236,60 @@ TEST_F(RMSNormOpTest, CompositeRMSNorm_Small_Backward) {
     EXPECT_FALSE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
 }
 
-TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_W32) {
+TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_Compare) {
     using namespace ttml;
-    float eps = 0.0078125F;  // default in PyTorch for bf16
 
-    uint32_t N = 1, C = 1, H = 1, W = 32;
+    // Split it into seperates tests for each width.
+    std::vector<uint32_t> widths = {10};  //, 10, 20, 32};  // Add 20 later;
+    for (uint32_t W : widths) {
+        // NOTE: Remove this when ready to land.
+        // if (W != 32) {
+        //     std::cerr << "Skipping W=" << W << " as it is not 10, which is the expected width for this test ATM."
+        //               << std::endl;
+        //     continue;
+        // }
+        float eps = 0.0078125F;
+        std::vector<std::size_t> shape = {1, 1, 1, static_cast<std::size_t>(W)};
+        xt::xarray<float> example_xtensor = xt::zeros<float>(shape);
+        for (uint32_t i = 0; i < W; ++i) {
+            example_xtensor(0, 0, 0, i) = static_cast<float>(i + 1) / 10.F;
+        }
+        auto* device = &autograd::ctx().get_device();
+        auto example_tensor = autograd::create_tensor(core::from_xtensor(example_xtensor, device));
+        auto gamma = autograd::create_tensor(core::ones(core::create_shape({1, 1, 1, W}), device));
 
-    xt::xarray<float> example_xtensor = {
-        {{{1.F,  2.F,  3.F,  4.F,  5.F,  6.F,  7.F,  8.F,  9.F,  10.F, 11.F, 12.F, 13.F, 14.F, 15.F, 16.F,
-           17.F, 18.F, 19.F, 20.F, 21.F, 22.F, 23.F, 24.F, 25.F, 26.F, 27.F, 28.F, 29.F, 30.F, 31.F, 32.F}}}};
+        // std::cerr << "Running rmsnorm (kernel) for W=" << W << std::endl;
+        auto result = ops::rmsnorm(example_tensor, gamma, eps);
+        auto target = autograd::create_tensor(core::zeros_like(result->get_value()));
+        auto mse_result = ttml::ops::mse_loss(result, target);
+        // std::cerr << "Running MSE loss for W=" << W << std::endl;
+        mse_result->backward();
+        // std::cerr << "RMSNorm backward done for W=" << W << std::endl;
 
-    example_xtensor /= 10.F;
+        auto example_tensor_grad = core::to_xtensor(example_tensor->get_grad());
+        // std::cerr << "DONE" << std::endl;
+        std::cerr << "RMSNorm example tensor grad: " << example_tensor_grad << std::endl;
+        auto gamma_grad = core::to_xtensor(gamma->get_grad());
+        std::cerr << "RMSNorm gamma grad: " << gamma_grad << std::endl;
 
-    auto example_tensor = autograd::create_tensor(core::from_xtensor(example_xtensor, &autograd::ctx().get_device()));
-    auto gamma = autograd::create_tensor(core::ones(core::create_shape({1, 1, 1, W}), &autograd::ctx().get_device()));
+        // Composite reference
+        auto example_tensor2 = autograd::create_tensor(core::from_xtensor(example_xtensor, device));
+        auto gamma2 = autograd::create_tensor(core::ones(core::create_shape({1, 1, 1, W}), device));
 
-    std::cerr << "Running rmsnorm" << std::endl;
-    auto result = ops::rmsnorm(example_tensor, gamma, eps);
-    // auto result_xtensor = core::to_xtensor(result->get_value());
-    // std::cerr << "RMSNorm result: " << result_xtensor << std::endl;
+        std::cerr << "Running COMPOSITE rmsnorm for W=" << W << std::endl;
+        auto result_composite = ops::rmsnorm_composite(example_tensor2, gamma2, eps);
+        auto target2 = autograd::create_tensor(core::zeros_like(result_composite->get_value()));
+        auto mse_result2 = ttml::ops::mse_loss(result_composite, target2);
+        mse_result2->backward();
 
-    auto target = autograd::create_tensor(core::zeros_like(result->get_value()));
-    auto mse_result = ttml::ops::mse_loss(result, target);
-    mse_result->backward();
+        auto expected_example_tensor_grad = core::to_xtensor(example_tensor2->get_grad());
+        std::cerr << "RMSNorm composite example tensor grad: " << expected_example_tensor_grad << std::endl;
+        auto expected_gamma_grad = core::to_xtensor(gamma2->get_grad());
+        std::cerr << "RMSNorm composite gamma grad: " << expected_gamma_grad << std::endl;
 
-    auto example_tensor_grad = core::to_xtensor(example_tensor->get_grad());
-    std::cerr << "RMSNorm example tensor grad: " << example_tensor_grad << std::endl;
-    auto gamma_grad = core::to_xtensor(gamma->get_grad());
-    std::cerr << "RMSNorm gamma grad: " << gamma_grad << std::endl;
-
-    // Compute expected gradients using the composite op
-    auto example_tensor2 = autograd::create_tensor(core::from_xtensor(example_xtensor, &autograd::ctx().get_device()));
-    auto gamma2 = autograd::create_tensor(core::ones(core::create_shape({1, 1, 1, W}), &autograd::ctx().get_device()));
-    std::cerr << "Running COMPOSITE rmsnorm" << std::endl;
-    auto result_composite = ops::rmsnorm_composite(example_tensor2, gamma2, eps);
-    // auto result_composite_xtensor = core::to_xtensor(result_composite->get_value());
-    // std::cerr << "RMSNorm composite result: " << result_composite_xtensor << std::endl;
-
-    auto target2 = autograd::create_tensor(core::zeros_like(result_composite->get_value()));
-    auto mse_result2 = ttml::ops::mse_loss(result_composite, target2);
-    mse_result2->backward();
-
-    auto expected_example_tensor_grad = core::to_xtensor(example_tensor2->get_grad());
-    std::cerr << "RMSNorm composite example tensor grad: " << expected_example_tensor_grad << std::endl;
-    auto expected_gamma_grad = core::to_xtensor(gamma2->get_grad());
-    std::cerr << "RMSNorm composite gamma grad: " << expected_gamma_grad << std::endl;
-
-    EXPECT_TRUE(xt::allclose(example_tensor_grad, expected_example_tensor_grad, 1.0e-3F, 1e-2F));
-    EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
+        EXPECT_TRUE(xt::allclose(example_tensor_grad, expected_example_tensor_grad, 1.0e-3F, 1e-2F));
+        EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
+    }
 }
 
 TEST_F(RMSNormOpTest, CompositeRMSNorm_Forward_Batch) {
