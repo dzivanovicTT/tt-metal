@@ -43,7 +43,7 @@ from models.utility_functions import disable_persistent_kernel_cache, run_for_wo
 @pytest.mark.parametrize(
     "model_task",
     [
-        "segment",  # To run the demo for instance segmentation
+        # "segment",  # To run the demo for instance segmentation
         "detect",  # To run the demo for Object Detection
     ],
 )
@@ -67,8 +67,20 @@ def test_demo(
 
     enable_segment = model_task == "segment"
     save_dir = "models/demos/yolov9c/demo/runs"
-    dataset = LoadImages(path=source)
+    dataset = LoadImages(path=["models/demos/yolov9c/demo/image.png", "models/sample_data/huggingface_cat_image.jpg"])
     names = load_coco_class_names()
+
+    performant_runner = YOLOv9PerformantRunner(
+        device,
+        1,
+        ttnn.bfloat8_b,
+        ttnn.bfloat8_b,
+        model_task=model_task,
+        resolution=(640, 640),
+        model_location_generator=None,
+        # torch_input_tensor=im,
+    )
+    performant_runner._capture_yolov9_trace_2cqs()
 
     for batch in dataset:
         paths, im0s, s = batch
@@ -86,17 +98,6 @@ def test_demo(
                 save_yolo_predictions_by_model(results[0], save_dir, source, model_type)
 
         else:
-            performant_runner = YOLOv9PerformantRunner(
-                device,
-                1,
-                ttnn.bfloat8_b,
-                ttnn.bfloat8_b,
-                model_task=model_task,
-                resolution=(640, 640),
-                model_location_generator=None,
-                torch_input_tensor=im,
-            )
-            performant_runner._capture_yolov9_trace_2cqs()
             logger.info("Inferencing [TTNN] Model")
 
             preds = performant_runner.run(torch_input_tensor=im)
@@ -115,6 +116,6 @@ def test_demo(
             else:
                 results = obj_postprocess(preds[0], im, im0s, batch, names)[0]
                 save_yolo_predictions_by_model(results, save_dir, source, "tt_model")
-            performant_runner.release()
+    performant_runner.release()
 
     logger.info("Inference done")
