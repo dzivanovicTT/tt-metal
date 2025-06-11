@@ -269,6 +269,7 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     // ToDo: enable 32 sticks per tile for reduction for all cases.
     const uint32_t max_rows_for_reduction =
         !is_partial_tile ? tt::constants::TILE_HEIGHT : tt::constants::TILE_HEIGHT / 2;
+    printf("max_rows_for_reduction = %u\n", max_rows_for_reduction);
     TT_FATAL(nblocks == 1, "Multiple blocks not yet supported");
 
     if (input_shape[3] < tt::constants::TILE_WIDTH) {
@@ -295,7 +296,7 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     // CBs
     const uint32_t multi_buffering_factor = 2;
 
-    const uint32_t split_reader = 1;
+    const uint32_t split_reader = 0;
 
     // scalar CB as coefficient of reduce
     using tt::tt_metal::CBHandle;

@@ -7,7 +7,7 @@
 #include "dataflow_api.h"
 #include "reader_pool2d_sharded_common.hpp"
 
-#define ENABLE_DEBUG_PRINT 0
+#define ENABLE_DEBUG_PRINT 1
 
 #if ENABLE_DEBUG_PRINT == 1
 #include "debug/dprint.h"
@@ -105,6 +105,9 @@ void kernel_main() {
     constexpr bool need_to_initialize_in_cb = remaining_elems && interm_reduction_chunks <= multi_buffering_factor;
     constexpr uint32_t in_cb_ntiles = in_cb_sz / (TILE_WIDTH * TILE_HEIGHT);  // only use the non-multi buffering size
 
+    DPRINT << "interm_reduction_chunks = " << interm_reduction_chunks << ENDL();
+    DPRINT << "remaining_elems = " << remaining_elems << ENDL();
+
     // fill the clear cb
     if constexpr (split_reader) {
         constexpr uint32_t half_tile = TILE_HEIGHT * TILE_WIDTH / 2;
@@ -130,8 +133,9 @@ void kernel_main() {
         cb_wait_front(sync_cb_id1, 1);
     }
 
-    if constexpr (need_to_initialize_in_cb && !is_avg_pool) {  // for avg pool fill_with_val runs in loop, no need to
-                                                               // initialize
+    if constexpr (need_to_initialize_in_cb) {  // for avg pool fill_with_val runs in loop, no need to
+                                               // initialize
+        // DPRINT << "HIT" << ENDL();
         clear_out_tiles<in_cb_id, clear_value_cb_id>();
     }
 
@@ -147,6 +151,9 @@ void kernel_main() {
             fill_with_val(get_write_ptr(in_one_cb_id), TILE_WIDTH, bf16_one_u16);
         }
     }
+
+    uint32_t interm_base_addr = get_read_ptr(interm_reduction_cb_id);
+    uint32_t in_cb_base_addr = get_read_ptr(in_cb_id);
 
     // ensure initialization is done before proceeding
     if constexpr (reader_id == 0) {
@@ -171,7 +178,7 @@ void kernel_main() {
     uint32_t counter = reader_id;
     constexpr uint32_t total_elems_to_reduce = window_h * window_w;
     constexpr bool wide_reduction = in_nblocks_c > 1;
-    constexpr uint32_t read_bytes =
+    constexpr uint32_t in_cb_width_bytes =
         wide_reduction ? MAX_ELE_PER_REDUCTION : in_nbytes_c;  // in_cb is MAX_ELE_PER_REDUCTION for wide reductions
 
     if constexpr (!one_scalar_per_core) {
@@ -185,6 +192,7 @@ void kernel_main() {
 
     while (counter < reader_nindices) {
         if constexpr (!one_scalar_per_core) {
+            // DPRINT << "NOT ONE SCALAR PER CORE" << ENDL();
             cb_reserve_back(in_scalar_cb_id, 1);
             while ((counter >= scalar_end) && scalar_end != reader_nindices) {
                 scalar_start = scalar_end;
@@ -206,24 +214,37 @@ void kernel_main() {
             cb_push_back(in_scalar_cb_id, 1);
         }
 
+        uint32_t out_l1_write_addr_base = get_write_ptr(in_cb_id);
         for (uint32_t c_i = 0; c_i < in_nblocks_c; c_i++) {
+            uint32_t read_bytes = in_nbytes_c <= MAX_ELE_PER_REDUCTION ? in_nbytes_c
+                                  : c_i < in_nblocks_c - 1             ? MAX_ELE_PER_REDUCTION
+                                                                       : in_nbytes_c - c_i * MAX_ELE_PER_REDUCTION;
+            // DPRINT << "c_i = " << c_i << ENDL();
+            // DPRINT << "read_bytes = " << read_bytes << ENDL();
             const uint16_t top_left_local_index = reader_indices_ptr[counter];
+            // DPRINT << "top_left_local_index = " << top_left_local_index << ENDL();
             uint32_t processed_rows = 0;
             cb_reserve_back(in_cb_id, 1);
             uint32_t out_l1_write_addr = get_write_ptr(in_cb_id);
+            uint32_t out_print_addr = out_l1_write_addr;
             for (uint32_t h = 0; h < window_h; ++h) {
                 for (uint32_t w = 0; w < window_w; w++) {
                     const uint32_t stick_offset = top_left_local_index + w + h * in_w_padded;
                     const uint32_t read_offset =
                         in_l1_read_base_addr + (stick_offset * in_nbytes_c + c_i * MAX_ELE_PER_REDUCTION);
                     noc_async_read_one_packet(get_noc_addr(read_offset), out_l1_write_addr, read_bytes);
-                    out_l1_write_addr += read_bytes;
+                    out_l1_write_addr += in_cb_width_bytes;
                     processed_rows++;
                     if ((processed_rows % max_rows_for_reduction) == 0) {
+                        // DPRINT << "MOD processed_rows = " << processed_rows << ENDL();
                         noc_async_read_barrier();
+                        // DPRINT << "out_print_addr = " << out_print_addr - out_l1_write_addr_base << ENDL();
+                        // tt::data_movement::common::print_bf16_pages(out_print_addr, 256, 32);
                         cb_push_back(in_cb_id, 1);
                         cb_reserve_back(in_cb_id, 1);
                         out_l1_write_addr = get_write_ptr(in_cb_id);
+                        fill_with_val(out_l1_write_addr, in_cb_ntiles * TILE_HEIGHT * TILE_WIDTH, 0);
+                        out_print_addr = out_l1_write_addr;
                         // If next is last chunk, fill whole buffer with the init_value. note for max pool we do
                         // not need to fill the CB for the partial chunk since as long as we have N>1 chunks we
                         // are guaranteed that the junk data remaining from chunk N-1 will fill the entire CB and
@@ -231,19 +252,30 @@ void kernel_main() {
                         // initialized the entire CB with the init value, but for avg pool we need to fill the
                         // entire CB with the init value since the junk data will contribute to the average.
                         if constexpr (is_avg_pool) {
-                            if ((total_elems_to_reduce - processed_rows) < max_rows_for_reduction) {
-                                clear_out_tiles<clear_value_cb_id, in_cb_ntiles>(
-                                    get_noc_addr(out_l1_write_addr), get_noc_addr(get_read_ptr(clear_value_cb_id)));
-                            }
+                            // if ((total_elems_to_reduce - processed_rows) < max_rows_for_reduction) {
+                            clear_out_tiles<clear_value_cb_id, in_cb_ntiles>(
+                                get_noc_addr(out_l1_write_addr), get_noc_addr(get_read_ptr(clear_value_cb_id)));
+                            //}
                         }
                     }
                 }
             }
             if (remaining_elems) {
                 noc_async_read_barrier();
+                // DPRINT << "out_print_addr = " << out_print_addr - out_l1_write_addr_base << ENDL();
+                // tt::data_movement::common::print_bf16_pages(out_print_addr, 256, 32);
                 cb_push_back(in_cb_id, 1);
             }
+
+            cb_reserve_back(sync_cb_id1, 2);
+            tt::data_movement::common::print_bf16_pages(interm_base_addr, 256, 32);
+            fill_with_val(interm_base_addr, in_cb_ntiles * TILE_HEIGHT * TILE_WIDTH, 0);
+            fill_with_val(in_cb_base_addr, 2 * in_cb_ntiles * TILE_HEIGHT * TILE_WIDTH, 0);
+            // clear_out_tiles<clear_value_cb_id, in_cb_ntiles>(
+            //     get_noc_addr(interm_base_addr), get_noc_addr(get_read_ptr(clear_value_cb_id)));
+            cb_push_back(sync_cb_id1, 2);
         }
+
         counter++;
         if constexpr (split_reader) {
             counter++;  // interleave the indices
