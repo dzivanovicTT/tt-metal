@@ -13,15 +13,13 @@ from loguru import logger
 from PIL import Image
 from torch.utils.data import DataLoader, Dataset
 from transformers import AutoImageProcessor, SegformerForSemanticSegmentation
-from ttnn.model_preprocessing import preprocess_model_parameters
 
 import ttnn
 from models.demos.segformer.reference.segformer_for_semantic_segmentation import (
     SegformerForSemanticSegmentationReference,
 )
-from models.demos.segformer.tt.ttnn_segformer_for_semantic_segmentation import TtSegformerForSemanticSegmentation
-from tests.ttnn.integration_tests.segformer.test_segformer_for_semantic_segmentation import create_custom_preprocessor
-from tests.ttnn.integration_tests.segformer.test_segformer_model import move_to_device
+from models.demos.segformer.tests.perf.segformer_test_infra import SegformerTrace2CQ
+from tests.ttnn.utils_for_testing import assert_with_pcc
 
 
 class SemanticSegmentationDataset(Dataset):
@@ -49,8 +47,11 @@ def shift_gt_indices(gt_mask):
     return gt_mask - 1
 
 
-@pytest.mark.parametrize("device_params", [{"l1_small_size": 24576}], indirect=True)
+@pytest.mark.parametrize(
+    "device_params", [{"l1_small_size": 24576, "num_command_queues": 2, "trace_region_size": 102000000}], indirect=True
+)
 def test_demo_semantic_segmentation(device):
+    device.enable_program_cache()
     torch_model = SegformerForSemanticSegmentation.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
     reference_model = SegformerForSemanticSegmentationReference(config=torch_model.config)
     reference_model.load_state_dict(torch_model.state_dict())
@@ -68,42 +69,34 @@ def test_demo_semantic_segmentation(device):
     data_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=0)
     ref_metric = evaluate.load("mean_iou")
     ttnn_metric = evaluate.load("mean_iou")
-    parameters = preprocess_model_parameters(
-        initialize_model=lambda: reference_model, custom_preprocessor=create_custom_preprocessor(device), device=None
+    i = 1
+    segformer_t2cq = SegformerTrace2CQ(
+        device,
+        batch_size=1,
+        act_dtype=ttnn.bfloat16,
+        weight_dtype=ttnn.bfloat16,
+        model_location_generator=None,
     )
-    ttnn_model = TtSegformerForSemanticSegmentation(torch_model.config, parameters)
-    parameters = move_to_device(parameters, device)
-    for i in range(4):
-        parameters["decode_head"]["linear_c"][i]["proj"]["weight"] = ttnn.to_device(
-            parameters["decode_head"]["linear_c"][i]["proj"]["weight"], device=device
-        )
-        parameters["decode_head"]["linear_c"][i]["proj"]["bias"] = ttnn.to_device(
-            parameters["decode_head"]["linear_c"][i]["proj"]["bias"], device=device
-        )
+    compile_finished = segformer_t2cq.compile()
+    capture_finished = segformer_t2cq.trace_capture(compile_finished)
     for batch in data_loader:
+        # print(i)
         image = batch["input"]
         mask = batch["gt_mask"].squeeze()
-        torch_input_tensor_permuted = torch.permute(image["pixel_values"].squeeze(dim=0), (0, 2, 3, 1))
-        ttnn_input_tensor = ttnn.from_torch(
-            torch_input_tensor_permuted,
-            dtype=ttnn.bfloat16,
-            memory_config=ttnn.L1_MEMORY_CONFIG,
-            device=device,
-            layout=ttnn.ROW_MAJOR_LAYOUT,
-        )
-        ttnn_output = ttnn_model(
-            device,
-            ttnn_input_tensor,
-            output_attentions=None,
-            output_hidden_states=None,
-            return_dict=None,
-            parameters=parameters,
-        )
-        ttnn_output = ttnn.to_torch(ttnn_output.logits)
+        image["pixel_values"] = image["pixel_values"].squeeze(dim=0)
+        input = torch.permute(image["pixel_values"], (0, 2, 3, 1))
+        ttnn_input = ttnn.from_torch(input, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT)
+        ttnn_output = segformer_t2cq.trace_execute_for_demo(capture_finished, ttnn_input)
+        i = i + 1
+
+        ttnn_output = ttnn.to_torch(ttnn_output)
         ttnn_output = torch.permute(ttnn_output, (0, 3, 1, 2))
+
         h = w = int(math.sqrt(ttnn_output.shape[-1]))
         ttnn_final_output = torch.reshape(ttnn_output, (ttnn_output.shape[0], ttnn_output.shape[1], h, w))
-        ref_logits = reference_model(image["pixel_values"].squeeze(dim=0)).logits
+        ref_logits = reference_model(image["pixel_values"]).logits
+        pcc_passed, pcc_message = assert_with_pcc(ref_logits, ttnn_final_output, 0.98)
+        logger.info(pcc_message)
         ref_upsampled_logits = torch.nn.functional.interpolate(
             ref_logits, size=mask.shape[-2:], mode="bilinear", align_corners=False
         )

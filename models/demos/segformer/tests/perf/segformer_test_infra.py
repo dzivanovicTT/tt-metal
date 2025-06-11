@@ -98,6 +98,7 @@ class SegformerTestInfra:
         act_dtype,
         weight_dtype,
         model_location_generator=None,
+        input=None,
     ):
         super().__init__()
         torch.manual_seed(0)
@@ -112,12 +113,18 @@ class SegformerTestInfra:
         self.ttnn_segformer_model = TtSegformerForSemanticSegmentation(config, self.parameters)
 
         processor = SegformerImageProcessor.from_pretrained("nvidia/segformer-b0-finetuned-ade-512-512")
-        url = "http://images.cocodataset.org/val2017/000000039769.jpg"
-        image = Image.open(requests.get(url, stream=True).raw)
-        self.inputs = processor(images=image, return_tensors="pt")
-        self.torch_output_tensor = reference_model(self.inputs.pixel_values)
-        input_pixels_permuted = torch.permute(self.inputs.pixel_values, (0, 2, 3, 1))
-        self.input_tensor = ttnn.from_torch(input_pixels_permuted, ttnn.bfloat16)
+        if input is None:
+            url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            image = Image.open(requests.get(url, stream=True).raw)
+            self.inputs = processor(images=image, return_tensors="pt")
+            self.torch_output_tensor = reference_model(self.inputs.pixel_values)
+            input_pixels_permuted = torch.permute(self.inputs.pixel_values, (0, 2, 3, 1))
+            self.input_tensor = ttnn.from_torch(input_pixels_permuted, ttnn.bfloat16)
+        else:
+            self.inputs = input
+            self.torch_output_tensor = reference_model(self.inputs.pixel_values)
+            input_pixels_permuted = torch.permute(self.inputs.pixel_values, (0, 2, 3, 1))
+            self.input_tensor = ttnn.from_torch(input_pixels_permuted, ttnn.bfloat16)
 
     def run(self):
         self.output_tensor = self.ttnn_segformer_model(
@@ -251,10 +258,12 @@ class SegformerBare:
 
 
 class SegformerTrace2CQ:
-    def __init__(self, device, batch_size, act_dtype, weight_dtype, model_location_generator=None):
+    def __init__(self, device, batch_size, act_dtype, weight_dtype, model_location_generator=None, input=None):
         self.device = device
 
-        self.test_infra = SegformerTestInfra(device, batch_size, act_dtype, weight_dtype, model_location_generator=None)
+        self.test_infra = SegformerTestInfra(
+            device, batch_size, act_dtype, weight_dtype, model_location_generator=None, input=input
+        )
 
         self.tt_inputs_host, input_mem_configs, input_shapes = self.test_infra.setup_l1_sharded_input(device)
 
@@ -270,9 +279,11 @@ class SegformerTrace2CQ:
 
         self.tt_outputs_host = []
 
-    def copy_input_to_device(self, input_consumed):
+    def copy_input_to_device(self, input_consumed, input=None):
+        if input is None:
+            input = self.tt_inputs_host
         ttnn.wait_for_event(1, input_consumed)
-        ttnn.copy_host_to_device_tensor(self.tt_inputs_host, self.tt_inputs_unpadded, cq_id=1)
+        ttnn.copy_host_to_device_tensor(input, self.tt_inputs_unpadded, cq_id=1)
         input_copied = ttnn.record_event(self.device, 1)
 
         ttnn.wait_for_event(0, input_copied)
@@ -341,6 +352,31 @@ class SegformerTrace2CQ:
         self.test_infra.dealloc_input()
 
         return read_done
+
+    def trace_execute_for_demo(self, capture_finished, input=None):
+        # copy of first input
+        copy_done = self.copy_input_to_device(capture_finished, input)
+
+        # reads from previous steps should have finished
+        read_done = ttnn.record_event(self.device, 0)
+        # start executing trace after data has been read
+        ttnn.wait_for_event(0, read_done)
+        ttnn.execute_trace(self.device, self.tid, cq_id=0, blocking=False)
+
+        # deallocate old and copy new input
+        self.test_infra.dealloc_input()
+        copy_done = self.copy_input_to_device(copy_done)
+
+        # read output
+        read_done = self.copy_output_to_host(read_done)
+
+        # last iteration without an extra input copy
+
+        ttnn.synchronize_device(self.device)
+
+        outputs = ttnn.from_device(self.test_infra.output_tensor.logits, blocking=True)
+
+        return outputs
 
     def trace_execute(self, capture_finished, num_iterations=10):
         start = time.time()
