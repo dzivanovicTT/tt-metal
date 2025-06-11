@@ -14,9 +14,10 @@ std::vector<std::optional<ttnn::Tensor>> RMSNormBackwardOperation::invoke(
     const ttnn::Tensor& rms_tensor,
     const ttnn::Tensor& dL_dout_tensor,
     float epsilon) {
-    // std::cerr << "Within RMSNormBackwardOperation::invoke" << std::endl;
+    std::cerr << "Within RMSNormBackwardOperation::invoke" << std::endl;
     // dL_dout_tensor.print();
     auto result = ttnn::prim::ttml_rmsnorm_bw(input_tensor, gamma_tensor, rms_tensor, dL_dout_tensor, epsilon);
+    std::cerr << "RMSNormBackwardOperation done" << std::endl;
 
     // Always return both gradients over input and gamma. Consider parameterizing this in the future and nullopt?
     return {result[0], result[1]};
