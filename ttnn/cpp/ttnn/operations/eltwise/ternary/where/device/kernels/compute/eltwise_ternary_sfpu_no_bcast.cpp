@@ -7,6 +7,7 @@
 #include "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels/compute/eltwise_utils_common.hpp"
 #include "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels/compute/eltwise_utils_sfpu.hpp"
 #include "compute_kernel_api/eltwise_unary/eltwise_unary.h"
+#include "compute_kernel_api/eltwise_unary/where.h"
 
 namespace NAMESPACE {
 void MAIN {
@@ -43,6 +44,7 @@ void MAIN {
             copy_tile(cb_pre_in3, i, i * 2 + 2);  // Copy to dst reg 2
             // TODO: Use the where op LLK API here
         }
+        where_tile(cb_out, 0, 1, 2);
 
         tile_regs_commit();
         tile_regs_wait();
