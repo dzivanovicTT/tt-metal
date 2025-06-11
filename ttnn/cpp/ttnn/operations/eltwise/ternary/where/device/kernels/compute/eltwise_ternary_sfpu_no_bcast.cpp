@@ -4,8 +4,9 @@
 
 #include <cstdint>
 
-#include "eltwise_utils_common.hpp"
-#include "eltwise_utils_sfpu.hpp"
+#include "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels/compute/eltwise_utils_common.hpp"
+#include "ttnn/cpp/ttnn/operations/eltwise/binary_ng/device/kernels/compute/eltwise_utils_sfpu.hpp"
+#include "compute_kernel_api/eltwise_unary/eltwise_unary.h"
 
 namespace NAMESPACE {
 void MAIN {
