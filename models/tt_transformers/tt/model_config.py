@@ -1493,6 +1493,12 @@ class ModelArgs:
 
         self.state_dict_text_prefix = self._get_text_prefix()
 
+        self.rms_norm_add_unit_offset = False
+
+        # Gemma3 specific params
+        if "gemma-3" in self.base_model_name.lower():
+            self.rms_norm_add_unit_offset = True
+
     @property
     def use_scaled_rope(self):
         return self.rope_scaling_factor is not None
