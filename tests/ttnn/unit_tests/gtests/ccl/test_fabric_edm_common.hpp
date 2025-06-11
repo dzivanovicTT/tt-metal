@@ -1211,7 +1211,8 @@ void setup_test_with_persistent_fabric(
     bool en_dateline_sender_extra_buffer = false,
     bool en_dateline_receiver_extra_buffer = false,
     bool en_dateline_upstream_sender_extra_buffer = false,
-    bool en_dateline_upstream_receiver_extra_buffer = false) {
+    bool en_dateline_upstream_receiver_extra_buffer = false,
+    bool en_dateline_upstream_adjcent_sender_extra_buffer = false) {
     if (enable_persistent_fabric) {
         log_info(tt::LogTest, "Enabling persistent fabric");
         fabric_programs = std::vector<Program>(devices.size());
@@ -1236,7 +1237,8 @@ void setup_test_with_persistent_fabric(
         en_dateline_sender_extra_buffer,
         en_dateline_receiver_extra_buffer,
         en_dateline_upstream_sender_extra_buffer,
-        en_dateline_upstream_receiver_extra_buffer);
+        en_dateline_upstream_receiver_extra_buffer,
+        en_dateline_upstream_adjcent_sender_extra_buffer);
     line_fabric->set_firmware_context_switch_interval(switch_interval);
     if (loopback_on_last_device) {
         for (auto& edm_builder : line_fabric->edm_builders_backward_direction.at(devices.back()->id())) {
@@ -2659,12 +2661,14 @@ void Run1DFabricPacketSendTest(
     bool en_dateline_receiver_extra_buffer = false;
     bool en_dateline_upstream_sender_extra_buffer = false;
     bool en_dateline_upstream_receiver_extra_buffer = false;
+    bool en_dateline_upstream_adjcent_sender_extra_buffer = true;
     if (fabric_mode == FabricTestMode::HalfRing) {
         // HalfRing test is more optimal with extra recv buffer on upstream edm.
         en_dateline_sender_extra_buffer = true;
         en_dateline_receiver_extra_buffer = true;
         en_dateline_upstream_sender_extra_buffer = true;
         en_dateline_upstream_receiver_extra_buffer = true;
+        en_dateline_upstream_adjcent_sender_extra_buffer = true;
     } else if (fabric_mode == FabricTestMode::FullRing) {
         // FullRing is more optimal with extra buffer on both send/recv channels.
         en_dateline_sender_extra_buffer = false;
@@ -2733,7 +2737,8 @@ void Run1DFabricPacketSendTest(
             en_dateline_sender_extra_buffer,
             en_dateline_receiver_extra_buffer,
             en_dateline_upstream_sender_extra_buffer,
-            en_dateline_upstream_receiver_extra_buffer);
+            en_dateline_upstream_receiver_extra_buffer,
+            en_dateline_upstream_adjcent_sender_extra_buffer);
         packet_header_size_bytes = sizeof(tt::tt_fabric::PacketHeader);
     } else {
         // TODO: get packet header size from control plane after it adds APIs to present this information

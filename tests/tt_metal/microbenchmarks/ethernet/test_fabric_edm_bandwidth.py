@@ -790,7 +790,7 @@ def test_fabric_8chip_multi_link_edm_mcast_full_ring_bw(
         line_sync=line_sync,
         line_size=line_size,
         packet_size=packet_size,
-        fabric_mode=FabricTestMode.FullRing,
+        fabric_mode=FabricTestMode.HalfRing,
         disable_sends_for_interior_workers=False,
     )
 
