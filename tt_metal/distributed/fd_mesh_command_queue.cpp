@@ -201,7 +201,15 @@ void FDMeshCommandQueue::enqueue_mesh_workload(MeshWorkload& mesh_workload, bool
     if (!sysmem_manager.get_bypass_mode()) {
         auto& sub_device_cq_owner = cq_shared_state_->sub_device_cq_owner;
         auto& sub_device = sub_device_cq_owner[*sub_device_id];
-        sub_device.take_ownership(sub_device_id, this->id_);
+        if (!sub_device.attempt_take_ownership(sub_device_id, this->id_)) {
+            uint32_t other_cq_id = 1 - id_;
+            MeshEvent event = mesh_device_->mesh_command_queue(other_cq_id)
+                                  .enqueue_record_event(tt::stl::Span<const SubDeviceId>{&sub_device_id, 1});
+            enqueue_wait_for_event(event);
+            bool succeeded = sub_device.attempt_take_ownership(sub_device_id, this->id_);
+            TT_FATAL(
+                succeeded, "Failed to take ownership of sub-device {} for command queue {}", *sub_device_id, this->id_);
+        }
     }
 
     TT_FATAL(
@@ -842,9 +850,24 @@ void FDMeshCommandQueue::enqueue_trace(const MeshTraceId& trace_id, bool blockin
     auto buffer = trace_inst->mesh_buffer;
     uint32_t num_sub_devices = descriptor->sub_device_ids.size();
     auto& sub_device_cq_owner = cq_shared_state_->sub_device_cq_owner;
+    std::vector<SubDeviceId> sub_device_ids_to_be_transferred;
     for (auto sub_device_id : descriptor->sub_device_ids) {
         auto& sub_device = sub_device_cq_owner[*sub_device_id];
-        sub_device.take_ownership(sub_device_id, this->id_);
+        if (!sub_device.attempt_take_ownership(sub_device_id, this->id_)) {
+            sub_device_ids_to_be_transferred.push_back(sub_device_id);
+        }
+    }
+    if (!sub_device_ids_to_be_transferred.empty()) {
+        uint32_t other_cq_id = 1 - id_;
+        MeshEvent event = mesh_device_->mesh_command_queue(other_cq_id)
+                              .enqueue_record_event(tt::stl::Span<const SubDeviceId>{sub_device_ids_to_be_transferred});
+        enqueue_wait_for_event(event);
+        for (auto sub_device_id : sub_device_ids_to_be_transferred) {
+            auto& sub_device = sub_device_cq_owner[*sub_device_id];
+            bool succeeded = sub_device.attempt_take_ownership(sub_device_id, this->id_);
+            TT_FATAL(
+                succeeded, "Failed to take ownership of sub-device {} for command queue {}", *sub_device_id, this->id_);
+        }
     }
 
     auto cmd_sequence_sizeB = trace_dispatch::compute_trace_cmd_size(num_sub_devices);

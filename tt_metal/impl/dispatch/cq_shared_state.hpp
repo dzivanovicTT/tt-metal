@@ -18,8 +18,8 @@ namespace tt::tt_metal {
 // Keeps track of the ownership state of a sub-device's workers.
 class CQOwnerState {
 public:
-    // Raises an exception if the sub-device is already owned by a different command queue.
-    void take_ownership(SubDeviceId id, uint32_t cq_id);
+    // Returns false if the sub-device is already owned by another command queue.
+    bool attempt_take_ownership(SubDeviceId id, uint32_t cq_id);
 
     void finished(uint32_t cq_id);
     void recorded_event(uint32_t event_id, uint32_t event_cq);

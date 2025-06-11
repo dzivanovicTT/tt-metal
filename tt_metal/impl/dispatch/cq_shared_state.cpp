@@ -5,18 +5,13 @@
 #include "cq_shared_state.hpp"
 
 namespace tt::tt_metal {
-void CQOwnerState::take_ownership(SubDeviceId id, uint32_t cq_id) {
+bool CQOwnerState::attempt_take_ownership(SubDeviceId id, uint32_t cq_id) {
     if (cq_id_ != std::nullopt && cq_id_ != cq_id) {
-        TT_FATAL(
-            cq_id_ == cq_id,
-            "Sub device id {} currently in use by cq {}. Can't enqueue program from cq {}. Finish or wait "
-            "for an event to transfer ownership.",
-            *id,
-            *cq_id_,
-            cq_id);
+        return false;
     }
     cq_id_ = cq_id;
     ownership_event_id_ = std::nullopt;
+    return true;
 }
 
 void CQOwnerState::finished(uint32_t cq_id) {

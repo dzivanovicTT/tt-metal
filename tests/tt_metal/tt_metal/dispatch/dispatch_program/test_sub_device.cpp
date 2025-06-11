@@ -512,37 +512,19 @@ TEST_F(MultiCommandQueueSingleDeviceFixture, TensixTestSubDeviceCQOwnership) {
         CoreRangeSet(CoreRange({3, 3}, {3, 3})),
         tt_metal::DataMovementConfig{
             .processor = tt_metal::DataMovementProcessor::RISCV_0, .noc = tt_metal::NOC::RISCV_0_default});
-    EnqueueProgram(device->command_queue(0), program_1, false);
     auto early_event = std::make_shared<Event>();
     EnqueueRecordEvent(device->command_queue(1), early_event);
-    EnqueueProgram(device->command_queue(1), program_2, false);
-
-    // CQ 0 owns sub device 1, CQ 1 owns sub device 2.
-    EXPECT_THROW(EnqueueProgram(device->command_queue(1), program_1, false), std::exception);
-
-    // Finish allows transfering ownership of sub device 1.
-    Finish(device->command_queue(0));
-    EnqueueProgram(device->command_queue(1), program_1, false);
-
-    // CQ 1 owns sub devices 1 and 2.
-    EXPECT_THROW(EnqueueProgram(device->command_queue(0), program_2, false), std::exception);
-
-    // Waiting on an event before the last program was queued does not allow transferring ownership of sub device 2.
-    EnqueueWaitForEvent(device->command_queue(0), early_event);
-    EXPECT_THROW(EnqueueProgram(device->command_queue(0), program_2, false), std::exception);
-
-    // Later event allows transferring ownership of sub device 2 to CQ 0
-    auto event1 = std::make_shared<Event>();
-    auto event2 = std::make_shared<Event>();
-    EnqueueRecordEvent(device->command_queue(1), event1);
-    EnqueueRecordEvent(device->command_queue(1), event2);
-    EnqueueWaitForEvent(device->command_queue(0), event2);
-    EnqueueProgram(device->command_queue(0), program_2, false);
-
-    Synchronize(device);
-    // Synchronize allows transferring ownership of either subdevice.
     EnqueueProgram(device->command_queue(0), program_1, false);
     EnqueueProgram(device->command_queue(1), program_2, false);
+
+    EnqueueProgram(device->command_queue(1), program_1, false);
+    EnqueueProgram(device->command_queue(0), program_2, false);
+
+    EnqueueWaitForEvent(device->command_queue(0), early_event);
+
+    EnqueueProgram(device->command_queue(0), program_1, false);
+    EnqueueProgram(device->command_queue(1), program_2, false);
+
     Synchronize(device);
 }
 

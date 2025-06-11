@@ -321,9 +321,6 @@ TEST_F(T3000MultiCQFabricMeshDeviceFixture, AsyncExecutionWorksCQ0CQ1) {
             auto promise = std::make_shared<std::promise<void>>();
             futures.push_back(promise->get_future());
             boost::asio::post(pool, [&, dev_idx, device, promise]() mutable {
-                // TODO: investigate why other OPs can't be scheduled on a different command queue until CCL is finished
-                ttnn::queue_synchronize(device->command_queue(ccl_cq_id));
-
                 auto dummy_data = std::shared_ptr<bfloat16[]>(new bfloat16[num_elems]);
                 for (int j = 0; j < num_elems; j++) {
                     dummy_data[j] = bfloat16(static_cast<float>(dev_idx));
