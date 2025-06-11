@@ -128,16 +128,19 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
     // L1 Scratch CB Creation
     const size_t packet_size_bytes = tt::tt_fabric::get_tt_fabric_channel_buffer_size_bytes();
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
+
+    // for bfloat8_b, tile_num_per_link=6, we would need to send 2 packages, but they can be of size 3 instead of 4
+    uint32_t tiles_to_write_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
+    uint32_t num_tiles_per_link = (batch_slice_num_pages + num_links - 1) / num_links;
+    uint32_t num_packages_per_link = (num_tiles_per_link + tiles_to_write_per_packet - 1) / tiles_to_write_per_packet;
+    tiles_to_write_per_packet = (num_tiles_per_link + num_packages_per_link - 1) / num_packages_per_link;
+
     // Will be reworked
-    uint32_t num_pages_per_packet;
-    uint32_t tile_granularity;
     if ((batch_slice_num_pages / num_links) % 4 != 0) {
-        num_pages_per_packet = 2;
-        tile_granularity = 2;
-    } else {
-        num_pages_per_packet = 4;
-        tile_granularity = 4;
+        tiles_to_write_per_packet = 2;
     }
+    uint32_t tile_granularity = 4 * tiles_to_write_per_packet;
+
     uint32_t cb_num_pages = 3 * tile_granularity;  // double buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
@@ -198,7 +201,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         ring_size,                                               // ring_size
         num_batches,                                             // num_batches
         fuse_op,                                                 // fused op
-        num_pages_per_packet                                     // contig_pages_advanced
+        tiles_to_write_per_packet                                // contig_pages_advanced
     };
     auto worker_sender_reader_kernel_id = tt::tt_metal::CreateKernel(
         program,
@@ -223,7 +226,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         batch_slice_num_pages,                                   // batch_slice_num_pages
         ring_size,                                               // ring_size
         num_batches,                                             // num_batches
-        num_pages_per_packet,                                    // contig_pages_advanced
+        tiles_to_write_per_packet,                               // contig_pages_advanced
     };
     auto worker_sender_writer_kernel_id = tt::tt_metal::CreateKernel(
         program,
@@ -239,7 +242,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         intermediate_cb_index,
         compute_output_cb_index,
         batch_slice_num_pages,
-        tile_granularity,
+        (8 < tile_granularity) ? 8 : tile_granularity,
         ring_size,
         num_batches,
         num_links};
