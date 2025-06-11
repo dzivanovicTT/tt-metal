@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2024 Tenstorrent Inc.
+// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
 //
 // SPDX-License-Identifier: Apache-2.0
 
@@ -26,7 +26,7 @@ inline void llk_math_eltwise_ternary_sfpu_params(
         // Row vector - Face0 + Face1
         for (int face = 0; face < 2; face++) {
             ckernel::sfpu::_calculate_where_<32>();
-            // sfpu_func(dst_offset, static_cast<ARGS&&>(args)...); //Need to replace the above line with this
+            // sfpu_func(static_cast<ARGS&&>(args)...); //Need to replace the above line with this
             TTI_SETRWC(p_setrwc::CLR_NONE, p_setrwc::CR_D, 8, 0, 0, p_setrwc::SET_D);  // repeat 2x
             TTI_SETRWC(p_setrwc::CLR_NONE, p_setrwc::CR_D, 8, 0, 0, p_setrwc::SET_D);
         }

@@ -44,7 +44,7 @@ void MAIN {
             copy_tile(cb_pre_in3, i, i * 2 + 2);  // Copy to dst reg 2
             // TODO: Use the where op LLK API here
         }
-        where_tile(cb_out, 0, 1, 2);
+        where_tile(0, 1, 2);
 
         tile_regs_commit();
         tile_regs_wait();
