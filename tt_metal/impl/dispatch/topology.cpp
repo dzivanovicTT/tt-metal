@@ -1314,6 +1314,11 @@ void build_tt_fabric_program(
 
     for (const auto& direction : tt::tt_fabric::FabricContext::routing_directions) {
         auto active_eth_chans = control_plane.get_active_fabric_eth_channels_in_direction(fabric_node_id, direction);
+        std::cout << "Get active eth chans for: " << device->id() << std::endl;
+        for (auto chan: active_eth_chans) {
+            std::cout << +chan << " "; 
+        }
+        std::cout << std::endl;
         if (active_eth_chans.empty()) {
             continue;
         }
@@ -1344,8 +1349,12 @@ void build_tt_fabric_program(
         }
 
         FabricNodeId neighbor_fabric_node_id = FabricNodeId(neighbors.begin()->first, neighbors.begin()->second[0]);
-        chip_neighbors[direction] = control_plane.get_physical_chip_id_from_fabric_node_id(neighbor_fabric_node_id);
-
+        if (neighbors.begin()->first == fabric_node_id.mesh_id) {
+            chip_neighbors[direction] = control_plane.get_physical_chip_id_from_fabric_node_id(neighbor_fabric_node_id);
+        } else {
+            chip_neighbors[direction] = *(neighbors.begin()->first) + 1;
+            std::cout << "Intermesh Neighbor: " << chip_neighbors[direction] << std::endl;
+        }
         active_fabric_eth_channels.insert({direction, active_eth_chans});
     }
 
@@ -1369,13 +1378,14 @@ void build_tt_fabric_program(
         const auto& curr_edm_config = fabric_context.get_fabric_router_config(is_dateline);
 
         for (const auto& eth_chan : active_fabric_eth_channels[direction]) {
+            std::cout << "Launch Fabric on: " << device->id() << " " << +eth_chan << " " << +static_cast<uint8_t>(direction) << std::endl;
             auto eth_logical_core = soc_desc.get_eth_core_for_channel(eth_chan, CoordSystem::LOGICAL);
             auto edm_builder = tt::tt_fabric::FabricEriscDatamoverBuilder::build(
                 device,
                 *fabric_program_ptr,
                 eth_logical_core,
                 device->id(),
-                remote_physical_chip_id,
+                remote_physical_chip_id, 
                 curr_edm_config,
                 true,  /* enable_persistent_mode */
                 false, /* build_in_worker_connection_mode */
@@ -1450,7 +1460,9 @@ std::unique_ptr<Program> create_and_compile_tt_fabric_program(IDevice* device) {
     const auto& control_plane= tt::tt_metal::MetalContext::instance().get_control_plane();
     auto& fabric_context = control_plane.get_fabric_context();
 
+    std::cout << "Call build" << std::endl;
     build_tt_fabric_program(device, fabric_program_ptr.get(), edm_builders);
+    std::cout << "Done build" << std::endl;
     fabric_context.set_num_fabric_initialized_routers(device->id(), edm_builders.size());
     if (edm_builders.empty()) {
         return nullptr;
