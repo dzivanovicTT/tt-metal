@@ -74,10 +74,7 @@ void set_or_update_runtime_arguments(
         };
         handle_args(program, writer_kernel_id, core, writer_runtime_args);
 
-        std::array compute_runtime_args = {
-            num_tiles_per_core
-            // TODO : Add args required for compute file and update the count in num_kernel_args
-        };
+        std::array compute_runtime_args = {num_tiles_per_core};
         handle_args(program, compute_kernel_id, core, compute_runtime_args);
 
         start_tile_id += num_tiles_per_core;
@@ -184,18 +181,35 @@ WhereDeviceOperation::WhereProgramFactory::cached_program_t WhereDeviceOperation
         tt_metal::WriterDataMovementConfig({output_tensor_cb, output_is_dram}));
 
     // COMPUTE KERNEL
-    bool fp32_dest_acc_en = value_false_data_format == tt::DataFormat::UInt32 ||
-                            value_false_data_format == tt::DataFormat::Int32 ||
-                            value_false_data_format == tt::DataFormat::Float32;
+    bool fp32_dest_acc_en = output_data_format == tt::DataFormat::UInt32 ||
+                            output_data_format == tt::DataFormat::Int32 ||
+                            output_data_format == tt::DataFormat::Float32;
 
+    std::vector<UnpackToDestMode> unpack_to_dest_mode(NUM_CIRCULAR_BUFFERS, UnpackToDestMode::Default);
+    unpack_to_dest_mode[tt::CBIndex::c_0] = (predicate_tensor.dtype() == DataType::FLOAT32)
+                                                ? UnpackToDestMode::UnpackToDestFp32
+                                                : UnpackToDestMode::Default;
+    unpack_to_dest_mode[tt::CBIndex::c_1] = (value_true_tensor.dtype() == DataType::FLOAT32)
+                                                ? UnpackToDestMode::UnpackToDestFp32
+                                                : UnpackToDestMode::Default;
+    unpack_to_dest_mode[tt::CBIndex::c_2] = (value_false_tensor.dtype() == DataType::FLOAT32)
+                                                ? UnpackToDestMode::UnpackToDestFp32
+                                                : UnpackToDestMode::Default;
+    unpack_to_dest_mode[tt::CBIndex::c_3] =
+        (output.dtype() == DataType::FLOAT32) ? UnpackToDestMode::UnpackToDestFp32 : UnpackToDestMode::Default;
+
+    constexpr uint32_t num_tiles_per_cycle = 1;  // we produce 1 output tile per read-compute-write cycle
     std::vector<uint32_t> compute_kernel_args = {
-        // TODO : Replace with required compile time args
+        num_tiles_per_cycle,
     };
     auto compute_kernel_id = tt_metal::CreateKernel(
         program,
         "ttnn/cpp/ttnn/operations/eltwise/ternary/where/device/kernels/compute/eltwise_ternary_sfpu_no_bcast.cpp",
         all_device_cores,
-        tt_metal::ComputeConfig{.fp32_dest_acc_en = fp32_dest_acc_en, .compile_args = compute_kernel_args});
+        tt_metal::ComputeConfig{
+            .fp32_dest_acc_en = fp32_dest_acc_en,
+            .unpack_to_dest_mode = unpack_to_dest_mode,
+            .compile_args = compute_kernel_args});
 
     auto set_runtime_args = [](Program& program, KernelHandle kernel_id, CoreCoord core, auto&& args) {
         tt_metal::SetRuntimeArgs(program, kernel_id, core, args);
