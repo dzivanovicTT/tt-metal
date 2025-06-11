@@ -101,6 +101,11 @@ class RMSNorm(LightweightModule):
                 else None,
             )
 
+        if add_unit_offset:
+            self.weight = ttnn.add(self.weight, 1.0, memory_config=weight_memory_config)
+            if self.is_distributed:
+                self.weight_distributed = ttnn.add(self.weight_distributed, 1.0, memory_config=weight_memory_config)
+
         self.sharded_output_config = sharded_output_config
         self.sharded_program_config = sharded_program_config
         self.output_mem_config = output_mem_config

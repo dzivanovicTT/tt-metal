@@ -1498,6 +1498,7 @@ class ModelArgs:
         # Gemma3 specific params
         if "gemma-3" in self.base_model_name.lower():
             self.rms_norm_add_unit_offset = True
+            self.mlp_activation_type = ttnn.UnaryOpType.GELU
 
     @property
     def use_scaled_rope(self):
