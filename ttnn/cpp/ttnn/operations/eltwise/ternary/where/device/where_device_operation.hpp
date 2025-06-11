@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #pragma once
 
 #include "ttnn/decorators.hpp"
@@ -17,7 +21,6 @@ struct WhereDeviceOperation {
         std::optional<DataType> dtype;
         std::optional<DeviceComputeKernelConfig> compute_kernel_config;
 
-        tt::stl::hash::hash_t to_hash() const;
         DataType get_dtype() const;
     };
 

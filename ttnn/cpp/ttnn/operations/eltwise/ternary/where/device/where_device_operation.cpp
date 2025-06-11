@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #include "where_device_operation.hpp"
 #include "ttnn/operations/cb_utils.hpp"
 #include "ttnn/operations/eltwise/unary/common/unary_op_utils.hpp"
