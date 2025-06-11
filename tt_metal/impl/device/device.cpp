@@ -857,8 +857,7 @@ void Device::initialize_and_launch_firmware() {
         if (is_active_ethernet_core(worker_core) && !hal.get_eth_fw_is_cooperative()) {
             reset_val =
                 reset_val & static_cast<TensixSoftResetOptions>(
-                                ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::BRISC));
-            continue;
+                                ~std::underlying_type<TensixSoftResetOptions>::type(TensixSoftResetOptions::TRISC0));
         }
         tt::tt_metal::MetalContext::instance().get_cluster().deassert_risc_reset_at_core(
             tt_cxy_pair(this->id(), worker_core), reset_val);
@@ -1172,8 +1171,6 @@ bool Device::close() {
                 if (!this->storage_only_cores_.contains(logical_core) && !is_active_ethernet_core(logical_core)) {
                     tt::tt_metal::MetalContext::instance().get_cluster().assert_risc_reset_at_core(
                         tt_cxy_pair(this->id(), worker_core));
-                } else if (is_active_ethernet_core(logical_core)) {
-                    log_info(tt::LogMetal, "{} is an active ethernet core, not resetting", worker_core.str());
                 }
             } else {
                 log_debug(tt::LogMetal, "{} will not be Reset when closing Device {}", worker_core.str(), this->id());

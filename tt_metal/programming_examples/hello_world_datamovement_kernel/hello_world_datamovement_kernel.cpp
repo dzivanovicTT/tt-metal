@@ -41,7 +41,10 @@ int main() {
     // Wait Until Program Finishes, Print "Hello World!", and Close Device
 
     Finish(cq);
-    printf("Thank you, Core {0, 0} on Device 0, for the completed task.\n");
+    while (true) {
+        printf("Thank you, Core {0, 0} on Device 0, for the completed task.\n");
+        sleep(1);
+    }
     CloseDevice(device);
 
     return 0;

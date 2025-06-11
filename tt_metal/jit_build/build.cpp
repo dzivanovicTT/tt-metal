@@ -597,6 +597,7 @@ JitBuildActiveEthernet::JitBuildActiveEthernet(const JitBuildEnv& env, const Jit
             this->defines_ +=
                 "-DCOMPILE_FOR_IDLE_ERISC=1 "
                 "-DERISC "
+                "-DSUBORDINATE_ACTIVE_DM "
                 "-DRISC_B0_HW ";
             this->includes_ += "-I " + env_.root_ + "tt_metal/hw/firmware/src ";
             if (this->is_fw_) {

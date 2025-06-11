@@ -100,7 +100,7 @@ int main() {
     while (routing_info->routing_enabled) {
         // Wait...
         WAYPOINT("GW");
-
+        ((volatile uint32_t*)(262144))[0]++;
         uint8_t go_message_signal = mailboxes->go_message.signal;
         if (go_message_signal == RUN_MSG_GO) {
             // Only include this iteration in the device profile if the launch message is valid. This is because all

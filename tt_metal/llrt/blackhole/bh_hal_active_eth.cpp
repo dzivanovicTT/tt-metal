@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <tt-logger/tt-logger.hpp>
 #include "llrt_common/mailbox.hpp"
 #define COMPILE_FOR_ERISC
 
@@ -93,7 +94,7 @@ HalCoreInfoType create_active_eth_mem_map() {
 
     std::vector<std::vector<HalJitBuildConfig>> processor_classes(NumEthDispatchClasses);
     std::vector<HalJitBuildConfig> processor_types(
-        static_cast<std::underlying_type_t<EthProcessorTypes>>(EthProcessorTypes::COUNT) - 1);
+        static_cast<std::underlying_type_t<EthProcessorTypes>>(EthProcessorTypes::COUNT));
 
     for (std::uint8_t processor_class_idx = 0; processor_class_idx < NumEthDispatchClasses; processor_class_idx++) {
         for (size_t processor_type_idx = 0; processor_type_idx < processor_types.size(); processor_type_idx++) {
@@ -102,7 +103,7 @@ HalCoreInfoType create_active_eth_mem_map() {
 
             switch (static_cast<EthProcessorTypes>(processor_type_idx)) {
                 case EthProcessorTypes::DM0: {
-                    fw_base = MEM_AERISC_FIRMWARE_BASE;
+                    fw_base = 0x36b8;  // MEM_AERISC_FIRMWARE_BASE;
                     local_init = MEM_AERISC_INIT_LOCAL_L1_BASE_SCRATCH;
                     fw_launch = 0;  // This is not used for DM0. The ETH FW API will be used instead.
                     fw_launch_value = fw_base;

@@ -63,8 +63,7 @@ inline __attribute__((always_inline)) void signal_subordinate_erisc_completion()
     *subordinate_erisc_run = RUN_SYNC_MSG_DONE;
 }
 
-int main(int argc, char* argv[]) {
-    ((volatile uint32_t*)(262160))[0] = 0xcafecafe;
+int main() {
     configure_csr();
     WAYPOINT("I");
     do_crt1((uint32_t*)MEM_SUBORDINATE_IERISC_INIT_LOCAL_L1_BASE_SCRATCH);
@@ -75,12 +74,11 @@ int main(int argc, char* argv[]) {
     my_logical_y_ = mailboxes->core_info.absolute_logical_y;
     risc_init();
 
-    ((volatile uint32_t*)(262160))[0] = 0xcafecafe;
-
     // Cleanup profiler buffer incase we never get the go message
     while (1) {
         WAYPOINT("W");
         while (*subordinate_erisc_run != RUN_SYNC_MSG_GO) {
+            ((volatile uint32_t*)(262160))[0]++;
             invalidate_l1_cache();
         }
         DeviceZoneScopedMainN("SUBORDINATE-IDLE-ERISC-FW");
