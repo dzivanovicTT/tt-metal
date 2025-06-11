@@ -84,14 +84,20 @@ class SentenceBERTPerformanceRunnerInfra:
         input_ids = self.input_ids if input_ids is None else input_ids
         print("its input is ", input_ids.shape)
         input_ids = ttnn.from_torch(input_ids, dtype=ttnn.uint32)
-        input_memory_config = ttnn.create_sharded_memory_config(
-            input_ids.shape,
-            core_grid=device.core_grid,
-            strategy=ttnn.ShardStrategy.BLOCK,
-            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        # input_memory_config = ttnn.create_sharded_memory_config(
+        #     (8,384),
+        #     core_grid=device.core_grid,
+        #     strategy=ttnn.ShardStrategy.BLOCK,
+        #     orientation=ttnn.ShardOrientation.ROW_MAJOR,
+        # )
+        grid_size = core_grid
+        grid_coord = ttnn.CoreCoord(grid_size.x - 1, grid_size.y - 1)
+        shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), grid_coord)})
+        shard_spec = ttnn.ShardSpec(shard_grid, (1, 384), ttnn.ShardOrientation.ROW_MAJOR)
+        input_mem_config = ttnn.MemoryConfig(
+            ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
         )
-
-        return input_ids, input_memory_config
+        return input_ids, input_mem_config
 
     def setup_input(self):
         print("setup input is called")
@@ -107,15 +113,15 @@ class SentenceBERTPerformanceRunnerInfra:
             ttnn.CoreRangeSet(
                 {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(dram_grid_size.x - 1, dram_grid_size.y - 1))}
             ),
-            tt_inputs_host.shape,
+            (1, 384),
             ttnn.ShardOrientation.ROW_MAJOR,
         )
         sharded_mem_config_DRAM = ttnn.MemoryConfig(
-            ttnn.TensorMemoryLayout.BLOCK_SHARDED, ttnn.BufferType.DRAM, dram_shard_spec
+            ttnn.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.BufferType.DRAM, dram_shard_spec
         )
-        _, ttnn_token_type_ids, ttnn_position_ids, ttnn_attention_mask = preprocess_inputs(
-            self.input_ids, self.token_type_ids, self.position_ids, self.extended_mask, self.device
-        )
+        ttnn_token_type_ids = ttnn.from_torch(self.token_type_ids, dtype=ttnn.uint32)
+        ttnn_position_ids = ttnn.from_torch(self.position_ids, dtype=ttnn.uint32)
+        ttnn_attention_mask = ttnn.from_torch(self.extended_mask, dtype=ttnn.bfloat16)  # , layout=ttnn.TILE_LAYOUT)
 
         return (
             tt_inputs_host,

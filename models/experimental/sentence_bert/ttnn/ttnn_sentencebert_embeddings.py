@@ -41,20 +41,29 @@ class TtnnSentenceBertEmbeddings:
         ttnn.deallocate(input_ids_interleaved)
         print("qjfbwjbef", token_type_ids.shape, input_ids.shape, position_ids.shape)
         # ss
+        if token_type_ids.is_sharded():
+            token_type_ids_altered = ttnn.sharded_to_interleaved(token_type_ids, ttnn.L1_MEMORY_CONFIG)
+        else:
+            token_type_ids_altered = token_type_ids
         token_type_embeddings = self.token_type_embeddings(
-            token_type_ids,
+            token_type_ids_altered,
             self.parameters.token_type_embeddings.weight,
             layout=ttnn.TILE_LAYOUT,
             memory_config=ttnn.L1_MEMORY_CONFIG,
         )
-
+        ttnn.deallocate(token_type_ids)
+        if position_ids.is_sharded():
+            position_ids_altered = ttnn.sharded_to_interleaved(position_ids, ttnn.L1_MEMORY_CONFIG)
+        else:
+            position_ids_altered = position_ids
         position_embeddings = self.position_embeddings(
-            position_ids,
+            position_ids_altered,
             self.parameters.position_embeddings.weight,
             layout=ttnn.TILE_LAYOUT,
             memory_config=ttnn.L1_MEMORY_CONFIG,
         )
-
+        # ttnn.deallocate(token_type_ids)
+        ttnn.deallocate(position_ids)
         embeddings = word_embeddings + token_type_embeddings + position_embeddings
         ttnn.deallocate(word_embeddings)
         ttnn.deallocate(token_type_embeddings)
@@ -70,6 +79,7 @@ class TtnnSentenceBertEmbeddings:
             ),
             dtype=ttnn.bfloat8_b,
         )
+
         embeddings = self.LayerNorm(
             embeddings,
             weight=self.parameters.LayerNorm.weight,

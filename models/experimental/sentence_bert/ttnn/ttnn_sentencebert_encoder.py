@@ -18,7 +18,13 @@ class TtnnSentenceBertEncoder:
         attention_mask: ttnn.Tensor,
         device=None,
     ):
+        if attention_mask.is_sharded():
+            attention_mask_t = ttnn.sharded_to_interleaved(attention_mask, ttnn.L1_MEMORY_CONFIG)
+            attention_mask_t = ttnn.to_layout(attention_mask_t, ttnn.TILE_LAYOUT)
+        else:
+            attention_mask_t = attention_mask
         for i in range(len(self.layers)):
-            layer_outputs = self.layers[i](hidden_states, attention_mask, device=device)
+            layer_outputs = self.layers[i](hidden_states, attention_mask_t, device=device)
             hidden_states = layer_outputs
+        ttnn.deallocate(attention_mask)
         return hidden_states

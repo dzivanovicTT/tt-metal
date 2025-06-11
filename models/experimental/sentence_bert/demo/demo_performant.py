@@ -58,7 +58,7 @@ def compute_ttnn_embeddings(sentences, model_name, device, batch_size=8):
 
             sentence_bert_trace_2cq._capture_sentencebert_trace_2cqs()
 
-        ttnn_output = sentence_bert_trace_2cq.run(input_ids, extended_mask)
+        ttnn_output = sentence_bert_trace_2cq.run(input_ids, token_type_ids, position_ids, extended_mask)
         print("ttnn output is", ttnn_output.shape, ttnn_output.layout)
         logger.info("Running inference on TTNN model for current batch...")
         ttnn_output = ttnn.to_torch(ttnn_output).squeeze(dim=1)
@@ -109,7 +109,9 @@ def test_semantic_search_with_ttnn(device, use_program_cache):
         input_ids = encoded_input["input_ids"]
         attention_mask = encoded_input["attention_mask"]
         extended_mask = custom_extended_mask(attention_mask, dtype=torch.bfloat16)
-        ttnn_output = model_instance.run(input_ids, extended_mask)
+        token_type_ids = encoded_input["token_type_ids"]
+        position_ids = torch.arange(0, input_ids.shape[-1], dtype=torch.int64).unsqueeze(dim=0)
+        ttnn_output = model_instance.run(input_ids, token_type_ids, position_ids, extended_mask)
         print("ttnn output is", ttnn_output.shape, ttnn_output.layout)
         logger.info("Running inference on TTNN model for current batch...")
         ttnn_output = ttnn.to_torch(ttnn_output).squeeze(dim=1)

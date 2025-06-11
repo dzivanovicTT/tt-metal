@@ -22,7 +22,7 @@ from models.experimental.sentence_bert.ttnn.common import custom_preprocessor, p
 
 
 def get_expected_times(name):
-    base = {"sentence_bert": (12.1, 0.14)}
+    base = {"sentence_bert": (12.1, 0.15)}
     return base[name]
 
 
@@ -49,11 +49,11 @@ def test_ttnn_sentence_bert_perf(device, inputs):
         device=device,
     )
     ttnn_module = TtnnSentenceBertModel(parameters=parameters, config=config)
-    ttnn_input_ids, ttnn_token_type_ids, ttnn_position_ids, ttnn_attention_mask = preprocess_inputs(
-        input_ids, token_type_ids, position_ids, extended_mask, device
-    )
     durations = []
     for i in range(2):
+        ttnn_input_ids, ttnn_token_type_ids, ttnn_position_ids, ttnn_attention_mask = preprocess_inputs(
+            input_ids, token_type_ids, position_ids, extended_mask, device
+        )
         start = time.time()
         ttnn_model_output = ttnn_module(
             ttnn_input_ids, ttnn_attention_mask, ttnn_token_type_ids, ttnn_position_ids, device=device

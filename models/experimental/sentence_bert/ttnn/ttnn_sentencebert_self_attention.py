@@ -72,7 +72,6 @@ class TtnnSentenceBertSelfAttention:
             head_size=head_size,
             program_config=softmax_config,
         )
-        # ttnn.deallocate(attention_mask)
         context_layer = ttnn.matmul(
             attention_probabilities,
             value_layer,
