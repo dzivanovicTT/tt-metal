@@ -26,7 +26,7 @@ FORCE_INLINE void setup_local_cb_read_write_interfaces(
 // The following code is a C++ version of the assembly loop. It performs the same operations as the assembly, but
 // the compiler doesn't optimize it as well as the assembly version (roughly 770 vs 595 cycles for 32 CBs on wormhole).
 // This code is only to demonstrate the logic of the loop and is not used in production builds.
-#if DISABLE_CB_ASSEMBLY
+#if 1
 
     bool next_cb_exists = local_cb_mask & 1;
     while (true) {
