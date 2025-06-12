@@ -175,58 +175,52 @@ def create_tt_model(
             True,  # stop_at_eos
             False,  # ci_only
         ),
-        # (  # Batch-1 run (Throughput) - 1 user, small prompt
-        #     "models/tt_transformers/demo/sample_prompts/input_data_questions_prefill_128.json",  # input_prompts
-        #     True,  # instruct mode
-        #     1,  # repeat_batches
-        #     128 * 1024,  # max_seq_len
-        #     1,  # batch_size
-        #     200,  # max_generated_tokens
-        #     True,  # paged_attention
-        #     {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
-        #     {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
-        #     True,  # stop_at_eos
-        #     False,  # ci_only
-        # ),
-        # (  # Repeat-5 Batch-1 run (Throughput) - 1 user, small prompt
-        #     "models/tt_transformers/demo/sample_prompts/input_data_questions_prefill_128.json",  # input_prompts
-        #     True,  # instruct mode
-        #     2,  # repeat_batches
-        #     128 * 1024,  # max_seq_len
-        #     1,  # batch_size
-        #     200,  # max_generated_tokens
-        #     True,  # paged_attention
-        #     {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
-        #     {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
-        #     True,  # stop_at_eos
-        #     False,  # ci_only
-        # ),
-        # (  # Long-context run - Single user, long prompt (adapted to the model being used and architecture)
-        #     "models/tt_transformers/demo/sample_prompts/input_data_long_16k.json",  # input_prompts
-        #     True,  # instruct mode
-        #     1,  # repeat_batches
-        #     128 * 1024,  # max_seq_len
-        #     32,  # batch_size
-        #     200,  # max_generated_tokens
-        #     True,  # paged_attention
-        #     {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
-        #     {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
-        #     True,  # stop_at_eos
-        #     False,  # ci_only
-        # ),
+        (  # Batch-1 run (Throughput) - 1 user, small prompt
+            "models/tt_transformers/demo/sample_prompts/input_data_questions_prefill_128.json",  # input_prompts
+            True,  # instruct mode
+            1,  # repeat_batches
+            128 * 1024,  # max_seq_len
+            1,  # batch_size
+            50,  # max_generated_tokens
+            True,  # paged_attention
+            {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
+            {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
+            True,  # stop_at_eos
+            False,  # ci_only
+        ),
+        (  # Repeat-5 Batch-1 run (Throughput) - 1 user, small prompt
+            "models/tt_transformers/demo/sample_prompts/input_data_questions_prefill_128.json",  # input_prompts
+            True,  # instruct mode
+            2,  # repeat_batches
+            128 * 1024,  # max_seq_len
+            1,  # batch_size
+            200,  # max_generated_tokens
+            True,  # paged_attention
+            {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
+            {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
+            True,  # stop_at_eos
+            False,  # ci_only
+        ),
+        (  # Long-context run - Single user, long prompt (adapted to the model being used and architecture)
+            "models/tt_transformers/demo/sample_prompts/input_data_long_16k.json",  # input_prompts
+            True,  # instruct mode
+            1,  # repeat_batches
+            128 * 1024,  # max_seq_len
+            1,  # batch_size
+            50,  # max_generated_tokens
+            True,  # paged_attention
+            {"page_block_size": 64, "page_max_num_blocks": 4096},  # page_params
+            {"temperature": 0, "top_p": 0.08},  # sampling_params (argmax)
+            True,  # stop_at_eos
+            False,  # ci_only
+        ),
     ],
-    # ids=[
-    #     "batch-32",  # throughput
-    #     "batch-1",  # latency
-    #     "repeat2",  # latency with 5 repeat batches
-    #     "long-context",  # max-length
-    # ],
-    # ids=[
-    #     "batch-32",  # throughput
-    #     "batch-1",  # latency
-    #     "repeat2",  # latency with 5 repeat batches
-    #     "long-context",  # max-length
-    # ],
+    ids=[
+        "batch-32",  # throughput
+        "batch-1",  # latency
+        "repeat2",  # latency with 5 repeat batches
+        "long-context",  # max-length
+    ],
 )
 @pytest.mark.parametrize(
     "optimizations",
@@ -281,7 +275,7 @@ def test_demo_text(
     if os.environ.get("MESH_DEVICE") == "TG" and batch_size not in [1, 32]:
         pytest.skip("Llama TG only supports batch-32")
 
-    enable_trace = True  # Use tracing for better perf
+    enable_trace = False  # Use tracing for better perf
     prefill_enable_trace = True  # repeat_batches > 1
     print_to_file = False  # Enable this flag to print the output of all users to a file
 
@@ -337,25 +331,7 @@ def test_demo_text(
     else:  # Inputs from file
         input_prompts = load_inputs(
             input_prompts,
-            [
-                2,
-                111,
-                534,
-                1008,
-                1111 * 4,
-                3333 * 4,
-                4444 * 4,
-                5555 * 4,
-                6666 * 4,
-                7777 * 4,
-                8888 * 2,
-                9999 * 2,
-                10000 * 2,
-                11111 * 2,
-                12222 * 2,
-                15384 * 2,
-            ]
-            * 2,
+            [100] * 32,
             input_prompts,
         )
     profiler.end("loading_inputs")
@@ -499,6 +475,7 @@ def test_demo_text(
         except Exception as e:
             logger.error(f"Error during prefill: {str(e)}")
             raise e
+        print("LOGITS: ", logits.shape, logits)
         prefilled_token = logits.view(-1, 1)  # torch.argmax(logits, dim=-1)
         profiler.end(f"inference_prefill", iteration=batch_idx)
         logger.info(f"Prefill finished")
@@ -511,9 +488,9 @@ def test_demo_text(
         for user in range(batch_size):
             user_tok = int(prefilled_token[user].item())
             all_outputs[user].append(user_tok)
-        print("Prefill outputs:", [tokenizer.decode(output) for output in all_outputs])
-        model.tt_ccl.close()
-        return True
+        # print("Prefill outputs:", [tokenizer.decode(output) for output in all_outputs])
+        # model.tt_ccl.close()
+        # return True
         user_done = [False] * batch_size  # Keeps track when a user reaches EoD token
 
         # TODO Argmax on device is only supported for batch_size=1
@@ -534,6 +511,7 @@ def test_demo_text(
         users_decoding = True
 
         out_tok = prefilled_token  # .repeat(batch_size, 1)
+        print(f"!! {prefilled_token=}")
         try:
             model.switch_mode("decode")
         except Exception as e:
@@ -558,8 +536,9 @@ def test_demo_text(
                     page_table=page_table,
                     kv_cache=tt_kv_cache,
                     sampling_params=device_sampling_params,
-                    reset_inputs=iteration == 0 or batch_size > 1,
+                    # reset_inputs=iteration == 0 or batch_size > 1,
                 )
+                print(f"{out_tok_cpu=}")
             except Exception as e:
                 logger.error(f"Error during decoding: {str(e)}")
                 break
@@ -586,12 +565,16 @@ def test_demo_text(
             for user in range(batch_size):
                 if batch_size == 1:
                     user_tok = tt_output_torch.tolist()[0]
+                    if isinstance(user_tok, list):
+                        user_tok = user_tok[0]
+                        print("user_tok casted from list!")
                 else:
                     user_tok = tt_output_torch.tolist()[user][0]
                 if (
                     user_tok not in tokenizer.stop_tokens and user_done[user] == False
                 ):  # Read until an eos token (e.g. <|eot_id|>); create_tokenizer adds stop_tokens to HF tokenizers
                     all_outputs[user].append(user_tok)
+                    print(f"{user_tok=}")
                 else:
                     if (
                         stop_at_eos
