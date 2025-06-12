@@ -311,8 +311,8 @@ void RunTestUnicastRaw(
     std::unordered_map<RoutingDirection, std::vector<FabricNodeId>> end_fabric_node_ids_by_dir;
     chip_id_t src_physical_device_id;
 
-    static chip_id_t dst_physical_device_id = 3;
-    // dst_physical_device_id = 2; // (dst_physical_device_id + 1) % 4;
+    static chip_id_t dst_physical_device_id = 0;
+    dst_physical_device_id = (dst_physical_device_id + 1) % 4;
 
     std::unordered_map<RoutingDirection, std::vector<chip_id_t>> physical_end_device_ids_by_dir;
     fabric_hops[direction] = num_hops;
@@ -352,7 +352,7 @@ void RunTestUnicastRaw(
         // create a list of available deive ids in a random order
         // In 2D routing the source and desitnation devices can be anywhere on the mesh.
         auto random_dev_list = get_random_numbers_from_range(0, devices.size() - 1, devices.size());
-        src_physical_device_id = 0;  //devices[random_dev_list[0]]->id();
+        src_physical_device_id = devices[random_dev_list[0]]->id();
         src_fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(src_physical_device_id);
 
         dst_fabric_node_id.mesh_id = MeshId{1};
@@ -363,9 +363,12 @@ void RunTestUnicastRaw(
         if (tt::tt_metal::MetalContext::instance().get_cluster().has_intermesh_links(src_physical_device_id)) {
             auto eth_cores_and_chans = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(src_physical_device_id);
             for (const auto& [core, chan] : eth_cores_and_chans) {
-                eth_chans.push_back(chan);
+                if (control_plane.get_routing_plane_id(src_fabric_node_id, chan) == 0) {
+                    eth_chans.push_back(chan);
+                }
             }
         }
+
         else {
             for (auto chip_id : tt::tt_metal::MetalContext::instance().get_cluster().user_exposed_chip_ids()) {
                 if (tt::tt_metal::MetalContext::instance().get_cluster().has_intermesh_links(chip_id)) {
