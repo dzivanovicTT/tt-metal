@@ -396,6 +396,7 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in0(
     }
 
     in1_sender_writer_compile_time_args.push_back((std::uint32_t)(fuse_op && fused_op_signaler->is_all_gather()));
+    in1_sender_writer_compile_time_args.push_back((std::uint32_t)(fuse_op && fused_op_signaler->is_reduce_scatter()));
 
     std::vector<uint32_t> in0_receiver_compile_time_args = {
         // in0 block args
@@ -908,8 +909,12 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in0(
             const std::vector<tt::tt_metal::Tensor>& input_tensors,
             const std::vector<std::optional<const tt::tt_metal::Tensor>>& optional_input_tensors,
             const std::vector<tt::tt_metal::Tensor>& output_tensors) {
-            TT_ASSERT(input_tensors.size() + optional_input_tensors.size() == 3);
-            TT_ASSERT(output_tensors.size() == 1);
+            TT_FATAL(
+                input_tensors.size() + optional_input_tensors.size() == 3,
+                "Total number of input tensors (required ({}) + optional ({})) must be 3",
+                input_tensors.size(),
+                optional_input_tensors.size());
+            TT_FATAL(output_tensors.size() == 1, "Number of output tensors ({}) must be 1", output_tensors.size());
 
             auto src_buffer_a = input_tensors.at(0).buffer();
             auto src_buffer_b = input_tensors.at(1).buffer();
@@ -1213,6 +1218,7 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in1(
     }
 
     in1_sender_writer_compile_time_args.push_back((std::uint32_t)fuse_op);
+    in1_sender_writer_compile_time_args.push_back((std::uint32_t)fuse_op);
 
     std::vector<uint32_t> in1_receiver_writer_compile_time_args = {
         // interleaved accessor args
@@ -1249,7 +1255,10 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in1(
 
     if (bias_buffer != nullptr) {
         in1_receiver_writer_compile_time_args.push_back((std::uint32_t)in1_block_w);
+    } else {
+        in1_receiver_writer_compile_time_args.push_back(0);  // Placeholder; not used
     }
+    in1_receiver_writer_compile_time_args.push_back((std::uint32_t)fuse_op);
 
     std::map<string, string> mm_kernel_defines;
     std::map<string, string> mm_kernel_in0_sender_defines;
@@ -1657,8 +1666,12 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in1(
             const std::vector<tt::tt_metal::Tensor>& input_tensors,
             const std::vector<std::optional<const tt::tt_metal::Tensor>>& optional_input_tensors,
             const std::vector<tt::tt_metal::Tensor>& output_tensors) {
-            TT_ASSERT(input_tensors.size() + optional_input_tensors.size() == 3);
-            TT_ASSERT(output_tensors.size() == 1);
+            TT_FATAL(
+                input_tensors.size() + optional_input_tensors.size() == 3,
+                "Total number of input tensors (required ({}) + optional ({})) must be 3",
+                input_tensors.size(),
+                optional_input_tensors.size());
+            TT_FATAL(output_tensors.size() == 1, "Number of output tensors ({}) must be 1", output_tensors.size());
 
             auto src_buffer_a = input_tensors.at(0).buffer();
             auto src_buffer_b = input_tensors.at(1).buffer();
@@ -2312,8 +2325,12 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_gather_in0(
             auto& global_cb = static_cast<const ttnn::operations::matmul::Matmul*>(operation)->global_cb;
 
             if (!global_cb.has_value()) {
-                TT_ASSERT(input_tensors.size() + optional_input_tensors.size() == 3);
-                TT_ASSERT(output_tensors.size() == 1);
+                TT_FATAL(
+                    input_tensors.size() + optional_input_tensors.size() == 3,
+                    "Total number of input tensors (required ({}) + optional ({})) must be 3",
+                    input_tensors.size(),
+                    optional_input_tensors.size());
+                TT_FATAL(output_tensors.size() == 1, "Number of output tensors ({}) must be 1", output_tensors.size());
             }
 
             auto src_buffer_a = input_tensors[0].buffer();

@@ -601,6 +601,8 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in0_in1(
                 fused_op_signaler->init_fused_op(program, device, in0_sender_interleaved);
             } else if (fused_op_signaler->is_reduce_scatter()) {
                 fused_op_signaler->init_fused_op(program, device, all_cores, cores);
+            } else {
+                TT_FATAL(false, "Fused operation must be either all_gather or reduce_scatter.");
             }
         }
 
@@ -1151,6 +1153,8 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in0_in1(
                         fused_op_signaler->push_matmul_fused_op_rt_args(mm_in1_sender_writer_args, true);
                     } else if (fused_op_signaler->is_reduce_scatter()) {
                         fused_op_signaler->push_matmul_fused_op_rt_args(mm_in1_sender_writer_args, in0_idx, in1_idx);
+                    } else {
+                        TT_FATAL(false, "Fused operation must be either all_gather or reduce_scatter.");
                     }
                 }
                 tt_metal::SetRuntimeArgs(
@@ -1272,8 +1276,14 @@ tt::tt_metal::operation::ProgramWithCallbacks create_program_mcast_in0_in1(
             const std::vector<tt::tt_metal::Tensor>& input_tensors,
             const std::vector<std::optional<const tt::tt_metal::Tensor>>& optional_input_tensors,
             const std::vector<tt::tt_metal::Tensor>& output_tensors) {
-            TT_ASSERT(input_tensors.size() + optional_input_tensors.size() == 3);
-            TT_ASSERT(output_tensors.size() == 1);
+            TT_FATAL(
+                input_tensors.size() + optional_input_tensors.size() == 3,
+                "Total number of input tensors (required + optional) must be 3, but got {} + {} = {}",
+                input_tensors.size(),
+                optional_input_tensors.size(),
+                input_tensors.size() + optional_input_tensors.size());
+            TT_FATAL(
+                output_tensors.size() == 1, "Number of output tensors must be 1, but got {}", output_tensors.size());
 
             auto src_buffer_a = input_tensors.at(0).buffer();
             auto src_buffer_b = input_tensors.at(1).buffer();
