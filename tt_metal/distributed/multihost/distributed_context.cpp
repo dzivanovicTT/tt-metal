@@ -26,4 +26,11 @@ const ContextPtr& DistributedContext::get_current_world() { return ContextImpl::
 void DistributedContext::set_current_world(const ContextPtr& ctx) { ContextImpl::set_current_world(ctx); }
 
 bool DistributedContext::is_initialized() { return ContextImpl::is_initialized(); }
+
+bool DistributedContext::using_mpi_environment() {
+    // `mpirun` and other MPI runners set predictable env vars and can use
+    // this to detect if we are in an MPI environment
+    return (std::getenv("OMPI_COMM_WORLD_SIZE") != nullptr);
+}
+
 }  // namespace tt::tt_metal::distributed::multihost

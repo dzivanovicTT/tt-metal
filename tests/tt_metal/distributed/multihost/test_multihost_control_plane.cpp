@@ -22,6 +22,10 @@
 #include <tt-metalium/control_plane.hpp>
 #include <tt-metalium/distributed_context.hpp>
 
+#include <tt-metalium/host_api.hpp>
+#include <tt-metalium/tt_metal.hpp>
+#include <tt-metalium/fabric_types.hpp>
+
 #ifdef __linux__
 #include <execinfo.h>
 #include <cstdlib>
@@ -63,30 +67,28 @@ std::map<tt_fabric::FabricNodeId, chip_id_t> get_physical_chip_mapping() {
         eth_coord_t{0, 0, 1, 0, 0},
         eth_coord_t{0, 1, 1, 0, 0},
     };
-
-    /* seems rank 1 also seems same eth coords as rank 0
+    // TODO: NEED TO VERIFY THESE COORDINATES
     auto rank1_eth_coords = std::vector<eth_coord_t>{
-        eth_coord_t{0, 2, 0, 0, 0},
-        eth_coord_t{0, 3, 0, 0, 0},  // Row 0
-        eth_coord_t{0, 2, 1, 0, 0},
-        eth_coord_t{0, 3, 1, 0, 0}  // Row 1
+        eth_coord_t{0, 1, 0, 0, 0},
+        eth_coord_t{0, 0, 0, 0, 0},
+        eth_coord_t{0, 1, 1, 0, 0},
+        eth_coord_t{0, 0, 1, 0, 0}
     };
-    */
     auto chip_ids_rank0 = std::vector<chip_id_t>{
         0, 1, 4, 5
     };
     auto chip_ids_rank1 = std::vector<chip_id_t>{
         2, 3, 6, 7
     };
-    auto eth_coords = rank0_eth_coords;
-    auto chip_ids = *mpi_rank == 0 ? chip_ids_rank0 : chip_ids_rank1;
+    auto eth_coords = *mpi_rank == 0 ? rank0_eth_coords : rank1_eth_coords;
+    auto fabric_chip_ids = *mpi_rank == 0 ? chip_ids_rank0 : chip_ids_rank1;
 
     std::uint32_t mesh_id = 0;
     for (std::uint32_t chip_id = 0; chip_id < eth_coords.size(); chip_id++) {
         const auto& eth_coord = eth_coords[chip_id];
-        auto chip = chip_ids.at(chip_id);
+        auto fabric_chip_id = fabric_chip_ids.at(chip_id);
         physical_chip_ids_mapping.insert(
-            {tt_fabric::FabricNodeId(tt_fabric::MeshId{mesh_id}, chip),
+            {tt_fabric::FabricNodeId(tt_fabric::MeshId{mesh_id}, fabric_chip_id),
              cluster.get_physical_chip_id_from_eth_coord(eth_coord)});
     }
 
@@ -121,10 +123,22 @@ protected:
         auto host_rank_opt = control_plane.get_local_host_rank_id();
         ASSERT_TRUE(host_rank_opt.has_value()) << "Local host rank ID not available";
         host_rank_id_ = *host_rank_opt;
+        if (fabric_config_ == tt::tt_metal::FabricConfig::DISABLED) {
+            tt::tt_metal::detail::InitializeFabricConfig(tt::tt_metal::FabricConfig::FABRIC_1D);
+            fabric_config_ = tt::tt_metal::FabricConfig::FABRIC_1D;
+        }
 
         fmt::print("SetUp complete: mesh_id={}, host_rank_id={}\n", *mesh_id_, *host_rank_id_);
     }
 
+    void TearDown() override {
+        if (fabric_config_ != tt::tt_metal::FabricConfig::DISABLED) {
+            tt::tt_metal::detail::InitializeFabricConfig(tt::tt_metal::FabricConfig::DISABLED);
+            fabric_config_ = tt::tt_metal::FabricConfig::DISABLED;
+        }
+    }
+
+    tt::tt_metal::FabricConfig fabric_config_ = tt::tt_metal::FabricConfig::DISABLED;
     MeshId mesh_id_;
     HostRankId host_rank_id_;
 };
@@ -170,6 +184,58 @@ TEST_F(ControlPlaneMultihostTest, GetMeshShapeGlobalMode) {
         tt::tt_metal::MetalContext::instance().get_control_plane().get_mesh_shape(ControlPlaneMode::GLOBAL_MESH);
     fmt::print("Global mesh shape is [{}, {}], expected [2, 4]\n", global_shape[0], global_shape[1]);
     EXPECT_EQ(global_shape, MeshShape(2, 4));
+}
+
+
+TEST_F(ControlPlaneMultihostTest, SystemMeshShape) {
+    auto distributed_context = tt::tt_metal::distributed::multihost::DistributedContext::get_current_world();
+    auto& system_mesh = tt::tt_metal::distributed::SystemMesh::instance();
+    auto shape = system_mesh.get_shape();
+    fmt::print("System mesh shape is [{}, {}], expected [2, 4]\n", shape[0], shape[1]);
+
+    EXPECT_EQ(shape, MeshShape(2, 4));
+
+    if (*distributed_context->rank() == 0) {
+        EXPECT_EQ(system_mesh.local_shape(), MeshShape(2, 2));
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(0, 0)), 2);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(0, 1)), 0);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(1, 0)), 3);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(1, 1)), 1);
+    } else {
+        std::cout << "**************Rank 1**************" << std::endl;
+        auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+        auto physical_chip_id = control_plane.get_physical_chip_id(tt_fabric::FabricNodeId(MeshId{0}, 2));
+        fmt::print("FabricNodeId(mesh={}, chip={}) -> physical chip {}\n", 0, 2, physical_chip_id.value());
+        physical_chip_id = control_plane.get_physical_chip_id(tt_fabric::FabricNodeId(MeshId{0}, 3));
+        fmt::print("FabricNodeId(mesh={}, chip={}) -> physical chip {}\n", 0, 3, physical_chip_id.value());
+        physical_chip_id = control_plane.get_physical_chip_id(tt_fabric::FabricNodeId(MeshId{0}, 6));
+        fmt::print("FabricNodeId(mesh={}, chip={}) -> physical chip {}\n", 0, 6, physical_chip_id.value());
+        physical_chip_id = control_plane.get_physical_chip_id(tt_fabric::FabricNodeId(MeshId{0}, 7));
+        fmt::print("FabricNodeId(mesh={}, chip={}) -> physical chip {}\n", 0, 7, physical_chip_id.value());
+
+        auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
+        auto chip_ids = cluster.all_chip_ids();
+        for (auto chip_id : chip_ids) {
+            fmt::print("CLUSTER -> Chip ID: {}\n", chip_id);
+        }
+
+
+
+
+        EXPECT_EQ(system_mesh.local_shape(), MeshShape(2, 2));
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(0, 2)), 0);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(0, 3)), 2);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(1, 2)), 1);
+        EXPECT_EQ(system_mesh.get_physical_device_id(MeshCoordinate(1, 3)), 3);
+    }
+}
+
+
+TEST_F(ControlPlaneMultihostTest, MeshDevice2x4) {
+    {
+        auto mesh_device = MeshDevice::create(MeshDeviceConfig(MeshShape(2, 4)));
+    }
+    std::cout << "MeshDevice2x4" << std::endl;
 }
 
 }  // namespace

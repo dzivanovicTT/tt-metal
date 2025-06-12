@@ -31,25 +31,35 @@ const MeshContainer<PhysicalMeshCoordinate>& get_system_mesh_coordinate_translat
         }
 
         const auto mesh_id = mesh_ids.front();
-        const auto mesh_shape = control_plane.get_physical_mesh_shape(mesh_id);
+        const auto local_mesh_shape = control_plane.get_mesh_shape(tt_fabric::ControlPlaneMode::LOCAL_MESH);
+        const auto global_mesh_shape = control_plane.get_mesh_shape(tt_fabric::ControlPlaneMode::GLOBAL_MESH);
+
 
         // Validate that the physical chip ids are unique.
         std::unordered_set<chip_id_t> unique_chip_ids;
 
         std::vector<PhysicalMeshCoordinate> physical_coordinates;
-        physical_coordinates.reserve(mesh_shape.mesh_size());
-        for (int logical_chip_id = 0; logical_chip_id < mesh_shape.mesh_size(); ++logical_chip_id) {
+        physical_coordinates.reserve(local_mesh_shape.mesh_size());
+        for (int logical_chip_id = 0; logical_chip_id < global_mesh_shape.mesh_size(); ++logical_chip_id) {
             // Query the control plane to get the physical chip id from logical chip id
-            const auto physical_chip_id = control_plane.get_physical_chip_id_from_fabric_node_id(
+            const auto physical_chip_id = control_plane.get_physical_chip_id(
                 tt::tt_fabric::FabricNodeId(mesh_id, logical_chip_id));
-            TT_FATAL(
-                unique_chip_ids.insert(physical_chip_id).second,
-                "Found duplicate physical chip id: {}, mesh id: {}",
-                physical_chip_id,
-                mesh_id);
-            physical_coordinates.push_back(PhysicalMeshCoordinate(/*mesh_id=*/*mesh_id, /*chip_id=*/physical_chip_id));
+            if (physical_chip_id.has_value()) {
+                TT_FATAL(
+                    unique_chip_ids.insert(*physical_chip_id).second,
+                    "Found duplicate physical chip id: {}, mesh id: {}",
+                    *physical_chip_id,
+                    mesh_id);
+                log_info(LogMetal, "Adding logical->physical coordinate: {}, {}", logical_chip_id, *physical_chip_id);
+                physical_coordinates.push_back(PhysicalMeshCoordinate(/*mesh_id=*/*mesh_id, /*chip_id=*/physical_chip_id));
+            }
         }
-        return MeshContainer<PhysicalMeshCoordinate>(mesh_shape, std::move(physical_coordinates));
+        log_info(LogMetal, "Mesh shape: {}, {}", local_mesh_shape[0], local_mesh_shape[1]);
+        log_info(LogMetal, "Physical coordinates: {}", physical_coordinates.size());
+        for (const auto& physical_coordinate : physical_coordinates) {
+            log_info(LogMetal, "Physical coordinate: {}, {}", physical_coordinate.mesh_id(), physical_coordinate.chip_id());
+        }
+        return MeshContainer<PhysicalMeshCoordinate>(local_mesh_shape, std::move(physical_coordinates));
     }());
     return kTranslationMap.get();
 }

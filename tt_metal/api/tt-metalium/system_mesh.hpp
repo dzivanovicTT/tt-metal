@@ -24,9 +24,12 @@ namespace tt::tt_metal::distributed {
 // It creates a logical mesh of devices and manages the mapping between logical and physical device coordinates.
 // It serves as a query interface between the logical coordinates to physical device IDs.
 class SystemMesh {
-private:
-    class Impl;  // Forward declaration only
+public:
+    class Impl;  // Forward declaration - needs to be public for derived classes
+    class SingleHostImpl;
+    class DistributedImpl;
 
+private:
     std::unique_ptr<Impl> pimpl_;
     SystemMesh();
 
@@ -39,8 +42,11 @@ public:
     SystemMesh(SystemMesh&&) = delete;
     SystemMesh& operator=(SystemMesh&&) = delete;
 
-    // Returns the shape of the system mesh
+    // Returns the shape of the system mesh; this is the global mesh shape in distributed context
     const MeshShape& get_shape() const;
+
+    // Returns the shape of the local mesh
+    const MeshShape& local_shape() const;
 
     // Returns the physical device ID for a given logical coordinate
     int get_physical_device_id(const MeshCoordinate& coord) const;

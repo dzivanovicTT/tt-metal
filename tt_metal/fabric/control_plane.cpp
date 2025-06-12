@@ -945,6 +945,13 @@ chip_id_t ControlPlane::get_physical_chip_id_from_fabric_node_id(const FabricNod
     return logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
 }
 
+std::optional<chip_id_t> ControlPlane::get_physical_chip_id(const FabricNodeId& fabric_node_id) const {
+    if (logical_mesh_chip_id_to_physical_chip_id_mapping_.contains(fabric_node_id)) {
+        return logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
+    }
+    return std::nullopt;
+}
+
 std::pair<FabricNodeId, chan_id_t> ControlPlane::get_connected_mesh_chip_chan_ids(
     FabricNodeId fabric_node_id, chan_id_t chan_id) const {
     // TODO: simplify this and maybe have this functionality in ControlPlane
@@ -1271,32 +1278,18 @@ void ControlPlane::clear_fabric_context() { this->fabric_context_.reset(nullptr)
 
 MeshShape ControlPlane::get_mesh_shape(ControlPlaneMode mode) const {
     // Check if we have local mesh info for LOCAL_MESH mode
+    std::optional<HostRankId> host_rank;
     if (mode == ControlPlaneMode::LOCAL_MESH) {
         TT_FATAL(local_mesh_info_.has_value(), "Local mesh info not available for LOCAL_MESH mode");
+        host_rank = local_mesh_info_->host_rank;
         log_info(
             tt::LogFabric,
             "Getting mesh shape for local mesh id: {}, host rank: {}",
             *local_mesh_info_->mesh_id,
-            *local_mesh_info_->host_rank);
-        const auto& mesh_shape = mesh_graph_->get_mesh_shape(local_mesh_info_->mesh_id, local_mesh_info_->host_rank);
-        log_info(tt::LogFabric, "LOCAL_MESH mode returning shape: [{}, {}]", mesh_shape[0], mesh_shape[1]);
-        return mesh_shape;
+            host_rank.value());
     }
-
-    // For GLOBAL_MESH mode, aggregate all meshes into a single global shape
-    // This assumes all meshes are laid out in a line for simplicity
-    // TODO: This may need to be enhanced for more complex multi-mesh layouts
-    std::vector<MeshId> mesh_ids = mesh_graph_->get_mesh_ids();
-    uint32_t total_rows = 0;
-    uint32_t max_cols = 0;
-
-    for (const auto& mesh_id : mesh_ids) {
-        MeshShape mesh_shape = mesh_graph_->get_mesh_shape(mesh_id);
-        total_rows += mesh_shape[0];
-        max_cols = std::max(max_cols, mesh_shape[1]);
-    }
-
-    return MeshShape(total_rows, max_cols);
+    const auto& mesh_shape = mesh_graph_->get_mesh_shape(local_mesh_info_->mesh_id, host_rank);
+    return mesh_shape;
 }
 
 MeshId ControlPlane::get_local_mesh_id() const {
@@ -1316,10 +1309,7 @@ MeshCoordinateRange ControlPlane::get_coord_range(ControlPlaneMode mode) const {
         TT_FATAL(local_mesh_info_.has_value(), "Local mesh info not available for LOCAL_MESH mode");
         return mesh_graph_->get_coord_range(local_mesh_info_->mesh_id, local_mesh_info_->host_rank);
     }
-
-    // For GLOBAL_MESH mode, return the full coordinate range across all meshes
-    MeshShape global_shape = get_mesh_shape(mode);
-    return MeshCoordinateRange(global_shape);
+    return mesh_graph_->get_coord_range(local_mesh_info_->mesh_id);
 }
 
 MeshContainer<chip_id_t> ControlPlane::get_chip_ids(ControlPlaneMode mode) const {
@@ -1391,6 +1381,10 @@ chip_id_t ControlPlane::global_coordinate_to_chip(MeshCoordinate coordinate) con
     // Get the physical chip id
     FabricNodeId fabric_node_id{target_mesh_id, logical_chip_id};
     return get_physical_chip_id_from_fabric_node_id(fabric_node_id);
+}
+
+MeshCoordinate ControlPlane::get_local_mesh_offset() const {
+    return get_coord_range(ControlPlaneMode::LOCAL_MESH).start_coord();
 }
 
 ControlPlane::~ControlPlane() = default;
