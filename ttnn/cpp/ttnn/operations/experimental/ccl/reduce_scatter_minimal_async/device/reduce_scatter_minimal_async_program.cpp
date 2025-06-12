@@ -264,7 +264,7 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
         uint32_t row_offset = (link * batch_slice_num_pages / num_links) / slice_Wt * stride_Wt;
         uint32_t tiles_read = (link * batch_slice_num_pages / num_links);
         uint32_t tiles_to_read = (link + 1) * batch_slice_num_pages / num_links;
-        uint32_t packet_id = (tiles_read + num_pages_per_packet - 1) / num_pages_per_packet;
+        uint32_t packet_id = ((tiles_to_read - tiles_read) + num_pages_per_packet - 1) / num_pages_per_packet * link;
         uint32_t intermediate_packet_offset_x = (packet_id * ring_size) % 12;
         uint32_t intermediate_packet_offset_y = (packet_id * ring_size) / 12;
 
