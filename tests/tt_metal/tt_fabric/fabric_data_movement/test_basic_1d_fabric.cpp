@@ -104,6 +104,80 @@ std::shared_ptr<tt_metal::Program> create_receiver_program(
     return recv_program;
 }
 
+void RunMultiMeshLineMcast(
+    BaseFabricFixture* fixture,
+    FabricNodeId mcast_request_node,
+    FabricNodeId mcast_start_node,
+    const std::vector<McastRoutingInfo>& mcast_routing_info,
+    const std::vector<FabricNodeId>& mcast_group_node_ids) {
+    auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+    auto mcast_start_phys_id = control_plane.get_physical_chip_id_from_fabric_node_id(mcast_start_node);
+    auto mcast_start_device = DevicePool::instance().get_active_device(mcast_start_phys_id);
+
+    std::vector<tt_metal::IDevice*> mcast_group_devices = {};
+    for (auto mcast_node_id : mcast_group_node_ids) {
+        mcast_group_devices.push_back(DevicePool::instance().get_active_device(control_plane.get_physical_chip_id_from_fabric_node_id(mcast_node_id)));
+    }
+
+    CoreCoord sender_logical_core = {0, 0};
+    CoreCoord receiver_logical_core = {1, 0};
+    
+    const auto topology = control_plane.get_fabric_context().get_fabric_topology();
+    uint32_t is_2d_fabric = topology == Topology::Mesh;
+
+    auto worker_mem_map = generate_worker_mem_map(mcast_start_device, topology);
+
+    static uint32_t time_seed = 0;
+    time_seed++;
+    uint32_t num_packets = 10;
+    static uint32_t target_address = worker_mem_map.target_address;
+    target_address += num_packets * worker_mem_map.packet_payload_size_bytes;
+    std::cout << "Using seed: " << time_seed << std::endl;
+    std::cout << "Reading from: " << target_address << std::endl;
+    // common compile time args for sender and receiver
+    std::vector<uint32_t> compile_time_args = {
+        worker_mem_map.test_results_address,
+        worker_mem_map.test_results_size_bytes,
+        target_address};
+
+    std::map<string, string> defines = {};
+    if (is_2d_fabric) {
+        defines["FABRIC_2D"] = "";
+    }
+
+    std::vector<uint32_t> receiver_runtime_args = {worker_mem_map.packet_payload_size_bytes, num_packets, time_seed};
+    std::unordered_map<tt_metal::IDevice*, std::shared_ptr<tt_metal::Program>> recv_programs;
+    
+    recv_programs[mcast_start_device] =
+        create_receiver_program(compile_time_args, receiver_runtime_args, receiver_logical_core);
+    for (const auto& dev : mcast_group_devices) {
+        recv_programs[dev] = create_receiver_program(compile_time_args, receiver_runtime_args, receiver_logical_core);
+    }
+
+    for (auto& [dev, recv_program] : recv_programs) {
+        log_info(tt::LogTest, "Run receiver on: {}", dev->id());
+        fixture->RunProgramNonblocking(dev, *recv_program);
+    }
+
+    for (auto& [dev, recv_program] : recv_programs) {
+        fixture->WaitForSingleProgramDone(dev, *recv_program);
+    }
+
+    for (auto& [dev, _] : recv_programs) {
+        std::vector<uint32_t> receiver_status;
+        std::cout << "Verify mcast recv: " << dev->id() << std::endl;
+        tt_metal::detail::ReadFromDeviceL1(
+            dev,
+            receiver_logical_core,
+            worker_mem_map.test_results_address,
+            worker_mem_map.test_results_size_bytes,
+            receiver_status,
+            CoreType::WORKER);
+
+        EXPECT_EQ(receiver_status[TT_FABRIC_STATUS_INDEX], TT_FABRIC_STATUS_PASS);
+    }
+}
+
 void RunTestLineMcast(
     BaseFabricFixture* fixture, RoutingDirection unicast_dir, const std::vector<McastRoutingInfo>& mcast_routing_info) {
     auto& control_plane= tt::tt_metal::MetalContext::instance().get_control_plane();
