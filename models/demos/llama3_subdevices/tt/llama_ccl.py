@@ -626,8 +626,8 @@ class TT_CCL:
         seqlen = input_tensor_mesh.shape[-2]
         persistent_buffers = self.persistent_buffers[seqlen].get(buffer_key, None)
         print("RING REDUCE SCATTER: ", input_tensor_mesh.shape)
-        if seqlen == 128:
-            num_links = 1
+        # if seqlen == 128:
+        num_links = 1
         num_semaphores = 3 * num_links
         ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor=input_tensor_mesh,
@@ -726,8 +726,8 @@ class TT_CCL:
 
         # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         print("RING ALL GATHER: ", input_tensor_mesh.shape)
-        if seqlen == 128:
-            num_links = 1
+        # if seqlen == 128:
+        num_links = 1
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor=input_tensor_mesh,
             persistent_intermediate_buffer=persistent_buffers["intermediate"],

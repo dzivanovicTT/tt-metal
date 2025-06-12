@@ -337,25 +337,7 @@ def test_demo_text(
     else:  # Inputs from file
         input_prompts = load_inputs(
             input_prompts,
-            [
-                2,
-                111,
-                534,
-                1008,
-                1111 * 4,
-                3333 * 4,
-                4444 * 4,
-                5555 * 4,
-                6666 * 4,
-                7777 * 4,
-                8888 * 2,
-                9999 * 2,
-                10000 * 2,
-                11111 * 2,
-                12222 * 2,
-                15384 * 2,
-            ]
-            * 2,
+            [4000 * 4] * 32,
             input_prompts,
         )
     profiler.end("loading_inputs")
