@@ -29,12 +29,11 @@ void kernel_main() {
 
     for (uint32_t input_idx = start_input_work; input_idx < end_input_work; input_idx++) {
         // Each mapping takes 3 entries: src_idx, dst_idx, is_padding
-        uint32_t mapping_offset = (input_idx - start_input_work) * 3;
+        uint32_t mapping_offset = (input_idx - start_input_work) * 2;
         uint32_t src_index = config_data[mapping_offset];
         uint32_t dst_index = config_data[mapping_offset + 1];
-        uint32_t is_padding = config_data[mapping_offset + 2];
 
-        if (is_padding == 0) {
+        if (src_index != UINT32_MAX) {
             cb_wait_front(cb_id_in0, 1);
             uint32_t l1_addr = get_read_ptr(cb_id_in0);
             uint64_t dst_noc_addr = get_noc_addr(dst_index, s_out);

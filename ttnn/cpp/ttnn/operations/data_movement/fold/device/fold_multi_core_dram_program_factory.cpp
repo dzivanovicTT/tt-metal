@@ -47,7 +47,7 @@ static Tensor create_fold_mapping_table(
     const uint32_t output_hw = output_height * output_width;
 
     // Create vector to store mapping entries (src_index, dst_index, is_padding)
-    std::vector<uint32_t> config_vector(total_entries * 3, 0);
+    std::vector<uint32_t> config_vector(total_entries * 2, 0);
     uint32_t entry_idx = 0;
 
     // Iterate over output dimensions and map back to input
@@ -71,17 +71,15 @@ static Tensor create_fold_mapping_table(
                              w >= static_cast<int>(input_width));
 
                         // Add mapping entry
-                        uint32_t base_idx = entry_idx * 3;
+                        uint32_t base_idx = entry_idx * 2;
 
                         if (!is_padding) {
                             uint32_t src_index = b * input_hw + h * input_width + w;
                             config_vector[base_idx] = src_index;
                             config_vector[base_idx + 1] = dst_index;
-                            config_vector[base_idx + 2] = 0;
                         } else {
-                            config_vector[base_idx] = 0;
+                            config_vector[base_idx] = UINT32_MAX;
                             config_vector[base_idx + 1] = dst_index;
-                            config_vector[base_idx + 2] = 1;
                         }
 
                         entry_idx++;
@@ -91,7 +89,7 @@ static Tensor create_fold_mapping_table(
         }
     }
 
-    ttnn::Shape config_shape({tt::div_up(config_vector.size(), elems_per_core * 3), elems_per_core * 3});
+    ttnn::Shape config_shape({tt::div_up(config_vector.size(), elems_per_core * 2), elems_per_core * 2});
     auto config_buffer = HostBuffer(std::move(config_vector));
     auto config_tensor = Tensor(std::move(config_buffer), config_shape, DataType::UINT32, Layout::ROW_MAJOR);
     auto shard_shape = std::array<uint32_t, 2>({1, (uint32_t)config_tensor.get_logical_shape()[-1]});
