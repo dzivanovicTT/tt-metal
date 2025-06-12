@@ -308,8 +308,8 @@ void RunTestUnicastRaw(
     std::unordered_map<RoutingDirection, uint32_t> fabric_hops;
     std::unordered_map<RoutingDirection, std::vector<FabricNodeId>> end_fabric_node_ids_by_dir;
     chip_id_t src_physical_device_id;
-    static chip_id_t dst_physical_device_id = 3;
-    // dst_physical_device_id = (dst_physical_device_id + 1) % 4;
+    static chip_id_t dst_physical_device_id = 0;
+    dst_physical_device_id = (dst_physical_device_id + 1) % 4;
     std::unordered_map<RoutingDirection, std::vector<chip_id_t>> physical_end_device_ids_by_dir;
     fabric_hops[direction] = num_hops;
 
