@@ -240,7 +240,6 @@ void kernel_main() {
         // In the linear case, I expect num_targets_backward_direction slices from the left, and check if I have a
         // neighbor to the right
         // In the ring case, I expect to write to the right num_forward_target times
-
         if ((forward_writes < forward_writes_expected) && fabric_connection.has_forward_connection()) {
             tiles_read = input_tile_id_start;
             int slice_chip_id = my_chip_id - forward_writes - 1;
@@ -353,7 +352,6 @@ void kernel_main() {
             pkt_hdr_bwd->to_chip_unicast(1);
             fabric_connection.get_backward_connection().send_payload_flush_blocking_from_address(
                 packet_header_buffer_seminc_backward, sizeof(PACKET_HEADER_TYPE));
-
             backward_writes++;
         }
     }

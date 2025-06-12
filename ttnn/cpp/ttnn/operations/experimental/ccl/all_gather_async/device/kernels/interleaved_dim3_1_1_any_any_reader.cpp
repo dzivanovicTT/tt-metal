@@ -79,6 +79,7 @@ void kernel_main() {
         noc_async_read_barrier();
         cb_push_back(cb_forward_id, num_pages_to_read);
     }
+    DPRINT << "reader: done local\n";
 
     constexpr bool intermediate_tensor_is_dram = intermediate_buffer_type == tt::tt_metal::BufferType::DRAM;
     auto intermediate_tensor_addrgen = InterleavedAddrGenFast<intermediate_tensor_is_dram>{
@@ -177,7 +178,6 @@ void kernel_main() {
         // In the linear case, I expect num_targets_forward_direction slices from the right
         // In the ring case, I expect num_targets_forward_direction slices from the right (keep in mind this differs for
         // odd/even chips)
-
         if (forward_slices_received < forward_slices_expected) {
             DPRINT << "Reader: forward sem wait.\n";
             while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(out_ready_sem_forward) <= forward_slices_received);

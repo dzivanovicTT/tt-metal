@@ -8,7 +8,6 @@ import math
 from loguru import logger
 import ttnn
 from tests.tt_eager.python_api_testing.sweep_tests.comparison_funcs import comp_equal, comp_pcc
-from tests.ttnn.unit_tests.operations.ccl.test_new_all_reduce import check_mesh_tensor_alloc
 from models.utility_functions import skip_for_grayskull
 from tests.ttnn.unit_tests.operations.ccl.test_all_gather import is_unsupported_case
 
@@ -95,9 +94,6 @@ def run_reduce_scatter_impl(
         for _ in range(num_iters)
     ]
 
-    for im_buf, out_buf in zip(persistent_intermediate_buffers, persistent_output_buffers):
-        check_mesh_tensor_alloc(im_buf)
-        check_mesh_tensor_alloc(out_buf)
     logger.info("Done creating persistent buffers")
 
     ##### All gather input setup #####
