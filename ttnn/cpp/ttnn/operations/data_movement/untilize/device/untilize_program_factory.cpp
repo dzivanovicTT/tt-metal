@@ -1324,7 +1324,10 @@ operation::ProgramWithCallbacks untilize_single_core(
     tt::tt_metal::IDevice* device = a.device();
     tt::tt_metal::Buffer* src0_buffer = a.buffer();
     tt::tt_metal::Buffer* dst_buffer = output.buffer();
-    TT_ASSERT(dst_buffer != nullptr, "Output buffer should be allocated on device!");
+    TT_FATAL(dst_buffer != nullptr, "Output buffer should be allocated on device!");
+
+    uint32_t tensor_width = a.padded_shape()[-1];
+    uint32_t tensor_height = a.physical_volume() / tensor_width;
 
     const auto& tile_shape = a.tensor_spec().tile().get_tile_shape();
     uint32_t tile_height = tile_shape[0];
@@ -1335,13 +1338,16 @@ operation::ProgramWithCallbacks untilize_single_core(
     bool output_is_sharded = output.memory_config().is_sharded();
 
     uint32_t num_tiles = a.physical_volume() / tile_volume;
-    uint32_t num_blocks_across_height = a.physical_volume() / a.padded_shape()[-1] / tile_height;
-    uint32_t num_columns_of_blocks = 1;
+    uint32_t num_blocks_across_height = tensor_height / tile_height;
+
+    uint32_t num_tiles_per_output_column_width_wise = tensor_width / tile_width;
+    uint32_t num_output_columns = 1;
     if (output.memory_config().memory_layout() == TensorMemoryLayout::WIDTH_SHARDED ||
         output.memory_config().memory_layout() == TensorMemoryLayout::BLOCK_SHARDED) {
-        num_columns_of_blocks = a.padded_shape()[-1] / output.shard_spec().value().shape[1];
+        uint32_t output_shard_width = output.shard_spec().value().shape[1];
+        num_tiles_per_output_column_width_wise = output_shard_width / tile_width;
+        num_output_columns = tt::div_up(tensor_width, output_shard_width);
     }
-    uint32_t num_tiles_per_column_row = a.padded_shape()[-1] / num_columns_of_blocks / tile_width;
 
     // Determine how much L1 space we can use for input and output CBs,
     // ensuring that we don't intrude into other L1 storage space
@@ -1349,33 +1355,30 @@ operation::ProgramWithCallbacks untilize_single_core(
         a.device()->l1_size_per_core() / 2 - a.device()->allocator()->get_base_allocator_addr(HalMemType::L1);
 
     // Determine the max number of tiles that can be in any CB at a given time (1 input CB + 1 output CB = 2 total CBs)
-    uint32_t max_tiles_per_cb = max_l1_size / (input_single_tile_size + output_single_tile_size);
+    uint32_t max_tiles_per_cb = 13;  // max_l1_size / (input_single_tile_size + output_single_tile_size);
 
     // Determine how many tiles each block will store.
     // Currently we require that the number of tiles in a row is divisible by the number of blocks in a row, or
     // equivalently the number of tiles in a row is divisible by the number of tiles in a block.
-    uint32_t num_tiles_per_block = num_tiles_per_column_row;
-    if (num_tiles_per_block > max_tiles_per_cb) {
+    uint32_t num_tiles_per_output_block = num_tiles_per_output_column_width_wise;
+    if (num_tiles_per_output_block > max_tiles_per_cb) {
         for (uint32_t i = max_tiles_per_cb; i > 0; --i) {
-            if (num_tiles_per_column_row % i == 0) {
-                num_tiles_per_block = i;
+            if (num_tiles_per_output_column_width_wise % i == 0) {
+                num_tiles_per_output_block = i;
                 break;
             }
         }
     }
-
-    uint32_t num_blocks_per_column_row = num_tiles_per_column_row / num_tiles_per_block;
-    uint32_t output_single_block_width_size = num_tiles_per_block * TILE_WIDTH * output.element_size();
-    uint32_t num_total_sticks = a.physical_volume() / a.padded_shape()[-1] * num_columns_of_blocks;
-    uint32_t output_stick_size = a.physical_volume() * output.element_size() / num_total_sticks;
+    uint32_t num_blocks_per_output_column_width_wise =
+        num_tiles_per_output_column_width_wise / num_tiles_per_output_block;
 
     // Input CB
-    uint32_t input_cb_num_tiles = num_tiles_per_block;
+    uint32_t input_cb_num_tiles = num_tiles_per_output_block;
     auto [src0_cb_index, cb_src0] =
         create_cb(tt::CBIndex::c_0, program, core, input_single_tile_size, input_cb_num_tiles, input_cb_data_format);
 
     // Output CB
-    uint32_t output_cb_num_tiles = num_tiles_per_block;
+    uint32_t output_cb_num_tiles = num_tiles_per_output_block;
     auto [output_cb_index, cb_output] = create_cb(
         tt::CBIndex::c_16, program, core, output_single_tile_size, output_cb_num_tiles, output_cb_data_format);
 
@@ -1411,6 +1414,8 @@ operation::ProgramWithCallbacks untilize_single_core(
 
     // Writer compile-time args
     bool output_is_dram = dst_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM;
+    uint32_t output_single_block_stick_size = num_tiles_per_output_block * tile_width * output.element_size();
+    uint32_t output_stick_size = output_single_block_stick_size * num_blocks_per_output_column_width_wise;
     bool stick_size_is_power_of_two = is_power_of_two_at_least_32(output_stick_size);
     uint32_t log2_stick_size = stick_size_is_power_of_two ? (std::bit_width(output_stick_size) - 1) : 0;
     std::vector<uint32_t> writer_compile_time_args = {
@@ -1421,10 +1426,10 @@ operation::ProgramWithCallbacks untilize_single_core(
         (uint32_t)log2_stick_size,
         (uint32_t)tile_height,
         (uint32_t)num_blocks_across_height,
-        (uint32_t)num_columns_of_blocks,
-        (uint32_t)num_blocks_per_column_row,
-        (uint32_t)num_tiles_per_block,
-        (uint32_t)output_single_block_width_size,
+        (uint32_t)num_output_columns,
+        (uint32_t)num_blocks_per_output_column_width_wise,
+        (uint32_t)num_tiles_per_output_block,
+        (uint32_t)output_single_block_stick_size,
     };
     if (output_is_sharded) {
         shard_builder::extend_sharding_compile_time_args(output, writer_compile_time_args);
@@ -1441,7 +1446,7 @@ operation::ProgramWithCallbacks untilize_single_core(
     // Compute file path
     std::string compute_kernel(
         "ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/pack_untilize.cpp");
-    if (num_tiles_per_block > MAX_PACK_UNTILIZE_WIDTH || !use_pack_untilize || a.dtype() == DataType::UINT16) {
+    if (num_tiles_per_output_block > MAX_PACK_UNTILIZE_WIDTH || !use_pack_untilize || a.dtype() == DataType::UINT16) {
         log_debug(tt::LogOp, "Using slow untilize.");
         compute_kernel =
             std::string("ttnn/cpp/ttnn/operations/data_movement/untilize/device/kernels/compute/untilize.cpp");
@@ -1450,9 +1455,13 @@ operation::ProgramWithCallbacks untilize_single_core(
     }
 
     // Compute compile-time args
-    uint32_t num_blocks = num_columns_of_blocks * num_blocks_per_column_row * num_blocks_across_height;
+    uint32_t num_output_blocks =
+        num_output_columns * num_blocks_per_output_column_width_wise * num_blocks_across_height;
     std::vector<uint32_t> compute_compile_time_args = {
-        (uint32_t)num_blocks, (uint32_t)num_tiles_per_block, (uint32_t)src0_cb_index, (uint32_t)output_cb_index};
+        (uint32_t)num_output_blocks,
+        (uint32_t)num_tiles_per_output_block,
+        (uint32_t)src0_cb_index,
+        (uint32_t)output_cb_index};
 
     // Compute kernel
     auto untilize_kernel_id = tt::tt_metal::CreateKernel(

@@ -70,45 +70,11 @@ void Untilize::validate(const std::vector<Tensor>& input_tensors) const {
             input_shard_height);
     }
 
-    // We don't support input or output uneven sharding for the single core implementation
-    if (!this->use_multicore) {
-        // Check for input uneven sharding
-        if (input_is_sharded) {
-            std::array<uint32_t, 2> input_shard_shape = input_tensor_a.shard_spec().value().shape;
-            uint32_t input_shard_width = input_shard_shape[1];
-            uint32_t input_shard_height = input_shard_shape[0];
-            TT_FATAL(
-                tensor_width % input_shard_width == 0,
-                "Uneven input shard width {} for tensor width {} not supported for single core implementation",
-                input_shard_width,
-                tensor_width);
-            TT_FATAL(
-                tensor_height % input_shard_height == 0,
-                "Uneven input shard height {} for tensor height {} not supported for single core implementation",
-                input_shard_height,
-                tensor_height);
-        }
-        // Check for output uneven sharding
-        if (output_is_sharded) {
-            std::array<uint32_t, 2> output_shard_shape = this->output_mem_config.shard_spec().value().shape;
-            uint32_t output_shard_width = output_shard_shape[1];
-            uint32_t output_shard_height = output_shard_shape[0];
-            TT_FATAL(
-                tensor_width % output_shard_width == 0,
-                "Uneven output shard width {} for tensor width {} not supported for single core implementation",
-                output_shard_width,
-                tensor_width);
-            TT_FATAL(
-                tensor_height % output_shard_height == 0,
-                "Uneven output shard height {} for tensor height {} not supported for single core implementation",
-                output_shard_height,
-                tensor_height);
-        }
-    }
-
-    // We always support uneven input sharding for the multicore implementation. Uneven output sharding is only
-    // supported if the input and output memory layouts are identical (i.e. height->height, width->width, block->block)
-    // and the input and output shard specs are identical. Otherwise uneven output sharding is not supported.
+    // Uneven input sharding always allowed.
+    // Uneven output sharding is only supported for the multicore implementation, where the input and output tensors are
+    // both in in L1, the input and output memory layouts are identical (i.e. height->height, width->width,
+    // block->block), and the input and output shard specs are identical. Otherwise uneven output sharding is not
+    // supported.
     if (output_is_sharded) {
         std::array<uint32_t, 2> output_shard_shape = this->output_mem_config.shard_spec().value().shape;
         uint32_t output_shard_width = output_shard_shape[1];
@@ -117,6 +83,10 @@ void Untilize::validate(const std::vector<Tensor>& input_tensors) const {
         bool output_is_uneven_sharded_width_wise = tensor_width % output_shard_width != 0;
         bool output_is_uneven_sharded_height_wise = tensor_height % output_shard_height != 0;
         if (output_is_uneven_sharded_width_wise || output_is_uneven_sharded_height_wise) {
+            TT_FATAL(this->use_multicore, "Uneven output sharding only supported for multicore implementation");
+            TT_FATAL(
+                input_buffer_type == BufferType::L1 && output_buffer_type == BufferType::L1,
+                "Uneven output sharding only supported when both input and output tensor are in L1");
             TT_FATAL(
                 input_memory_layout == output_memory_layout,
                 "Input and output memory layouts must be identical if output is uneven sharded");
@@ -128,12 +98,17 @@ void Untilize::validate(const std::vector<Tensor>& input_tensors) const {
 
     // Multicore implementation doesn't support input DRAM sharding
     if (this->use_multicore && input_is_sharded) {
-        TT_FATAL(input_buffer_type == BufferType::L1, "Multicore implementation doesn't support DRAM sharding");
+        TT_FATAL(input_buffer_type == BufferType::L1, "Multicore implementation doesn't support input DRAM sharding");
+    }
+
+    // We don't support input DRAM block sharding
+    if (input_memory_layout == TensorMemoryLayout::BLOCK_SHARDED) {
+        TT_FATAL(input_buffer_type == BufferType::L1, "We don't support input DRAM block sharding");
     }
 
     // We don't support output DRAM block sharding
     if (output_memory_layout == TensorMemoryLayout::BLOCK_SHARDED) {
-        TT_FATAL(output_buffer_type == BufferType::L1, "We don't support DRAM block sharding");
+        TT_FATAL(output_buffer_type == BufferType::L1, "We don't support output DRAM block sharding");
     }
 }
 
