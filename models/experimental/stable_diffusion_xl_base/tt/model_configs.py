@@ -420,7 +420,7 @@ class ModelOptimisations:
         self.sdpa_configs["SELF_ATTENTION"] = ttnn.SDPAProgramConfig(
             compute_with_storage_grid_size=(8, 8),
             q_chunk_size=128,
-            k_chunk_size=1024,
+            k_chunk_size=128,
             exp_approx_mode=False,
         )
 
