@@ -27,7 +27,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
     const auto& input = tensor_args.input;
 
     auto compute_unit_size = [&](const auto& tensor, const auto& data_format) {
-        return tensor.get_logical_shape()[-1] * tensor.element_size();
+        return tensor.get_padded_shape()[-1] * tensor.element_size();
     };
 
     uint32_t num_units = output.volume() / output.get_logical_shape()[-1];
