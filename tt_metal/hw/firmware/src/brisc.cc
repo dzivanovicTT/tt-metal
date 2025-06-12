@@ -180,6 +180,13 @@ void set_deassert_addresses() {
 #endif
 }
 
+void pre_subordinate_start() {
+    set_deassert_addresses();
+    volatile tt_reg_ptr uint32_t* cfg_regs = core.cfg_regs_base(0);
+    // Invalidate tensix icache for all 4 risc cores
+    cfg_regs[RISCV_IC_INVALIDATE_InvalidateAll_ADDR32] = RISCV_IC_BRISC_MASK | RISCV_IC_TRISC_ALL_MASK | RISCV_IC_NCRISC_MASK;
+}
+
 void device_setup() {
     instrn_buf[0] = core.instrn_buf_base(0);
     instrn_buf[1] = core.instrn_buf_base(1);
@@ -214,12 +221,8 @@ void device_setup() {
     noc_set_cfg_reg(ROUTER_CFG_0, router_cfg1 | 0x1);
     noc_set_active_instance(0);
 
-    set_deassert_addresses();
-
     wzeromem(MEM_ZEROS_BASE, MEM_ZEROS_SIZE);
 
-    // Invalidate tensix icache for all 4 risc cores
-    cfg_regs[RISCV_IC_INVALIDATE_InvalidateAll_ADDR32] = RISCV_IC_BRISC_MASK | RISCV_IC_TRISC_ALL_MASK | RISCV_IC_NCRISC_MASK;
 
     // Clear destination registers
     core.ex_zeroacc(instrn_buf[0]);
@@ -329,6 +332,11 @@ int main() {
 
     do_crt1((uint32_t*)MEM_BRISC_INIT_LOCAL_L1_BASE_SCRATCH);
 
+    pre_subordinate_start();
+    // Set ncrisc's resume address to 0 so we know when ncrisc has overwritten it
+    mailboxes->ncrisc_halt.resume_addr = 0;
+    deassert_ncrisc_trisc();
+
     noc_bank_table_init(MEM_BANK_TO_NOC_SCRATCH);
 
     mailboxes->launch_msg_rd_ptr = 0; // Initialize the rdptr to 0
@@ -338,10 +346,6 @@ int main() {
 
     risc_init();
     device_setup();
-
-    // Set ncrisc's resume address to 0 so we know when ncrisc has overwritten it
-    mailboxes->ncrisc_halt.resume_addr = 0;
-    deassert_ncrisc_trisc();
 
     // Wait for all cores to be finished initializing before reporting initialization done.
     wait_ncrisc_trisc();

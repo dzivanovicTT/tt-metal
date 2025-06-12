@@ -110,6 +110,13 @@ int main() {
     do_crt1((uint32_t *)MEM_IERISC_INIT_LOCAL_L1_BASE_SCRATCH);
     uint32_t heartbeat = 0;
 
+    mailboxes->subordinate_sync.all = RUN_SYNC_MSG_ALL_SUBORDINATES_DONE;
+#ifdef ARCH_BLACKHOLE
+    mailboxes->subordinate_sync.dm1 = RUN_SYNC_MSG_INIT;
+#endif
+    set_deassert_addresses();
+    deassert_all_reset(); // Bring all riscs on eth cores out of reset
+
     noc_bank_table_init(MEM_IERISC_BANK_TO_NOC_SCRATCH);
 
     my_logical_x_ = mailboxes->core_info.absolute_logical_x;
@@ -117,11 +124,6 @@ int main() {
 
     risc_init();
 
-    mailboxes->subordinate_sync.all = RUN_SYNC_MSG_ALL_SUBORDINATES_DONE;
-#ifdef ARCH_BLACKHOLE
-    mailboxes->subordinate_sync.dm1 = RUN_SYNC_MSG_INIT;
-#endif
-    set_deassert_addresses();
     //device_setup();
 
     noc_init(MEM_NOC_ATOMIC_RET_VAL_ADDR);
@@ -129,7 +131,6 @@ int main() {
         noc_local_state_init(n);
     }
 
-    deassert_all_reset(); // Bring all riscs on eth cores out of reset
     // Wait for all subordinate ERISCs to be ready before reporting the core is done initializing.
     wait_subordinate_eriscs(heartbeat);
     mailboxes->go_message.signal = RUN_MSG_DONE;
