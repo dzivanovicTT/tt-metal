@@ -97,12 +97,14 @@ void __attribute__((noinline)) Application(void) {
     ncrisc_noc_full_sync();
     WAYPOINT("REW");
     uint32_t count = 0;
+    DPRINT << "Waiting for routing enable" << ENDL();
     while (routing_info->routing_enabled != 1) {
         volatile uint32_t *ptr = (volatile uint32_t *)0xffb2010c;
         count++;
         *ptr = 0xAABB0000 | (count & 0xFFFF);
         internal_::risc_context_switch();
     }
+    DPRINT << "Done waiting for routing enable" << ENDL();
     WAYPOINT("RED");
 
     mailboxes->launch_msg_rd_ptr = 0; // Initialize the rdptr to 0

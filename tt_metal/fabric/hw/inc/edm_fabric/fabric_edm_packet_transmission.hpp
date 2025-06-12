@@ -134,6 +134,8 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
     switch (noc_send_type) {
         case tt::tt_fabric::NocSendType::NOC_UNICAST_WRITE: {
             const auto dest_address = header.command_fields.unicast_write.noc_address;
+            DPRINT << "NOC ADDR0: " << dest_address << ENDL();
+            DPRINT << "NOC ADDR1: " << (dest_address >> 32) << ENDL();
             noc_async_write_one_packet_with_trid<false, false>(
                 payload_start_address,
                 dest_address,

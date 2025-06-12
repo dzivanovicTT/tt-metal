@@ -498,6 +498,7 @@ FORCE_INLINE bool can_forward_packet_completely(
         // check if header matches curr. If so, check mcast fields, set mcast true and forward to specific direction
         auto dest_chip_id = packet_header->dst_start_chip_id;
         auto dest_mesh_id = packet_header->dst_start_mesh_id;
+        DPRINT << "Header " << dest_chip_id << " " << dest_mesh_id << ENDL();
         tt_l1_ptr fabric_router_l1_config_t* routing_table =
             reinterpret_cast<tt_l1_ptr fabric_router_l1_config_t*>(eth_l1_mem::address_map::FABRIC_ROUTER_CONFIG_BASE);
 
@@ -507,7 +508,9 @@ FORCE_INLINE bool can_forward_packet_completely(
             auto downstream_direction = port_direction_table[downstream_channel];
             return downstream_edm_interface[downstream_direction].edm_has_space_for_packet();
         } else {
+            DPRINT << "Found packet for my mesh" << ENDL();
             if (dest_chip_id == routing_table->my_device_id) {
+                DPRINT << "Found packet for my chip" << ENDL();
                 // Packet has reached its intended chip. Check if this is an mcast or unicast txn.
                 // If mcast, this packet needs to be forwarded to remote and unicasted locally.
                 bool mcast_active = false;
@@ -672,7 +675,9 @@ FORCE_INLINE __attribute__((optimize("jump-tables"))) void receiver_forward_pack
             transaction_id);
     } else {
         if (dest_chip_id == routing_table->my_device_id || mcast_active) {
+            DPRINT << "Execute local unicast" << ENDL();
             execute_chip_unicast_to_local_chip(packet_start, payload_size_bytes, transaction_id, rx_channel_id);
+            DPRINT << "Done execute local unicast" << ENDL();
             if (mcast_active) {
                 // This packet is in an active mcast
                 for (size_t i = eth_chan_directions::EAST; i < eth_chan_directions::COUNT; i++) {
@@ -1017,6 +1022,7 @@ void run_receiver_channel_step(
                 receiver_buffer_index);
             if constexpr (is_2d_fabric) {
 #if defined(DYNAMIC_ROUTING_ENABLED)
+                DPRINT << "Forward packet" << ENDL();
                 receiver_forward_packet(
                     packet_header,
                     cached_routing_fields,
@@ -1448,6 +1454,7 @@ void populate_local_sender_channel_free_slots_stream_id_ordered_map(
 }
 
 void kernel_main() {
+    DPRINT << "Start fabric kernel" << ENDL();
     eth_txq_reg_write(sender_txq_id, ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD, DEFAULT_NUM_ETH_TXQ_DATA_PACKET_ACCEPT_AHEAD);
     if constexpr (receiver_txq_id != sender_txq_id) {
         eth_txq_reg_write(
@@ -1959,10 +1966,15 @@ void kernel_main() {
     }
 
     if constexpr (enable_ethernet_handshake) {
+        DPRINT << "Start handshake" << ENDL();
         if constexpr (is_handshake_sender) {
+            DPRINT << "Sender start" << ENDL();
             erisc::datamover::handshake::sender_side_finish(handshake_addr, DEFAULT_HANDSHAKE_CONTEXT_SWITCH_TIMEOUT);
+            DPRINT << "Sender done" << ENDL();
         } else {
+            DPRINT << "Recv start" << ENDL();
             erisc::datamover::handshake::receiver_side_finish(handshake_addr, DEFAULT_HANDSHAKE_CONTEXT_SWITCH_TIMEOUT);
+            DPRINT << "Recv done" << ENDL();
         }
 
         *edm_status_ptr = tt::tt_fabric::EDMStatus::REMOTE_HANDSHAKE_COMPLETE;

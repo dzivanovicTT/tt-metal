@@ -105,6 +105,7 @@ inline void wait_subordinate_eriscs(uint32_t &heartbeat) {
 }
 
 int main() {
+    DPRINT << "Start Idle Erisc kernel" << ENDL();
     configure_csr();
     WAYPOINT("I");
     do_crt1((uint32_t *)MEM_IERISC_INIT_LOCAL_L1_BASE_SCRATCH);
