@@ -696,7 +696,15 @@ FabricEriscDatamoverBuilder::FabricEriscDatamoverBuilder(
 }
 
 std::vector<uint32_t> FabricEriscDatamoverBuilder::get_compile_time_args(uint32_t risc_id) const {
-    const bool is_handshake_master = this->my_chip_id < this->peer_chip_id;
+    bool is_handshake_master;
+    if (this->peer_chip_id == 10) {
+        is_handshake_master = true;
+        std::cout << "Intermesh Handshake master" << std::endl;
+    }
+    else {
+        is_handshake_master = this->my_chip_id < this->peer_chip_id;
+    }
+
     TT_ASSERT(this->my_chip_id != this->peer_chip_id);
 
     for (uint32_t i = 0; i < FabricEriscDatamoverConfig::num_sender_channels; i++) {

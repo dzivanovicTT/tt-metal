@@ -1200,6 +1200,10 @@ std::unordered_set<CoreCoord> Cluster::get_active_ethernet_cores(
             }
         }
     }
+    auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(chip_id);
+    for (const auto& [eth_coord, eth_chan] : intermesh_links) {
+        active_ethernet_cores.insert(eth_coord);
+    }
     return active_ethernet_cores;
 }
 

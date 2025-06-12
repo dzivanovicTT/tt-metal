@@ -533,13 +533,10 @@ void DevicePool::wait_for_fabric_router_sync() const {
         for (auto i = 0; i < tunnels_from_mmio.size(); i++) {
             // Need to poll on devices from farthest to the closest.
             for (auto j = tunnels_from_mmio[i].size() - 1; j > 0; j--) {
-                std::cout << "Wait for handshake " << get_device(tunnels_from_mmio[i][j])->id() << std::endl;
                 wait_for_handshake(get_device(tunnels_from_mmio[i][j]));
             }
         }
-        std::cout << "Wait for handshake " << dev->id() << std::endl;
         wait_for_handshake(dev);
-        std::cout << "Done wait for handshake " << dev->id() << std::endl;
     }
 }
 
