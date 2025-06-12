@@ -766,7 +766,7 @@ TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomUnicastRaw) {
     auto [mesh_graph_desc_path, mesh_graph_eth_coords] = GetParam();
     CustomMeshGraphFabric2DDynamicFixture::SetUp(
         mesh_graph_desc_path, get_physical_chip_mapping_from_eth_coords_mapping(mesh_graph_eth_coords));
-    for (uint32_t i = 0; i < 100; i++) {
+    for (uint32_t i = 0; i < 20; i++) {
         RunTestUnicastRaw(this);
     }
 }

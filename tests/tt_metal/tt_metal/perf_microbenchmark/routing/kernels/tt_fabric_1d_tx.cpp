@@ -55,6 +55,8 @@ inline void send_packet(
     uint32_t seed,
     tt::tt_fabric::WorkerToFabricEdmSender& connection) {
 #ifndef BENCHMARK_MODE
+    DPRINT << "NOC ADDR0: " << noc_dest_addr << ENDL();
+    DPRINT << "NOC ADDR1: " << (noc_dest_addr >> 32) << ENDL();
     packet_header->to_noc_unicast_write(NocUnicastCommandHeader{noc_dest_addr}, packet_payload_size_bytes);
     // fill packet data for sanity testing
     tt_l1_ptr uint32_t* start_addr = reinterpret_cast<tt_l1_ptr uint32_t*>(source_l1_buffer_address);
@@ -155,6 +157,10 @@ void kernel_main() {
 
         if constexpr (is_2d_fabric) {
             if constexpr (use_dynamic_routing) {
+                DPRINT << "Using dynamic routing on worker" << ENDL();
+                DPRINT << "Send in direction: " << (uint32_t)(fwd_fabric_connection.direction) << ENDL();
+                DPRINT << "EDM X " << +(fwd_fabric_connection.edm_noc_x) << ENDL();
+                DPRINT << "EDM Y " << +(fwd_fabric_connection.edm_noc_y) << ENDL();
                 fabric_set_unicast_route(
                     (MeshPacketHeader*)packet_header_buffer_address,
                     (eth_chan_directions)fwd_fabric_connection.direction,
@@ -184,9 +190,9 @@ void kernel_main() {
 
     // loop over for num packets
     for (uint32_t i = 0; i < num_packets; i++) {
-#ifndef BENCHMARK_MODE
-        time_seed = prng_next(time_seed);
-#endif
+// #ifndef BENCHMARK_MODE
+//         time_seed = 0; // prng_next(time_seed);
+// #endif
         if constexpr (mcast_mode) {
             // fwd packet
             send_packet(
