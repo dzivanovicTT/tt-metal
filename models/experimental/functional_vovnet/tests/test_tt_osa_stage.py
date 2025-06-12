@@ -6,14 +6,14 @@ import torch
 import pytest
 import timm
 
-from loguru import logger
 import ttnn
 
 # from models.experimental.functional_vovnet.tt.conv_norm_act import TtConvNormAct
-from models.experimental.functional_vovnet.tt.model_preprocessing import create_vovnet_model_parameters
+# from models.experimental.functional_vovnet.tt.model_preprocessing import create_vovnet_model_parameters
 from tests.ttnn.utils_for_testing import assert_with_pcc
 
 from models.experimental.functional_vovnet.tt.osa_stage import TtOsaStage
+from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
 
 
 @pytest.mark.parametrize(
@@ -26,8 +26,8 @@ def test_osa_stage_inference(device, pcc, reset_seeds):
     STAGE_INDEX = 3
 
     base_address = f"stages.{STAGE_INDEX}"
-    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True)
-
+    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True).eval()
+    parameters = custom_preprocessor(device, model.state_dict())
     torch_model = model.stages[STAGE_INDEX]
     print(torch_model)
 
@@ -36,7 +36,8 @@ def test_osa_stage_inference(device, pcc, reset_seeds):
         downsample = True
     tt_model = TtOsaStage(
         base_address=base_address,
-        torch_model=model.state_dict(),
+        # torch_model=model.state_dict(),
+        parameters=parameters,
         device=device,
         downsample=downsample,
     )

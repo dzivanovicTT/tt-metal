@@ -10,6 +10,7 @@ import ttnn
 
 from tests.ttnn.utils_for_testing import assert_with_pcc
 from models.experimental.functional_vovnet.tt.osa_block import TtOsaBlock
+from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
 
 
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 16384}], indirect=True)
@@ -17,13 +18,14 @@ def test_osa_block_inference(device, reset_seeds):
     STAGE_INDEX = 0
     BLOCK_INDEX = 0
     base_address = f"stages.{STAGE_INDEX}.blocks.{BLOCK_INDEX}"
-    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True)
+    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True).eval()
 
     torch_model = model.stages[STAGE_INDEX].blocks[BLOCK_INDEX]
-
+    parameters = custom_preprocessor(device, model.state_dict())
     tt_model = TtOsaBlock(
         base_address=base_address,
-        torch_model=model.state_dict(),
+        # torch_model=model.state_dict(),
+        parameters=parameters,
         device=device,
     )
     torch_model = model.stages[STAGE_INDEX].blocks[BLOCK_INDEX]
@@ -32,6 +34,8 @@ def test_osa_block_inference(device, reset_seeds):
     # torch_model3 = model.stages[STAGE_INDEX].blocks[BLOCK_INDEX].attn
     # run torch model
     input = torch.randn(1, 64, 56, 56)
+    # input = torch.randn(1, 256, 56, 56)
+    # input = torch.randn(1, 768, 56, 56)
     out_list = [input]
     model_output = torch_model(input)
     # model_output = torch_model1(model_output, out_list)

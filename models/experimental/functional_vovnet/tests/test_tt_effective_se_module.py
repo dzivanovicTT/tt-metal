@@ -6,11 +6,10 @@ import torch
 import pytest
 import timm
 
-from loguru import logger
 import ttnn
 
 from tests.ttnn.utils_for_testing import assert_with_pcc
-
+from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
 from models.experimental.functional_vovnet.tt.effective_se_module import TtEffectiveSEModule
 
 
@@ -22,20 +21,21 @@ from models.experimental.functional_vovnet.tt.effective_se_module import TtEffec
 def test_effective_se_module_inference(device, pcc, reset_seeds):
     base_address = f"stages.0.blocks.0.attn"
 
-    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True)
+    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True).eval()
 
     torch_model = model.stages[0].blocks[0].attn
-    print(torch_model)
+    parameters = custom_preprocessor(device, model.state_dict())
 
     tt_model = TtEffectiveSEModule(
         stride=1,
         dilation=1,
         padding=0,
         bias=None,
-        torch_model=model.state_dict(),
+        # torch_model=model.state_dict(),
         base_address=base_address,
         device=device,
         temp_model=torch_model,
+        parameters=parameters,
     )
 
     # run torch model

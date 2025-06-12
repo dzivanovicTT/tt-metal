@@ -6,7 +6,6 @@ import torch
 import pytest
 import timm
 
-from loguru import logger
 import ttnn
 from models.experimental.functional_vovnet.tt.classifier_head import TtClassifierHead
 from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
@@ -20,7 +19,7 @@ from tests.ttnn.utils_for_testing import assert_with_pcc
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 16384}], indirect=True)
 def test_classifier_head_inference(device, pcc, reset_seeds):
     base_address = f"head"
-    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=False)
+    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True).eval()
 
     torch_model = model.head
     parameters = custom_preprocessor(device, model.state_dict())

@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import ttnn
-import torch.nn as nn
 
 
 class Conv:
@@ -73,8 +72,9 @@ class Conv:
             weights_dtype=ttnn.bfloat8_b,
             activation=activation,
             # shard_layout=ttnn.TensorMemoryLayout.HEIGHT_SHARDED,
-            shard_layout=self.shard_layout,
-            input_channels_alignment=16,  # if self.input_params[-1] < 16 else 32,
+            # shard_layout=self.shard_layout
+            shard_layout=None,
+            # input_channels_alignment=16,  # if self.input_params[-1] < 16 else 32,
             reshard_if_not_optimal=True,
             deallocate_activation=True,
             reallocate_halo_output=True,
@@ -105,7 +105,7 @@ class Conv:
             packer_l1_acc=False,
         )
 
-        self.conv_config.input_channels_alignment = 16 if input_tensor.shape[-1] < 16 else 32
+        # self.conv_config.input_channels_alignment = 16 if input_tensor.shape[-1] < 16 else 32
         output_tensor, [_out_height, _out_width], [self.weights, self.bias] = ttnn.conv2d(
             input_tensor=input_tensor,
             weight_tensor=self.weights,
@@ -120,8 +120,8 @@ class Conv:
             input_height=input_tensor.shape[1],
             input_width=input_tensor.shape[2],
             conv_config=self.conv_config,
-            conv_op_cache=self.reader_patterns_cache,
-            debug=self.debug,
+            # conv_op_cache=self.reader_patterns_cache,
+            # debug=self.debug,
             groups=self.groups,
             compute_config=compute_config,
             return_output_dim=True,
@@ -134,7 +134,7 @@ class Conv:
         output_tensor = ttnn.permute(output_tensor, (0, 3, 1, 2))
         if self.fused_op:
             output_tensor = ttnn.to_layout(output_tensor, layout=ttnn.TILE_LAYOUT)
-            self.bn = ttnn.batch_norm(
+            bn = ttnn.batch_norm(
                 output_tensor,
                 running_mean=self.bn_running_mean,
                 running_var=self.bn_running_var,
@@ -142,5 +142,5 @@ class Conv:
                 bias=self.bn_bias,
                 training=False,
             )
-            output_tensor = ttnn.relu(output_tensor, memory_config=ttnn.L1_MEMORY_CONFIG)
+            output_tensor = ttnn.relu(bn, memory_config=ttnn.L1_MEMORY_CONFIG)
         return output_tensor, _out_height, _out_width

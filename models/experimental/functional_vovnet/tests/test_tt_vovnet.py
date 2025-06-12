@@ -5,7 +5,6 @@
 import pytest
 import timm
 import torch
-from loguru import logger
 import ttnn
 from models.experimental.functional_vovnet.tt.vovnet import TtVoVNet
 from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
@@ -18,10 +17,11 @@ from tests.ttnn.utils_for_testing import assert_with_pcc
 )
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 32768}], indirect=True)
 def test_vovnet_model_inference(device, pcc, imagenet_sample_input, model_name, reset_seeds):
-    model = timm.create_model(model_name, pretrained=False).eval()
+    model = timm.create_model(model_name, pretrained=True).eval()
 
-    torch_model = model
-    parameters = custom_preprocessor(device, torch_model.state_dict())
+    # state_dict = torch_model.state_dict()
+    # torch_model.load_state_dict(state_dict)
+    parameters = custom_preprocessor(device, model.state_dict())
 
     tt_model = TtVoVNet(
         device=device,
@@ -34,7 +34,7 @@ def test_vovnet_model_inference(device, pcc, imagenet_sample_input, model_name, 
     input = torch.rand(1, 3, 224, 224)
     print("Shape of input :", input.shape)
 
-    model_output = torch_model(input)
+    model_output = model(input)
 
     tt_input = ttnn.from_torch(input, dtype=ttnn.bfloat16, device=device)  # , layout = ttnn.TILE_LAYOUT)
     tt_output = tt_model.forward(tt_input)

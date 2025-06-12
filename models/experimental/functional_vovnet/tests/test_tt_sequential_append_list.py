@@ -6,15 +6,12 @@ import torch
 import pytest
 import timm
 
-from loguru import logger
 import ttnn
 
 from tests.ttnn.utils_for_testing import assert_with_pcc
 
-from models.experimental.functional_vovnet.tt.osa_stage import TtOsaStage
-
-
 from models.experimental.functional_vovnet.tt.sequential_append_list import TtSequentialAppendList
+from models.experimental.functional_vovnet.tt.model_preprocessing import custom_preprocessor
 
 
 @pytest.mark.parametrize(
@@ -28,12 +25,15 @@ def test_sequential_append_list_inference(device, pcc, reset_seeds):
 
     base_address = f"stages.{STAGE_INDEX}.blocks.{BLOCK_INDEX}"
 
-    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True)
+    model = timm.create_model("hf_hub:timm/ese_vovnet19b_dw.ra_in1k", pretrained=True).eval()
 
     torch_model = model.stages[STAGE_INDEX].blocks[BLOCK_INDEX].conv_mid
-
+    parameters = custom_preprocessor(device, model.state_dict())
     tt_model = TtSequentialAppendList(
-        layer_per_block=3, torch_model=model.state_dict(), base_address=f"{base_address}", device=device
+        layer_per_block=3,
+        base_address=f"{base_address}",
+        device=device,
+        parameters=parameters,
     )
 
     input = torch.randn(1, 128, 56, 56)
