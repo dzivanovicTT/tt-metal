@@ -1,4 +1,5 @@
 #include "deinterleave_device_operation.hpp"
+#include "tt-metalium/circular_buffer_types.hpp"
 #include "tt-metalium/kernel_types.hpp"
 #include "ttnn/operations/moreh/moreh_helper_functions.hpp"
 
@@ -11,11 +12,11 @@ DeinterleaveLocalOperation::ProgramFactoryLocal::create(
     // TODO: implement
     Program program;
 
-    tt::tt_metal::CoreRangeSet worker_grid;
-    tt::tt_metal::KernelHandle read_kernel_id = CreateReadKernel(program, "", worker_grid);
-    tt::tt_metal::KernelHandle write_kernel_id = CreateWriteKernel(program, "", worker_grid);
+    // temporary
+    tt::tt_metal::CBHandle src_cb_id = 0;
+    tt::tt_metal::CBHandle dst_cb_id = 0;
 
-    return {std::move(program), {read_kernel_id, write_kernel_id, worker_grid}};
+    return {std::move(program), {src_cb_id, dst_cb_id}};
 }
 
 void DeinterleaveLocalOperation::ProgramFactoryLocal::override_runtime_arguments(
@@ -23,10 +24,8 @@ void DeinterleaveLocalOperation::ProgramFactoryLocal::override_runtime_arguments
     const operation_attributes_t& operation_attributes,
     const tensor_args_t& tensor_args,
     tensor_return_value_t& output) {
-    const auto& program = cached_program.program;
-    const auto& read_kernel_id = cached_program.shared_variables.read_kernel_id;
-    const auto& write_kernel_id = cached_program.shared_variables.write_kernel_id;
-
-    TT_FATAL(false, "to resolve overriding runtime args");
+    auto& program = cached_program.program;
+    const auto& src_cb_id = cached_program.shared_variables.src_cb_id;
+    const auto& dst_cb_id = cached_program.shared_variables.dst_cb_id;
 }
 }  // namespace ttnn::operations::experimental::deinterleave

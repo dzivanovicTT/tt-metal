@@ -8,6 +8,7 @@
 
 #include "deinterleave_device_operation.hpp"
 #include <tt-metalium/work_split.hpp>
+#include "tt-metalium/host_api.hpp"
 #include "ttnn/operations/math.hpp"
 
 namespace ttnn::operations::experimental::deinterleave {
@@ -294,7 +295,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
              (uint32_t)dst_rollover_offset_dm1});
     }
 
-    return {std::move(program), {read_kernel_id, write_kernel_id, worker_grid}};
+    return {std::move(program), {src_cb_id, dst_cb_id}};
 }
 
 void DeinterleaveToBatchOperation::ProgramFactoryToBatch::override_runtime_arguments(
@@ -302,10 +303,14 @@ void DeinterleaveToBatchOperation::ProgramFactoryToBatch::override_runtime_argum
     const operation_attributes_t& operation_attributes,
     const tensor_args_t& tensor_args,
     tensor_return_value_t& output) {
-    const auto& program = cached_program.program;
-    const auto& read_kernel_id = cached_program.shared_variables.read_kernel_id;
-    const auto& write_kernel_id = cached_program.shared_variables.write_kernel_id;
+    auto& program = cached_program.program;
+    const auto& src_cb_id = cached_program.shared_variables.src_cb_id;
+    const auto& dst_cb_id = cached_program.shared_variables.dst_cb_id;
 
-    TT_FATAL(false, "to resolve overriding runtime args");
+    auto src_buffer = tensor_args.input.buffer();
+    auto dst_buffer = output.buffer();
+
+    tt::tt_metal::UpdateDynamicCircularBufferAddress(program, src_cb_id, *src_buffer);
+    tt::tt_metal::UpdateDynamicCircularBufferAddress(program, dst_cb_id, *dst_buffer);
 }
 }  // namespace ttnn::operations::experimental::deinterleave

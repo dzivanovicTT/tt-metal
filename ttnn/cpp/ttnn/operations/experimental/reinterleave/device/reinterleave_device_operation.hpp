@@ -28,9 +28,8 @@ struct ReinterleaveFromBatchOperation {
 
     struct ProgramFactoryFromBatch {
         struct shared_variables_t {
-            tt::tt_metal::KernelHandle read_kernel_id;
-            tt::tt_metal::KernelHandle write_kernel_id;
-            tt::tt_metal::CoreRangeSet worker_grid;
+            tt::tt_metal::CBHandle src_cb_id;
+            tt::tt_metal::CBHandle dst_cb_id;
         };
 
         using cached_program_t = ttnn::device_operation::CachedProgram<shared_variables_t>;
