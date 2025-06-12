@@ -202,7 +202,7 @@ void kernel_main() {
                     (actual_forward_chip_id_x == ring_size - 1) ? 0 : actual_forward_chip_id_x + 1;
 
                 uint32_t intermediate_packet_id_x = actual_forward_chip_id_x + intermediate_packet_offset_x;
-                uint32_t intermediate_packet_id_y = actual_forward_chip_id_x + intermediate_packet_offset_y;
+                uint32_t intermediate_packet_id_y = actual_forward_chip_id_y + intermediate_packet_offset_y;
                 if (intermediate_packet_id_x >= N_DRAM_BANKS) {
                     intermediate_packet_id_x -= N_DRAM_BANKS;
                     intermediate_packet_id_y++;
