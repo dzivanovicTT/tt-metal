@@ -104,6 +104,147 @@ std::shared_ptr<tt_metal::Program> create_receiver_program(
     return recv_program;
 }
 
+void RunMultiMeshLineMcast(BaseFabricFixture* fixture, FabricNodeId mcast_request_node, FabricNodeId mcast_start_node, const std::vector<McastRoutingInfo>& mcast_routing_info) {
+    auto& control_plane = tt::tt_metal::MetalContext::instance().get_control_plane();
+    auto request_phys_id = control_plane.get_physical_chip_id_from_fabric_node_id(mcast_request_node);
+    auto request_device = DevicePool::instance().get_active_device(request_phys_id);
+    std::cout << "Request Mcast from: " << request_phys_id << std::endl;
+    CoreCoord sender_logical_core = {0, 0};
+    CoreCoord receiver_logical_core = {1, 0};
+
+    const std::vector<uint32_t> dst_node_id_to_phys = {0, 1, 2, 3};
+
+    CoreCoord receiver_virtual_core = request_device->worker_core_from_logical_core(receiver_logical_core);
+    auto receiver_noc_encoding =
+        tt::tt_metal::MetalContext::instance().hal().noc_xy_encoding(receiver_virtual_core.x, receiver_virtual_core.y);
+    
+    const auto& fabric_context = control_plane.get_fabric_context();
+    const auto topology = fabric_context.get_fabric_topology();
+    const auto& edm_config = fabric_context.get_fabric_router_config();
+    uint32_t is_2d_fabric = topology == Topology::Mesh;
+
+    auto worker_mem_map = generate_worker_mem_map(request_device, topology);
+
+    static uint32_t time_seed = 0;
+    time_seed++;
+    uint32_t num_packets = 10;
+    static uint32_t target_address = worker_mem_map.target_address;
+    target_address += num_packets * worker_mem_map.packet_payload_size_bytes;
+
+    std::cout << "Using seed: " << time_seed << std::endl;
+    std::cout << "Writing to: " << target_address << std::endl;
+    // common compile time args for sender and receiver
+    std::vector<uint32_t> compile_time_args = {
+        worker_mem_map.test_results_address,
+        worker_mem_map.test_results_size_bytes,
+        target_address};
+
+    std::map<string, string> defines = {};
+    if (is_2d_fabric) {
+        defines["FABRIC_2D"] = "";
+    }
+
+    auto mcast_req_program = tt_metal::CreateProgram();
+    auto mcast_req_kernel = tt_metal::CreateKernel(
+        mcast_req_program,
+        "tests/tt_metal/tt_metal/perf_microbenchmark/routing/kernels/tt_fabric_line_mcast_tx.cpp",
+        {sender_logical_core},
+        tt_metal::DataMovementConfig{
+            .processor = tt_metal::DataMovementProcessor::RISCV_0,
+            .noc = tt_metal::NOC::RISCV_0_default,
+            .compile_args = compile_time_args,
+            .defines = defines});
+
+    std::vector<uint32_t> sender_runtime_args = {
+        worker_mem_map.packet_header_address,
+        worker_mem_map.source_l1_buffer_address,
+        worker_mem_map.packet_payload_size_bytes,
+        num_packets,
+        receiver_noc_encoding,
+        time_seed,
+        mcast_start_node.chip_id,
+        *mcast_start_node.mesh_id};
+    
+    std::vector<uint32_t> mcast_header_rtas(4, 0);
+    for (const auto& routing_info : mcast_routing_info) {
+        mcast_header_rtas[static_cast<uint32_t>(
+            control_plane.routing_direction_to_eth_direction(routing_info.mcast_dir))] = routing_info.num_mcast_hops;
+    }
+    
+    sender_runtime_args.insert(sender_runtime_args.end(), mcast_header_rtas.begin(), mcast_header_rtas.end());
+
+    std::vector<chan_id_t> eth_chans;
+    chan_id_t edm_port;
+    if (tt::tt_metal::MetalContext::instance().get_cluster().has_intermesh_links(request_phys_id)) {
+        auto eth_cores_and_chans = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(request_phys_id);
+        for (const auto& [core, chan] : eth_cores_and_chans) {
+            if (control_plane.get_routing_plane_id(mcast_request_node, chan) == 0) {
+                eth_chans.push_back(chan);
+            }
+        }
+    }
+
+    else {
+        chip_id_t edge_chip = 0;
+        for (auto chip_id : tt::tt_metal::MetalContext::instance().get_cluster().user_exposed_chip_ids()) {
+            if (tt::tt_metal::MetalContext::instance().get_cluster().has_intermesh_links(chip_id)) {
+                edge_chip = chip_id;
+                break;
+            }
+        }
+        auto edge_fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(edge_chip);
+        eth_chans = control_plane.get_forwarding_eth_chans_to_chip(mcast_request_node, edge_fabric_node_id);
+    }
+
+    edm_port = *eth_chans.begin();
+    auto edm_direction = control_plane.get_eth_chan_direction(mcast_request_node, edm_port);
+    CoreCoord edm_eth_core = tt::tt_metal::MetalContext::instance().get_cluster().get_virtual_eth_core_from_channel(
+        request_phys_id, edm_port);
+    log_info(tt::LogTest, "Using edm port {} in direction {}", edm_port, edm_direction);
+
+    const auto sender_channel = topology == Topology::Mesh ? edm_direction : 0;
+    tt::tt_fabric::SenderWorkerAdapterSpec edm_connection = {
+        .edm_noc_x = edm_eth_core.x,
+        .edm_noc_y = edm_eth_core.y,
+        .edm_buffer_base_addr = edm_config.sender_channels_base_address[sender_channel],
+        .num_buffers_per_channel = edm_config.sender_channels_num_buffers[sender_channel],
+        .edm_l1_sem_addr = edm_config.sender_channels_local_flow_control_semaphore_address[sender_channel],
+        .edm_connection_handshake_addr = edm_config.sender_channels_connection_semaphore_address[sender_channel],
+        .edm_worker_location_info_addr = edm_config.sender_channels_worker_conn_info_base_address[sender_channel],
+        .buffer_size_bytes = edm_config.channel_buffer_size_bytes,
+        .buffer_index_semaphore_id = edm_config.sender_channels_buffer_index_semaphore_address[sender_channel],
+        .persistent_fabric = true,
+        .edm_direction = edm_direction};
+
+    auto worker_flow_control_semaphore_id = tt_metal::CreateSemaphore(mcast_req_program, sender_logical_core, 0);
+    auto worker_teardown_semaphore_id = tt_metal::CreateSemaphore(mcast_req_program, sender_logical_core, 0);
+    auto worker_buffer_index_semaphore_id = tt_metal::CreateSemaphore(mcast_req_program, sender_logical_core, 0);
+
+    append_worker_to_fabric_edm_sender_rt_args(
+        edm_connection,
+        worker_flow_control_semaphore_id,
+        worker_teardown_semaphore_id,
+        worker_buffer_index_semaphore_id,
+        sender_runtime_args);
+
+    tt_metal::SetRuntimeArgs(mcast_req_program, mcast_req_kernel, sender_logical_core, sender_runtime_args);
+
+
+    log_info(tt::LogTest, "Run Sender on: {}", request_device->id());
+    fixture->RunProgramNonblocking(request_device, mcast_req_program);
+    fixture->WaitForSingleProgramDone(request_device, mcast_req_program);
+
+    std::vector<uint32_t> sender_status;
+    tt_metal::detail::ReadFromDeviceL1(
+        request_device,
+        sender_logical_core,
+        worker_mem_map.test_results_address,
+        worker_mem_map.test_results_size_bytes,
+        sender_status,
+        CoreType::WORKER);
+    EXPECT_EQ(sender_status[TT_FABRIC_STATUS_INDEX], TT_FABRIC_STATUS_PASS);   
+}
+
 void RunTestLineMcast(
     BaseFabricFixture* fixture, RoutingDirection unicast_dir, const std::vector<McastRoutingInfo>& mcast_routing_info) {
     auto& control_plane= tt::tt_metal::MetalContext::instance().get_control_plane();
@@ -220,7 +361,7 @@ void RunTestLineMcast(
 
     std::vector<uint32_t> sender_runtime_args = {
         worker_mem_map.packet_header_address,
-        worker_mem_map.source_l1_buffer_address,
+    worker_mem_map.source_l1_buffer_address,
         worker_mem_map.packet_payload_size_bytes,
         num_packets,
         receiver_noc_encoding,
