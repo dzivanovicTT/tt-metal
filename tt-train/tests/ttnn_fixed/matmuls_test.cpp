@@ -237,4 +237,19 @@ TEST(MatmulsTest, MatMulBackwardTransposeBoth) {
     EXPECT_TRUE(xt::allclose(grad_a, expected_grad_a));
     EXPECT_TRUE(xt::allclose(grad_b, expected_grad_b));
 }
+
+TEST(MatmulsTest, FastMatmulTest) {
+    xt::xarray<float> q = xt::random::randn<float>({64, 6, 256, 384});
+    xt::xarray<float> k = xt::random::randn<float>({64, 6, 256, 384});
+
+    auto q_tt = core::from_xtensor(q, &autograd::ctx().get_device());
+    auto k_tt = core::from_xtensor(k, &autograd::ctx().get_device());
+
+    // time it
+    auto start = std::chrono::high_resolution_clock::now();
+    auto q_k = matmul(q_tt, k_tt, false, true);
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+    fmt::println("Time taken: {} ms", duration.count());
+}
 }  // namespace ttml::ttnn_fixed::tests

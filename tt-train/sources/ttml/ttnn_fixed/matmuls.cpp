@@ -41,7 +41,7 @@ tt::tt_metal::Tensor matmul(
     // Create the 2D matmul program config
     auto matmul_program_config = ttnn::operations::matmul::MatmulMultiCoreReuseMultiCastProgramConfig{
       .compute_with_storage_grid_size = {cores_x, cores_y},  // (cores_x, cores_y)
-      .in0_block_w = 2,                          // K dimension blocking
+      .in0_block_w = 1,                          // K dimension blocking
       .out_subblock_h = 1,                       // Must divide per_core_M
       .out_subblock_w = 1,                       // Must divide per_core_N
       .per_core_M = M / tt::constants::TILE_HEIGHT / cores_y,                           // M / TILE_HEIGHT / cores_y
