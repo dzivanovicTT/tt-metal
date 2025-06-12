@@ -115,7 +115,7 @@ def create_model_pipeline(device, num_inference_steps, image_size=(256, 256)):
     ttnn_scheduler.set_timesteps(num_inference_steps)
 
     latents = latents * ttnn_scheduler.init_noise_sigma
-    rand_latents = torch.tensor(latents)
+    rand_latents = latents
     rand_latents = ttnn.from_torch(rand_latents, dtype=ttnn.bfloat16, layout=ttnn.TILE_LAYOUT, device=device)
 
     # ttnn_latents = ttnn.from_torch(ttnn_latents, dtype=ttnn.bfloat16, device=device, layout=ttnn.TILE_LAYOUT)

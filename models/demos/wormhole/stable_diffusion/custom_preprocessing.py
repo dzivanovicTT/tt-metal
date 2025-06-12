@@ -30,7 +30,7 @@ def custom_preprocessor(model, name):
         parameters["bias"] = preprocess_conv_parameter(model.bias, dtype=ttnn.bfloat16)
 
     if isinstance(model, (nn.Linear, nn.LayerNorm)):
-        weight = model.weight.T.contiguous()
+        weight = model.weight.permute(*torch.arange(model.weight.ndim - 1, -1, -1)).contiguous()
         while len(weight.shape) < 4:
             weight = weight.unsqueeze(0)
         parameters["weight"] = ttnn.from_torch(weight, dtype=ttnn.bfloat16, layout=ttnn.TILE_LAYOUT)
