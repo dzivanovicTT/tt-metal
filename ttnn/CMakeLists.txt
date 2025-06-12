@@ -627,12 +627,4 @@ add_subdirectory(cpp/ttnn/operations/transformer)
 add_subdirectory(cpp/ttnn/operations/uniform)
 add_subdirectory(cpp/ttnn/operations/pool)
 add_subdirectory(cpp/ttnn/operations/normalization)
-<<<<<<< HEAD
-<<<<<<< HEAD
-
 add_subdirectory(cpp/ttnn/deprecated)
-=======
-add_subdirectory(cpp/ttnn/operations/test)
->>>>>>> a63c0f9ba9 (added a way to get the traces when an operation hangs, it is quite hacky so it is under conditional compilation, also updated our documentation)
-=======
->>>>>>> 54538ac816 (Moved the hang operation to the experimental namespace, the idea is to not allow users to even consider it, is just for testing!)
