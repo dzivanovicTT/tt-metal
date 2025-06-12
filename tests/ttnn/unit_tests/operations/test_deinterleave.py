@@ -160,6 +160,15 @@ def run_deinterleave(
         passing, out = comp_allclose_and_pcc(golden_output, torch_output, rtol=0.01, atol=0.01, pcc=0.999)
         logger.info(out)
         assert passing, out
+        passing, out = comp_allclose_and_pcc(
+            torch_input_view,
+            torch_reinterleaved,
+            rtol=0.01,
+            atol=0.01,
+            pcc=0.999,
+        )
+        logger.info(out)
+        assert passing, out
     else:
         # Not implemented yet
         pass
