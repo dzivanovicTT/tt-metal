@@ -120,7 +120,9 @@ MetalContext::MetalContext() {
         Cluster::is_base_routing_fw_enabled(Cluster::get_cluster_type_from_cluster_desc(rtoptions_));
     hal_ = std::make_unique<Hal>(get_platform_architecture(rtoptions_), is_base_routing_fw_enabled);
     cluster_ = std::make_unique<Cluster>(rtoptions_, *hal_);
-    if (!distributed::multihost::DistributedContext::is_initialized()) {
+
+    if (distributed::multihost::DistributedContext::using_mpi_environment() &&
+        !distributed::multihost::DistributedContext::is_initialized()) {
         log_info(tt::LogMetal, "Initializing distributed context from MetalContext");
         distributed::multihost::DistributedContext::create(0, nullptr);
     }

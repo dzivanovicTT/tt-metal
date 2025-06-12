@@ -25,4 +25,4 @@ global_env:
   TEST_GLOBAL_VAR: "global_value"
 
   # Logging configuration
-  TT_METAL_LOGGER_LEVEL: "Info"
+  TT_METAL_LOGGER_LEVEL: "Debug"

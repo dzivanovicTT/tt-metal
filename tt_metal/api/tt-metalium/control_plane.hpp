@@ -106,6 +106,12 @@ public:
     MeshCoordinate chip_to_global_coordinate(chip_id_t chip_id) const;
     chip_id_t global_coordinate_to_chip(MeshCoordinate coordinate) const;
 
+    // Returns the offset of the local mesh in the global mesh
+    MeshCoordinate get_local_mesh_offset() const;
+
+    // If the fabric node id is not in the mapping, return std::nullopt
+    std::optional<chip_id_t> get_physical_chip_id(const FabricNodeId& fabric_node_id) const;
+
 private:
     uint16_t routing_mode_ = 0;  // ROUTING_MODE_UNDEFINED
     // TODO: remove this from local node control plane. Can get it from the global control plane
