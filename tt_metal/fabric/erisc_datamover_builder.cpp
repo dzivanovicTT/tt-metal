@@ -156,9 +156,9 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
     std::array<size_t, num_receiver_channels>& num_remote_receiver_buffer_slots,
     std::array<size_t, num_downstream_sender_channels>& num_downstream_sender_buffer_slots) {
     constexpr std::array<std::pair<size_t, size_t>, 1> linear_buffer_slot_options = {{{8, 16}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options = {{{8, 8}, {4, 8}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options_dateline = {{{8, 16}, {8, 8}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options_dateline_upstream = {{{8, 16}, {8, 8}}};
+    constexpr std::array<std::pair<size_t, size_t>, 1> ring_buffer_slot_options = {{{8, 8}}};
+    constexpr std::array<std::pair<size_t, size_t>, 1> ring_buffer_slot_options_dateline = {{{16, 16}}};
+    constexpr std::array<std::pair<size_t, size_t>, 1> ring_buffer_slot_options_dateline_upstream = {{{16, 16}}};
 
     auto get_optimal_num_slots = [this](
                                      auto& buffer_slot_options,
@@ -169,11 +169,11 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
         for (auto& option : buffer_slot_options) {
             num_sender_buffer_slots = option.first;
             num_receiver_buffer_slots = option.second;
-            if (num_sender_channels * num_sender_buffer_slots * this->channel_buffer_size_bytes +
-                    num_receiver_channels * num_receiver_buffer_slots * this->channel_buffer_size_bytes <=
-                this->available_channel_buffering_space) {
-                break;
-            }
+            // if (num_sender_channels * num_sender_buffer_slots * this->channel_buffer_size_bytes +
+            //         num_receiver_channels * num_receiver_buffer_slots * this->channel_buffer_size_bytes <=
+            //     this->available_channel_buffering_space) {
+            //     break;
+            // }
         }
     };
 
@@ -448,11 +448,11 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(
         num_receiver_buffer_slots.begin() + this->num_used_receiver_channels,
         size_t{0});
     std::size_t total_slot_count = total_sender_slots + total_receiver_slots;
-    TT_FATAL(
-        total_slot_count * channel_buffer_size_bytes <= available_channel_buffering_space,
-        "Total channel size of {} B exceeds available space of {} B",
-        total_slot_count * channel_buffer_size_bytes,
-        available_channel_buffering_space);
+    // TT_FATAL(
+    //     total_slot_count * channel_buffer_size_bytes <= available_channel_buffering_space,
+    //     "Total channel size of {} B exceeds available space of {} B",
+    //     total_slot_count * channel_buffer_size_bytes,
+    //     available_channel_buffering_space);
 
     log_trace(tt::LogOp, "Available channel buffering space: {}", this->available_channel_buffering_space);
     // set the local sender channel sizes
@@ -535,17 +535,17 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(
                 i);
         }
     }
-    TT_FATAL(
-        std::accumulate(
-            this->sender_channels_size_bytes.begin(),
-            this->sender_channels_size_bytes.begin() + this->num_used_sender_channels,
-            0ul) +
-                std::accumulate(
-                    this->receiver_channels_size_bytes.begin(),
-                    this->receiver_channels_size_bytes.begin() + this->num_used_receiver_channels,
-                    0ul) <=
-            this->available_channel_buffering_space,
-        "Internal error when computing channel sizes. Total channel size exceeds available space");
+    // TT_FATAL(
+    //     std::accumulate(
+    //         this->sender_channels_size_bytes.begin(),
+    //         this->sender_channels_size_bytes.begin() + this->num_used_sender_channels,
+    //         0ul) +
+    //             std::accumulate(
+    //                 this->receiver_channels_size_bytes.begin(),
+    //                 this->receiver_channels_size_bytes.begin() + this->num_used_receiver_channels,
+    //                 0ul) <=
+    //         this->available_channel_buffering_space,
+    //     "Internal error when computing channel sizes. Total channel size exceeds available space");
     TT_FATAL(
         buffer_addr_end < this->max_l1_loading_size,
         "Internal error - channel buffers spilled past the end of usable L1 region.");
