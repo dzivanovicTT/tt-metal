@@ -165,7 +165,7 @@ add_compile_options(
     -Wno-deprecated-declarations
     # Vars that are used only in Asserts will appear as dead stores in builds
     # where the preprocessor has stripped away the assert.
-    "$<$<CONFIG:Release>:-Wno-unused-but-set-variable>"
+    "$<$<OR:$<CONFIG:Release>,$<CXX_COMPILER_ID:GNU>>:-Wno-unused-but-set-variable>"
     -Wno-unused-function
     -Wno-unused-variable
     "$<$<CXX_COMPILER_ID:Clang>:-Wno-c++11-narrowing>"
@@ -203,6 +203,23 @@ if(TT_ENABLE_LIGHT_METAL_TRACE)
     add_compile_definitions(TT_ENABLE_LIGHT_METAL_TRACE=1)
 else()
     add_compile_definitions(TT_ENABLE_LIGHT_METAL_TRACE=0)
+endif()
+
+# Control compile time logging for TT_METAL - needs to be set before PCH compilation
+if(NOT DEFINED TT_METAL_ENABLE_LOGGING)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        set(_default_enable_logging OFF)
+    else()
+        set(_default_enable_logging ON)
+    endif()
+endif()
+option(
+    TT_METAL_ENABLE_LOGGING
+    "Enables inclusion of log_trace and log_debug into the binary."
+    ${_default_enable_logging}
+)
+if(TT_METAL_ENABLE_LOGGING)
+    add_compile_definitions(SPDLOG_ACTIVE_LEVEL=SPDLOG_LEVEL_TRACE)
 endif()
 
 include(GNUInstallDirs)

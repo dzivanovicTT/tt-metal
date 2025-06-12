@@ -45,7 +45,7 @@ inline void RunPersistent1dFabricLatencyTest(
     auto num_devices = tt::tt_metal::GetNumAvailableDevices();
     bool is_6u = num_devices == 32 && tt::tt_metal::GetNumPCIeDevices() == num_devices;
     if (num_devices < 4 && !is_6u) {
-        log_info("This test can only be run on T3000 or 6u systems");
+        log_info(tt::LogTest, "This test can only be run on T3000 or 6u systems");
         return;
     }
 
@@ -108,7 +108,6 @@ inline void RunPersistent1dFabricLatencyTest(
     static constexpr uint32_t packet_header_cb_index = tt::CB::c_in0;
     static constexpr uint32_t source_payload_cb_index = tt::CB::c_in1;
     static constexpr size_t packet_header_cb_size_in_headers = 4;
-    static constexpr bool enable_persistent_fabric_mode = true;
     std::vector<size_t> dest_buffer_addresses(writer_specs.size(), 0);
 
     for (size_t i = 0; i < writer_specs.size(); i++) {
@@ -154,12 +153,10 @@ inline void RunPersistent1dFabricLatencyTest(
         std::vector<Program> dummy_worker_programs;
         setup_test_with_persistent_fabric(
             devices,
-            dummy_worker_programs,
             subdevice_managers,
             fabric_programs,
             fabric_program_ptrs,
             fabric_handle,
-            enable_persistent_fabric_mode,
             num_links,
             topology,
             tt::tt_fabric::FabricEriscDatamoverBuilder::default_firmware_context_switch_interval,
@@ -260,13 +257,7 @@ inline void RunPersistent1dFabricLatencyTest(
         if (!use_device_init_fabric) {
             local_device_fabric_handle =
                 ttnn::ccl::EdmLineFabricOpInterface::build_program_builder_worker_connection_fabric(
-                    device,
-                    forward_device,
-                    backward_device,
-                    &program,
-                    enable_persistent_fabric_mode,
-                    num_links,
-                    topology);
+                    device, forward_device, backward_device, &program, num_links, topology);
         }
 
         // reserve CB
@@ -466,7 +457,7 @@ inline void RunPersistent1dFabricLatencyTest(
     for (size_t i = 0; i < programs.size(); i++) {
         auto d = devices_with_workers.at(i);
         auto& program = programs.at(i);
-        tt_metal::DumpDeviceProfileResults(d, program);
+        tt_metal::detail::DumpDeviceProfileResults(d);
     }
     log_info(tt::LogTest, "Finished");
 }
@@ -496,7 +487,7 @@ int main(int argc, char** argv) {
     size_t num_devices = tt::tt_metal::GetNumAvailableDevices();
     bool is_6u = num_devices == 32 && tt::tt_metal::GetNumPCIeDevices() == num_devices;
     if (num_devices < test_expected_num_devices) {
-        tt::log_warning("This test can only be run on T3000 devices");
+        log_warning(tt::LogTest, "This test can only be run on T3000 devices");
         return 1;
     }
 
