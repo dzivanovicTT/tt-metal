@@ -9,6 +9,48 @@
 namespace ttml::ttnn_fixed {
 tt::tt_metal::Tensor matmul(
     const tt::tt_metal::Tensor& a, const tt::tt_metal::Tensor& b, bool transpose_a, bool transpose_b) {
+
+    ttnn::Shape a_shape_full = a.logical_shape();
+    ttnn::Shape b_shape_full = b.logical_shape();
+
+    auto a_shape = std::vector<uint32_t>{a_shape_full[-2], a_shape_full[-1]};
+    auto b_shape = std::vector<uint32_t>{b_shape_full[-2], b_shape_full[-1]};
+
+    if (transpose_a) {
+        std::swap(a_shape[0], a_shape[1]);
+    }
+
+    if (transpose_b) {
+        std::swap(b_shape[0], b_shape[1]);
+    }
+
+    if (a_shape[1] != b_shape[0]){
+      fmt::println("a_transpose: {}, b_transpose: {}", transpose_a, transpose_b);
+      fmt::println("a_shape_full: {}, b_shape_full: {}", a_shape_full, b_shape_full);
+      fmt::println("The last dimension of the first tensor must match the first dimension of the second tensor for matmul, Got ({},{}) x ({},{})", a_shape[0],a_shape[1], b_shape[0], b_shape[1]);
+      throw std::runtime_error("Invalid shapes for matmul");
+    }
+    
+    auto M = a_shape[0];
+    auto N = b_shape[1];
+    auto K = a_shape[1];
+
+    size_t cores_x = 7;
+    size_t cores_y = 8;
+
+    // Create the 2D matmul program config
+    auto matmul_program_config = ttnn::operations::matmul::MatmulMultiCoreReuseMultiCastProgramConfig{
+      .compute_with_storage_grid_size = {cores_x, cores_y},  // (cores_x, cores_y)
+      .in0_block_w = 2,                          // K dimension blocking
+      .out_subblock_h = 1,                       // Must divide per_core_M
+      .out_subblock_w = 1,                       // Must divide per_core_N
+      .per_core_M = M / tt::constants::TILE_HEIGHT / cores_y,                           // M / TILE_HEIGHT / cores_y
+      .per_core_N = N / tt::constants::TILE_WIDTH / cores_x,                           // N / TILE_WIDTH / cores_x
+      .transpose_mcast = false,
+      .fused_activation = std::nullopt,          // Or specific activation
+      .fuse_batch = false
+    };
+
     return ttnn::matmul(
         a,
         b,
@@ -16,11 +58,11 @@ tt::tt_metal::Tensor matmul(
         transpose_b,
         /* memory_config */ std::nullopt,
         /* dtype */ std::nullopt,
-        /* program_config */ std::nullopt,
+        /* program_config */ matmul_program_config,
         /* activation */ std::nullopt,
         /* compute_kernel_config */
         ttml::core::ComputeKernelConfig::matmul(),
-        /* core_grid */ ttnn::CoreGrid{7, 8},
+        /* core_grid */ std::nullopt, // ttnn::CoreGrid{7, 8},
         /* output_tile */ std::nullopt);
 }
 
