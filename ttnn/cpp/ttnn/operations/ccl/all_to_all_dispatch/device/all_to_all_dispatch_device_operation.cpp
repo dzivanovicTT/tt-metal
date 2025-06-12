@@ -49,7 +49,7 @@ AllToAllDispatchDeviceOperation::spec_return_value_t AllToAllDispatchDeviceOpera
     uint32_t hidden_size = input_shape[-1];
     if (operation_attributes.axis.has_value()) {
         uint32_t axis = operation_attributes.axis.value();
-        tt::log_info("axis: {}", axis);
+        log_info(tt::LogOp, "axis: {}", axis);
         dispatch_devices = axis == 0 ? mesh_view.num_rows() : mesh_view.num_cols();
     }
 
@@ -61,15 +61,15 @@ AllToAllDispatchDeviceOperation::spec_return_value_t AllToAllDispatchDeviceOpera
     auto output_shape = ttnn::Shape({1, dispatched_tokens, seq_len, hidden_size});
     auto metadata_shape = ttnn::Shape({1, dispatched_tokens, seq_len, selected_experts_k});
 
-    tt::log_info("output_shape: {}", output_shape);
-    tt::log_info("metadata_shape: {}", metadata_shape);
-    tt::log_info("input_tensor_shape: {}", input_shape);
-    tt::log_info("indices_shape: {}", indices_shape);
-    tt::log_info("mapping_shape: {}", mapping_shape);
-    tt::log_info("dispatch_devices: {}", dispatch_devices);
-    tt::log_info("hidden_size: {}", hidden_size);
-    tt::log_info("dispatched_tokens: {}", dispatched_tokens);
-    tt::log_info("selected_experts_k: {}", selected_experts_k);
+    log_info(tt::LogOp, "output_shape: {}", output_shape);
+    log_info(tt::LogOp, "metadata_shape: {}", metadata_shape);
+    log_info(tt::LogOp, "input_tensor_shape: {}", input_shape);
+    log_info(tt::LogOp, "indices_shape: {}", indices_shape);
+    log_info(tt::LogOp, "mapping_shape: {}", mapping_shape);
+    log_info(tt::LogOp, "dispatch_devices: {}", dispatch_devices);
+    log_info(tt::LogOp, "hidden_size: {}", hidden_size);
+    log_info(tt::LogOp, "dispatched_tokens: {}", dispatched_tokens);
+    log_info(tt::LogOp, "selected_experts_k: {}", selected_experts_k);
 
     auto mem_config = operation_attributes.output_mem_config;
     auto output_tokens_spec = TensorSpec(

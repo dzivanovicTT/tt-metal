@@ -116,8 +116,8 @@ uint32_t device_index(const std::vector<tt::tt_metal::IDevice*>& devices, const 
 std::pair<std::vector<tt::tt_metal::IDevice*>, std::array<bool, 4>> get_neighbors(
     const MeshDeviceView& mesh_view,
     const MeshCoordinate& mesh_coordinate,
-    tt::tt_fabric::Topology& topology,
-    const std::optional<uint32_t> axis) {
+    const tt::tt_fabric::Topology& topology,
+    const std::optional<uint32_t>& axis) {
     std::vector<tt::tt_metal::IDevice*> neighbors;
     std::array<bool, 4> directions;  // east, west, north, south
     if (topology == tt::tt_fabric::Topology::Ring) {
@@ -125,7 +125,7 @@ std::pair<std::vector<tt::tt_metal::IDevice*>, std::array<bool, 4>> get_neighbor
     } else {
         directions = {false, false, false, false};
     }
-    auto control_plane = tt::tt_fabric::get_control_plane();
+    const auto& control_plane = tt::tt_fabric::get_control_plane();
     auto src_device = mesh_view.get_device(mesh_coordinate);
     if (axis.has_value()) {
         if (axis.value() == 1) {
@@ -331,13 +331,13 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
     auto src_device = mesh_device->get_device(mesh_coordinate);
     auto src_physical_device_id = src_device->id();
 
-    auto control_plane = tt::tt_fabric::get_control_plane();
-    auto fabric_node_id = control_plane->get_fabric_node_id_from_physical_chip_id(src_device->id());
+    const auto& control_plane = tt::tt_fabric::get_control_plane();
+    auto fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(src_device->id());
     uint32_t src_mesh_id = *fabric_node_id.mesh_id;
     uint32_t src_chip_id = (uint32_t)fabric_node_id.chip_id;
 
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "Creating all to all dispatch program for mesh coordinate: ({}, {}) with physical device id: {} mesh id: {} "
         "chip id: {}",
         mesh_coordinate[0],
@@ -397,8 +397,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
     uint32_t send_preparation_buffer_id = tt::CBIndex::c_4;
 
     uint32_t aligned_input_page_size = detail::get_aligned_page_size(input_tensor);
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "input shape: {}, input_pages: {}, input_page_size: {}, aligned_input_page_size: {}",
         input_tensor.logical_shape(),
         input_pages,
@@ -406,8 +406,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
         aligned_input_page_size);
 
     uint32_t aligned_indices_page_size = detail::get_aligned_page_size(indices_tensor);
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "indices shape: {}, indices_pages: {}, indices_page_size: {}, aligned_indices_page_size: {}",
         indices_tensor.logical_shape(),
         indices_pages,
@@ -415,8 +415,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
         aligned_indices_page_size);
 
     uint32_t aligned_mapping_page_size = detail::get_aligned_page_size(mapping_tensor);
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "mapping shape: {}, mapping_pages: {}, mapping_page_size: {}, aligned_mapping_page_size: {}",
         mapping_tensor.logical_shape(),
         mapping_pages,
@@ -424,8 +424,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
         aligned_mapping_page_size);
 
     uint32_t aligned_output_page_size = detail::get_aligned_page_size(output_tensor);
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "output shape: {}, output_pages: {}, output_page_size: {}, aligned_output_page_size: {}",
         output_tensor.logical_shape(),
         output_pages,
@@ -433,8 +433,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
         aligned_output_page_size);
 
     uint32_t aligned_metadata_page_size = detail::get_aligned_page_size(metadata_tensor);
-    tt::log_info(
-        tt::LogAlways,
+    log_info(
+        tt::LogOp,
         "metadata shape: {}, metadata_pages: {}, metadata_page_size: {}, aligned_metadata_page_size: {}",
         metadata_tensor.logical_shape(),
         metadata_pages,
@@ -501,18 +501,18 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
     std::vector<uint32_t> dest_mesh_id, dest_chip_id;
     for (const auto& coord : tensor_coords.coords()) {
         auto device = mesh_device->get_device(coord);
-        auto fabric_node_id = control_plane->get_fabric_node_id_from_physical_chip_id(device->id());
+        auto fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(device->id());
         dest_mesh_id.push_back(*fabric_node_id.mesh_id);
         dest_chip_id.push_back((uint32_t)fabric_node_id.chip_id);
     }
-    tt::log_info(tt::LogAlways, "dest_chip_id: {}", detail::stringify_vector(dest_chip_id));
-    tt::log_info(tt::LogAlways, "dest_mesh_id: {}", detail::stringify_vector(dest_mesh_id));
-    // tt::log_info(tt::LogAlways, "directions: {}", detail::stringify_array(directions));
+    log_info(tt::LogOp, "dest_chip_id: {}", detail::stringify_vector(dest_chip_id));
+    log_info(tt::LogOp, "dest_mesh_id: {}", detail::stringify_vector(dest_mesh_id));
+    // log_info(tt::LogOp, "directions: {}", detail::stringify_array(directions));
 
     // TODO: add fabric node and mesh id to the compile time args
     // TODO: add an array mapping logical device id to physical device id
 
-    const auto& fabric_context = control_plane->get_fabric_context();
+    const auto& fabric_context = control_plane.get_fabric_context();
     auto fabric_max_packet_size = fabric_context.get_fabric_max_payload_size_bytes();
 
     std::vector<uint32_t> reader_compile_time_args = {
@@ -605,7 +605,7 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
             .compile_args = writer_compile_time_args,
             .defines = writer_defines});
 
-    tt::log_info(tt::LogAlways, "metadata tensor address: {}", metadata_tensor.buffer()->address());
+    log_info(tt::LogOp, "metadata tensor address: {}", metadata_tensor.buffer()->address());
     std::vector<uint32_t> reader_runtime_args = {
         input_tensor.buffer()->address(),
         indices_tensor.buffer()->address(),

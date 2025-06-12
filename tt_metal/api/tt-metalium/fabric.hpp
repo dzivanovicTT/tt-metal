@@ -55,6 +55,6 @@ void append_fabric_connection_rt_args(
     std::vector<uint32_t>& worker_args,
     CoreType core_type = CoreType::WORKER);
 
-ControlPlane* get_control_plane();
+const ControlPlane& get_control_plane();
 
 }  // namespace tt::tt_fabric
