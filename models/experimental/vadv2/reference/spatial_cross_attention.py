@@ -1,7 +1,7 @@
 import warnings
 import torch
 import torch.nn as nn
-from VADv2.reference.utils import multi_scale_deformable_attn_pytorch
+from models.experimental.vadv2.reference.utils import multi_scale_deformable_attn_pytorch
 
 
 class SpatialCrossAttention(nn.Module):
@@ -60,11 +60,13 @@ class SpatialCrossAttention(nn.Module):
             query = query + query_pos
 
         bs, num_query, _ = query.size()
+        print(bs, num_query)
 
         D = reference_points_cam.size(3)
         indexes = []
         for i, mask_per_img in enumerate(bev_mask):
             index_query_per_img = mask_per_img[0].sum(-1).nonzero().squeeze(-1)
+            print(index_query_per_img.shape)
             indexes.append(index_query_per_img)
         max_len = max([len(each) for each in indexes])
 
