@@ -637,15 +637,6 @@ void detail::ProgramImpl::update_kernel_groups(uint32_t programmable_core_type_i
                     }
                 }
             }
-
-            if (local_cb_mask > 0) {
-                unsigned msb = 31 - __builtin_clz(local_cb_mask);
-                if (msb == 31) {
-                    local_cb_mask = 0xFFFFFFFF;
-                } else {
-                    local_cb_mask = (1 << (msb + 1)) - 1;  // Set all bits up to and including the MSB
-                }
-            }
             TT_FATAL(
                 max_local_cb_end_index <= min_remote_cb_start_index,
                 "Circular buffer indices overlap for KernelGroup {} on programmable core type {}. Local end index {}, "
