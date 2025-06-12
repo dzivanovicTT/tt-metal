@@ -122,7 +122,6 @@ jobs:
           install_wheel: true
           run_args: |
             source ${{ github.workspace }}/tests/scripts/single_card/run_single_card_demo_tests.sh
-            chmod +w /mnt/MLPerf/tt-dnn_models/
             ${{ matrix.test-group.cmd }}
       - name: Save environment data
         if: ${{ matrix.test-group.runner-label == 'N300' && matrix.test-group.performance && !cancelled() && matrix.test-group.name != 'whisper' }}

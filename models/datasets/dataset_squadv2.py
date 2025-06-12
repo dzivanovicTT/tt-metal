@@ -101,8 +101,9 @@ def squad_divide_chunks(dataset_question, dataset_context, dataset_reference, ba
 def squadv2_1K_samples_input(tokenizer, seq_len, attention_mask, token_type_ids, microbatch=8):
     path = model_location_generator2_("squad_v2")
     squadv2_dataset = load_dataset(path, use_auth_token=False, streaming=True)["validation"]
-    my_dataset = load_dataset(path, use_auth_token=False)["validation"]
-    my_dataset.save_to_disk("/mnt/MLPerf/tt_dnn-models/squadv2")
+    squadv2_dataset.save_to_disk("/mnt/MLPerf/tt_dnn-models/squadv2")
+    #my_dataset = load_dataset(path, use_auth_token=False)["validation"]
+    #my_dataset.save_to_disk("/mnt/MLPerf/tt_dnn-models/squadv2")
     # squadv2_dataset = load_dataset("squad_v2", use_auth_token=True, streaming=True)["validation"]
 
     dataset_iter = iter(squadv2_dataset)
