@@ -394,6 +394,11 @@ std::map<chip_id_t, IDevice*> CreateDevices(
     // to allow TT-Mesh Workload dispatch to target active ethernet cores.
     ZoneScoped;
     bool is_galaxy = tt::tt_metal::MetalContext::instance().get_cluster().is_galaxy_cluster();
+
+    std::cout << std::endl;
+    std::cout << " ---------------- CreateDevices 1 ---------------- " << std::endl;
+    std::cout << std::endl;
+
     tt::DevicePool::initialize(
         device_ids,
         num_hw_cqs,
@@ -405,6 +410,10 @@ std::map<chip_id_t, IDevice*> CreateDevices(
         init_profiler,
         use_max_eth_core_count_on_all_devices,
         initialize_fabric_and_dispatch_fw);
+
+    std::cout << std::endl;
+    std::cout << " ---------------- CreateDevice 2 ---------------- " << std::endl;
+    std::cout << std::endl;
 
     const auto devices = tt::DevicePool::instance().get_all_active_devices();
     std::map<chip_id_t, IDevice*> ret_devices;
@@ -1018,8 +1027,17 @@ IDevice* CreateDevice(
     const size_t worker_l1_size) {
     ZoneScoped;
 
+    std::cout << std::endl;
+    std::cout << " ---------------- CreateDevice 1 ---------------- " << std::endl;
+    std::cout << std::endl;
+
     tt::DevicePool::initialize(
         {device_id}, num_hw_cqs, l1_small_size, trace_region_size, dispatch_core_config, l1_bank_remap, worker_l1_size);
+
+    std::cout << std::endl;
+    std::cout << " ---------------- CreateDevice 2 ---------------- " << std::endl;
+    std::cout << std::endl;
+
     auto dev = tt::DevicePool::instance().get_active_device(device_id);
     return dev;
 }
