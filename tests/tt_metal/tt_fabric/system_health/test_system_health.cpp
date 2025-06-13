@@ -66,6 +66,9 @@ bool is_chip_on_corner_of_mesh(chip_id_t physical_chip_id, tt::ClusterType clust
             "is_chip_on_corner_of_mesh not implemented for {} cluster type",
             magic_enum::enum_name(cluster_type));
         return false;
+    }
+}
+    
 
 TEST(Cluster, ReportIntermeshLinks) {
     const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
