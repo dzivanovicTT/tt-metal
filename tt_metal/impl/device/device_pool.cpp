@@ -516,6 +516,7 @@ void DevicePool::wait_for_fabric_router_sync() const {
         if (!dev) {
             TT_THROW("Fabric router sync on null device. All devices must be opened for Fabric.");
         }
+        std::cout << "WAIT_FOR_HANDSHAKE Device ID: " << dev->id() << std::endl;
         if (fabric_context.get_num_fabric_initialized_routers(dev->id()) == 0) {
             return;
         }

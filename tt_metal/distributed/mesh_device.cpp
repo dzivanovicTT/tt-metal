@@ -45,6 +45,7 @@
 #include "dispatch/launch_message_ring_buffer_state.hpp"
 #include "sub_device/sub_device_manager_tracker.hpp"
 #include <umd/device/types/xy_pair.h>
+#include "impl/context/metal_context.hpp"
 
 enum class CoreType;
 namespace tt {
@@ -213,7 +214,12 @@ std::shared_ptr<MeshDevice> MeshDevice::create(
     std::cout << "ScopedDevices created" << std::endl;
 
     auto root_devices = scoped_devices->root_devices();
-    MeshContainer<IDevice*> devices(config.mesh_shape(), root_devices);
+    std::cout << "Root devices: " << root_devices.size() << std::endl;
+    auto& control_plane = MetalContext::instance().get_control_plane();
+    auto local_mesh_shape = control_plane.get_mesh_shape(tt_fabric::ControlPlaneMode::LOCAL_MESH);
+    log_info(LogMetal, "[MeshDevice::create] LOCAL Mesh shape: {}", local_mesh_shape);
+
+    MeshContainer<IDevice*> devices(local_mesh_shape, root_devices);
     auto mesh_device = std::make_shared<MeshDevice>(
         std::move(scoped_devices), std::make_unique<MeshDeviceView>(devices), std::shared_ptr<MeshDevice>());
 

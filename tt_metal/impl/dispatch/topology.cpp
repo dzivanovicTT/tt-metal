@@ -1449,6 +1449,7 @@ std::unique_ptr<Program> create_and_compile_tt_fabric_program(IDevice* device) {
     auto& fabric_context = control_plane.get_fabric_context();
 
     build_tt_fabric_program(device, fabric_program_ptr.get(), edm_builders);
+    std::cout << "CALLING SET_NUM_FABRIC_INITIALIZED_ROUTERS" << device->id() << " " << edm_builders.size() << std::endl;
     fabric_context.set_num_fabric_initialized_routers(device->id(), edm_builders.size());
     if (edm_builders.empty()) {
         return nullptr;

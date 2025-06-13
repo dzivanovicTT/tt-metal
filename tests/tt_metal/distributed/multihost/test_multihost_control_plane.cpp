@@ -69,10 +69,10 @@ std::map<tt_fabric::FabricNodeId, chip_id_t> get_physical_chip_mapping() {
     };
     // TODO: NEED TO VERIFY THESE COORDINATES
     auto rank1_eth_coords = std::vector<eth_coord_t>{
-        eth_coord_t{0, 1, 0, 0, 0},
-        eth_coord_t{0, 0, 0, 0, 0},
-        eth_coord_t{0, 1, 1, 0, 0},
-        eth_coord_t{0, 0, 1, 0, 0}
+        eth_coord_t{0, 2, 0, 0, 0},
+        eth_coord_t{0, 3, 0, 0, 0},
+        eth_coord_t{0, 2, 1, 0, 0},
+        eth_coord_t{0, 3, 1, 0, 0}
     };
     auto chip_ids_rank0 = std::vector<chip_id_t>{
         0, 1, 4, 5
@@ -123,19 +123,25 @@ protected:
         auto host_rank_opt = control_plane.get_local_host_rank_id();
         ASSERT_TRUE(host_rank_opt.has_value()) << "Local host rank ID not available";
         host_rank_id_ = *host_rank_opt;
+        /*
         if (fabric_config_ == tt::tt_metal::FabricConfig::DISABLED) {
-            tt::tt_metal::detail::InitializeFabricConfig(tt::tt_metal::FabricConfig::FABRIC_1D);
+            std::cout << "**********Setting fabric config to FABRIC_1D" << std::endl;
+            tt::tt_metal::detail::SetFabricConfig(tt::tt_metal::FabricConfig::FABRIC_1D);
             fabric_config_ = tt::tt_metal::FabricConfig::FABRIC_1D;
         }
+        */
 
         fmt::print("SetUp complete: mesh_id={}, host_rank_id={}\n", *mesh_id_, *host_rank_id_);
     }
 
     void TearDown() override {
+        /*
+
         if (fabric_config_ != tt::tt_metal::FabricConfig::DISABLED) {
-            tt::tt_metal::detail::InitializeFabricConfig(tt::tt_metal::FabricConfig::DISABLED);
+            tt::tt_metal::detail::SetFabricConfig(tt::tt_metal::FabricConfig::DISABLED);
             fabric_config_ = tt::tt_metal::FabricConfig::DISABLED;
         }
+        */
     }
 
     tt::tt_metal::FabricConfig fabric_config_ = tt::tt_metal::FabricConfig::DISABLED;
@@ -233,7 +239,11 @@ TEST_F(ControlPlaneMultihostTest, SystemMeshShape) {
 
 TEST_F(ControlPlaneMultihostTest, MeshDevice2x4) {
     {
+        //tt::tt_metal::detail::SetFabricConfig(tt::tt_metal::FabricConfig::DISABLED);
         auto mesh_device = MeshDevice::create(MeshDeviceConfig(MeshShape(2, 4)));
+        mesh_device->close();
+        mesh_device.reset();
+        //tt::tt_metal::detail::SetFabricConfig(tt::tt_metal::FabricConfig::FABRIC_1D);
     }
     std::cout << "MeshDevice2x4" << std::endl;
 }
