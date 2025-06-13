@@ -83,56 +83,56 @@ def get_device_freq():
 
 
 matmul_shapes_bfloat16 = [
-    (512, 512, 512, True, True, 1, 1, 1),
-    (512, 1024, 1024, True, True, 1, 1, 1),
-    (512, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 1024, 1024, True, True, 1, 1, 1),
-    (1024, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 3072, True, True, 1, 1, 1),
-    (2048, 3072, 3072, True, True, 2, 1, 1),
-    (3072, 3072, 3072, True, True, 4, 1, 1),
-    (3072, 3072, 4096, False, False, 2, 1, 1),
-    (3072, 4096, 4096, False, False, 2, 1, 1),
-    (4096, 4096, 4096, False, False, 1, 2, 2),
-    (8192, 8192, 8192, False, False, 2, 4, 4),
-    (16384, 16384, 16384, False, False, 4, 8, 8),
+    (640, 704, 704, True, True, 1, 1, 1),  # was (512, 512, 512)
+    (640, 1408, 1408, True, True, 1, 1, 1),  # was (512, 1024, 1024)
+    (640, 1408, 2816, True, True, 1, 1, 1),  # was (512, 1024, 2048)
+    (1280, 1408, 1408, True, True, 1, 1, 1),  # was (1024, 1024, 1024)
+    (1280, 1408, 2816, True, True, 1, 1, 1),  # was (1024, 1024, 2048)
+    (1280, 2816, 2816, True, True, 1, 1, 1),  # was (1024, 2048, 2048)
+    (2560, 2816, 2816, True, True, 1, 1, 1),  # was (2048, 2048, 2048)
+    (2560, 2816, 4224, True, True, 1, 1, 1),  # was (2048, 2048, 3072)
+    (2560, 4224, 4224, True, True, 2, 1, 1),  # was (2048, 3072, 3072)
+    (3840, 4224, 4224, True, True, 4, 1, 1),  # was (3072, 3072, 3072)
+    (3840, 4224, 5632, False, False, 2, 1, 1),  # was (3072, 3072, 4096)
+    (3840, 5632, 5632, False, False, 2, 1, 1),  # was (3072, 4096, 4096)
+    (5120, 5632, 5632, False, False, 1, 2, 2),  # was (4096, 4096, 4096)
+    (10240, 11264, 11264, False, False, 2, 4, 4),  # was (8192, 8192, 8192)
+    (20480, 22528, 22528, False, False, 4, 8, 8),  # was (16384, 16384, 16384)
 ]
 
 matmul_shapes_bfloat8_b = [
-    (512, 512, 512, True, True, 1, 1, 1),
-    (512, 1024, 1024, True, True, 1, 1, 1),
-    (512, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 1024, 1024, True, True, 1, 1, 1),
-    (1024, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 3072, True, True, 1, 1, 1),
-    (2048, 3072, 3072, True, True, 1, 1, 1),
-    (3072, 3072, 3072, True, True, 2, 1, 1),
-    (3072, 3072, 4096, True, True, 2, 1, 1),
-    (4096, 4096, 4096, False, False, 1, 2, 2),
-    (8192, 8192, 8192, False, False, 2, 4, 4),
-    (16384, 16384, 16384, False, False, 4, 8, 8),
+    (640, 704, 704, True, True, 1, 1, 1),  # was (512, 512, 512)
+    (640, 1408, 1408, True, True, 1, 1, 1),  # was (512, 1024, 1024)
+    (640, 1408, 2816, True, True, 1, 1, 1),  # was (512, 1024, 2048)
+    (1280, 1408, 1408, True, True, 1, 1, 1),  # was (1024, 1024, 1024)
+    (1280, 1408, 2816, True, True, 1, 1, 1),  # was (1024, 1024, 2048)
+    (1280, 2816, 2816, True, True, 1, 1, 1),  # was (1024, 2048, 2048)
+    (2560, 2816, 2816, True, True, 1, 1, 1),  # was (2048, 2048, 2048)
+    (2560, 2816, 4224, True, True, 1, 1, 1),  # was (2048, 2048, 3072)
+    (2560, 4224, 4224, True, True, 1, 1, 1),  # was (2048, 3072, 3072)
+    (3840, 4224, 4224, True, True, 2, 1, 1),  # was (3072, 3072, 3072)
+    (3840, 4224, 5632, True, True, 2, 1, 1),  # was (3072, 3072, 4096)
+    (5120, 5632, 5632, False, False, 1, 2, 2),  # was (4096, 4096, 4096)
+    (10240, 11264, 11264, False, False, 2, 4, 4),  # was (8192, 8192, 8192)
+    (20480, 22528, 22528, False, False, 4, 8, 8),  # was (16384, 16384, 16384)
 ]
 
 matmul_shapes_bfloat4_b = [
-    (512, 512, 512, True, True, 1, 1, 1),
-    (512, 1024, 1024, True, True, 1, 1, 1),
-    (512, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 1024, 1024, True, True, 1, 1, 1),
-    (1024, 1024, 2048, True, True, 1, 1, 1),
-    (1024, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 2048, True, True, 1, 1, 1),
-    (2048, 2048, 3072, True, True, 1, 1, 1),
-    (2048, 3072, 3072, True, True, 1, 1, 1),
-    (3072, 3072, 3072, True, True, 1, 1, 1),
-    (3072, 3072, 4096, True, True, 1, 1, 1),
-    (3072, 4096, 4096, True, True, 2, 1, 1),
-    (4096, 4096, 4096, True, True, 2, 1, 1),
-    (8192, 8192, 8192, False, False, 2, 2, 2),
-    (16384, 16384, 16384, False, False, 4, 4, 4),
+    (640, 704, 704, True, True, 1, 1, 1),  # was (512, 512, 512)
+    (640, 1408, 1408, True, True, 1, 1, 1),  # was (512, 1024, 1024)
+    (640, 1408, 2816, True, True, 1, 1, 1),  # was (512, 1024, 2048)
+    (1280, 1408, 1408, True, True, 1, 1, 1),  # was (1024, 1024, 1024)
+    (1280, 1408, 2816, True, True, 1, 1, 1),  # was (1024, 1024, 2048)
+    (1280, 2816, 2816, True, True, 1, 1, 1),  # was (1024, 2048, 2048)
+    (2560, 2816, 2816, True, True, 1, 1, 1),  # was (2048, 2048, 2048)
+    (2560, 2816, 4224, True, True, 1, 1, 1),  # was (2048, 2048, 3072)
+    (2560, 4224, 4224, True, True, 1, 1, 1),  # was (2048, 3072, 3072)
+    (3840, 4224, 4224, True, True, 1, 1, 1),  # was (3072, 3072, 3072)
+    (3840, 4224, 5632, True, True, 1, 1, 1),  # was (3072, 3072, 4096)
+    (3840, 5632, 5632, True, True, 2, 1, 1),  # was (3072, 4096, 4096)
+    (5120, 5632, 5632, True, True, 2, 1, 1),  # was (4096, 4096, 4096)
+    (10240, 11264, 11264, False, False, 2, 2, 2),  # was (8192, 8192, 8192)
+    (20480, 22528, 22528, False, False, 4, 4, 4),  # was (16384, 16384, 16384)
 ]
 
 matmul_configs = [
@@ -149,13 +149,13 @@ matmul_configs = [
 ]
 
 
-@pytest.mark.skip(reason="Benchmark is not intended to be run as part of CI and can be manually run locally")
+# @pytest.mark.skip(reason="Benchmark is not intended to be run as part of CI and can be manually run locally")
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 24576, "trace_region_size": 3855488}], indirect=True)
-@pytest.mark.parametrize("grid_size", [(8, 8)])
+@pytest.mark.parametrize("grid_size", [(11, 10)])
 @pytest.mark.parametrize("tile_h", [32])
 @pytest.mark.parametrize("tile_w", [32])
 @pytest.mark.parametrize("num_warmup_iterations", [5])
-@pytest.mark.parametrize("num_measurement_iterations", [100])
+@pytest.mark.parametrize("num_measurement_iterations", [75])
 def test_matmul_2d_host_perf(
     device,
     grid_size,
@@ -171,6 +171,7 @@ def test_matmul_2d_host_perf(
     FILE_NAME = ARTIFACTS_DIR / "matmul_2d_host_perf_report.csv"
 
     compute_grid_size = device.compute_with_storage_grid_size()
+    print("Grid x: " + str(compute_grid_size.x) + " Grid y: " + str(compute_grid_size.y))
     if compute_grid_size.y < grid_size[1] or compute_grid_size.x < grid_size[0]:
         pytest.skip(
             f"Skipping test as requested compute grid size {grid_size} exceeds available compute grid {compute_grid_size}"
@@ -199,7 +200,7 @@ def test_matmul_2d_host_perf(
                 "inference_time_avg (ns)",
                 "TFLOPs (avg)",
                 "Utilization (vs user grid)",
-                "Utilization (vs 8x8 full grid)",
+                "Utilization (vs Full grid)",
             ]
         )
 
@@ -325,6 +326,8 @@ def test_matmul_2d_host_perf(
                 if use_trace:
                     tid = ttnn.begin_trace_capture(device, cq_id=0)
                     for iter in range(0, num_measurement_iterations):
+                        if iter % 10 == 0:
+                            logger.info(f"Starting iteration {iter} of {num_measurement_iterations}")
                         output_t = ttnn.matmul(
                             in0_t,
                             in1_t,
@@ -343,6 +346,8 @@ def test_matmul_2d_host_perf(
                 else:
                     profiler.start(f"run")
                     for iter in range(0, num_measurement_iterations):
+                        if iter % 10 == 0:
+                            logger.info(f"Starting iteration {iter} of {num_measurement_iterations}")
                         output_t = ttnn.matmul(
                             in0_t,
                             in1_t,
@@ -377,7 +382,7 @@ def test_matmul_2d_host_perf(
                 utilization_full_grid_percentage = f"{utilization_full_grid * 100:.2f}%"
                 utilization_user_grid_percentage = f"{utilization_user_grid * 100:.2f}%"
                 logger.info(
-                    f"M*K*N = {m}*{k}*{n} == inference time (avg): {inference_time_avg}, tflops (avg): {tflops}, utilization (vs user grid): {utilization_user_grid_percentage}, utilization (vs 8x8 grid): {utilization_full_grid_percentage}"
+                    f"M*K*N = {m}*{k}*{n} == inference time (avg): {inference_time_avg}, tflops (avg): {tflops}, utilization (vs user grid): {utilization_user_grid_percentage}, utilization (vs Full grid): {utilization_full_grid_percentage}"
                 )
 
                 output_tensor = ttnn.to_torch(output_t)
@@ -407,19 +412,19 @@ def test_matmul_2d_host_perf(
 
 
 matmul_shapes_oob = [
-    (512, 512, 512),
-    (512, 1024, 1024),
-    (512, 1024, 2048),
-    (1024, 1024, 1024),
-    (1024, 1024, 2048),
-    (1024, 2048, 2048),
-    (2048, 2048, 2048),
-    (2048, 2048, 3072),
-    (2048, 3072, 3072),
-    (3072, 3072, 3072),
-    (3072, 3072, 4096),
-    (3072, 4096, 4096),
-    (4096, 4096, 4096),
+    (640, 704, 704),  # was (512, 512, 512)
+    (640, 1408, 1408),  # was (512, 1024, 1024)
+    (640, 1408, 2816),  # was (512, 1024, 2048)
+    (1280, 1408, 1408),  # was (1024, 1024, 1024)
+    (1280, 1408, 2816),  # was (1024, 1024, 2048)
+    (1280, 2816, 2816),  # was (1024, 2048, 2048)
+    (2560, 2816, 2816),  # was (2048, 2048, 2048)
+    (2560, 2816, 4224),  # was (2048, 2048, 3072)
+    (2560, 4224, 4224),  # was (2048, 3072, 3072)
+    (3840, 4224, 4224),  # was (3072, 3072, 3072)
+    (3840, 4224, 5632),  # was (3072, 3072, 4096)
+    (3840, 5632, 5632),  # was (3072, 4096, 4096)
+    (5120, 5632, 5632),  # was (4096, 4096, 4096)
 ]
 
 matmul_configs_oob = [
@@ -432,13 +437,13 @@ matmul_configs_oob = [
 ]
 
 
-@pytest.mark.skip(reason="Benchmark is not intended to be run as part of CI and can be manually run locally")
+# @pytest.mark.skip(reason="Benchmark is not intended to be run as part of CI and can be manually run locally")
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 24576, "trace_region_size": 3855488}], indirect=True)
-@pytest.mark.parametrize("grid_size", [(8, 8)])
+@pytest.mark.parametrize("grid_size", [(11, 10)])
 @pytest.mark.parametrize("tile_h", [32])
 @pytest.mark.parametrize("tile_w", [32])
 @pytest.mark.parametrize("num_warmup_iterations", [5])
-@pytest.mark.parametrize("num_measurement_iterations", [100])
+@pytest.mark.parametrize("num_measurement_iterations", [50])
 def test_matmul_2d_host_perf_out_of_box(
     device,
     grid_size,
@@ -454,6 +459,7 @@ def test_matmul_2d_host_perf_out_of_box(
     FILE_NAME = ARTIFACTS_DIR / "matmul_2d_host_perf_out_of_box_report.csv"
 
     compute_grid_size = device.compute_with_storage_grid_size()
+    print("Grid: " + str(compute_grid_size.x) + " " + str(compute_grid_size.y))
     if compute_grid_size.y < grid_size[1] or compute_grid_size.x < grid_size[0]:
         pytest.skip(
             f"Skipping test as requested compute grid size {grid_size} exceeds available compute grid {compute_grid_size}"
@@ -480,7 +486,7 @@ def test_matmul_2d_host_perf_out_of_box(
                 "inference_time_avg (ns)",
                 "TFLOPs (avg)",
                 "Utilization (vs user grid)",
-                "Utilization (vs 8x8 full grid)",
+                "Utilization (vs Full grid)",
             ]
         )
 
@@ -566,7 +572,7 @@ def test_matmul_2d_host_perf_out_of_box(
                 utilization_full_grid_percentage = f"{utilization_full_grid * 100:.2f}%"
                 utilization_user_grid_percentage = f"{utilization_user_grid * 100:.2f}%"
                 logger.info(
-                    f"M*K*N = {m}*{k}*{n} == inference time (avg): {inference_time_avg}, tflops (avg): {tflops}, utilization (vs user grid): {utilization_user_grid_percentage}, utilization (vs 8x8 grid): {utilization_full_grid_percentage}"
+                    f"M*K*N = {m}*{k}*{n} == inference time (avg): {inference_time_avg}, tflops (avg): {tflops}, utilization (vs user grid): {utilization_user_grid_percentage}, utilization (vs Full grid): {utilization_full_grid_percentage}"
                 )
 
                 output_tensor = ttnn.to_torch(output_t)
