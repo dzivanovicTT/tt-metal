@@ -39,9 +39,10 @@ OptionalTensors DeinterleaveLocal::create_async_optional_output_tensors(
     const std::array<uint32_t, 2> stride_hw,
     const uint32_t barrier_threshold,
     const std::optional<DeviceComputeKernelConfig>& compute_kernel_config) {
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::create_async_output_tensors");
+    log_warning(tt::LogOp, "DeinterleaveLocal::create_async_output_tensors");
 
-    return {std::optional<Tensor>(tt::tt_metal::operation::get_workers_for_op_output({input}))};
+    // TODO: Implement
+    return {std::optional<Tensor>()};
 }
 
 }  // namespace ttnn::operations::experimental::deinterleave

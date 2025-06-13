@@ -5,7 +5,7 @@
 #include "deinterleave_pybind.hpp"
 
 #include "deinterleave.hpp"
-#include "pybind11/decorators.hpp"
+#include "ttnn-pybind/decorators.hpp"
 
 namespace ttnn::operations::experimental::deinterleave {
 void bind_deinterleave_operation(py::module& module) {

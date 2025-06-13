@@ -2,9 +2,9 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include "ttnn/operations/experimental/reinterleave/reinterleave_pybind.hpp"
-#include "ttnn/operations/experimental/reinterleave/reinterleave.hpp"
-#include "pybind11/decorators.hpp"
+#include "reinterleave_pybind.hpp"
+#include "reinterleave.hpp"
+#include "ttnn-pybind/decorators.hpp"
 
 namespace ttnn::operations::experimental::reinterleave {
 void bind_reinterleave_operation(pybind11::module& module) {

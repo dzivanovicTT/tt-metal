@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import ttnn
-import torch
 
 
 # Split-Knit Conv2d with high dilation
@@ -17,6 +16,8 @@ def torch_split_knit_dilation(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -91,6 +92,8 @@ def torch_split_knit_batched_dilation(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -173,6 +176,8 @@ def torch_knit_dilation(
     padding_hw,
     dilation_hw,
 ):
+    import torch
+
     assert isinstance(out_splited, torch.Tensor), "out_splited must be a torch.Tensor"
     out_splited = torch.permute(out_splited, (0, 3, 1, 2))
 
@@ -208,6 +213,8 @@ def ttnn_split_knit_batched_dilation(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -375,6 +382,8 @@ def ttnn_split_knit_local_dilation(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -552,6 +561,8 @@ def torch_split_knit_grouped_dilation(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -652,6 +663,8 @@ def torch_split_knit_dilation_h(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"
@@ -721,6 +734,8 @@ def torch_split_knit_grouped_dilation_h(
     dilation_hw,
     groups,
 ):
+    import torch
+
     assert groups == 1, "groups must be 1"
     assert all(d % 2 == 0 for d in dilation_hw), "dilation must be even"
     assert all(s == 1 for s in stride_hw), "stride must be 1"

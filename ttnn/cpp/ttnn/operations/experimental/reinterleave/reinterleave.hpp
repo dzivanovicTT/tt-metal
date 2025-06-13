@@ -39,11 +39,11 @@ struct ReinterleaveLocal {
 
 namespace ttnn {
 namespace experimental {
-constexpr auto reinterleave_from_batch = ttnn::register_operation_with_auto_launch_op<
+constexpr auto reinterleave_from_batch = ttnn::register_operation<
     "ttnn::experimental::reinterleave_from_batch",
     ttnn::operations::experimental::reinterleave::ReinterleaveFromBatch>();
 
-constexpr auto reinterleave_local = ttnn::register_operation_with_auto_launch_op<
+constexpr auto reinterleave_local = ttnn::register_operation<
     "ttnn::experimental::reinterleave_local",
     ttnn::operations::experimental::reinterleave::ReinterleaveLocal>();
 

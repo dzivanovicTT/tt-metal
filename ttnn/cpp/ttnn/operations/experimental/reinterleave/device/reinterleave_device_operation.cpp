@@ -16,13 +16,13 @@ void ReinterleaveFromBatchOperation::validate_inputs(
     TT_FATAL(input.get_layout() == Layout::ROW_MAJOR, "Reinterleave: input must be ROW_MAJOR");
     TT_FATAL(input.buffer() != nullptr, "Reinterleave: input must be allocated in buffer on device");
     TT_FATAL(
-        input.memory_config().memory_layout == TensorMemoryLayout::HEIGHT_SHARDED,
+        input.memory_config().memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED,
         "Reinterleave: input must be HEIGHT_SHARDED");
-    TT_FATAL(input.memory_config().shard_spec.has_value(), "Reinterleave: input must have shard_spec");
+    TT_FATAL(input.memory_config().shard_spec().has_value(), "Reinterleave: input must have shard_spec");
     TT_FATAL(
-        input.memory_config().shard_spec.value().orientation == ShardOrientation::ROW_MAJOR,
+        input.memory_config().shard_spec().value().orientation == ShardOrientation::ROW_MAJOR,
         "Reinterleave: input must have ROW_MAJOR orientation");
-    auto per_core_height = input.memory_config().shard_spec.value().shape[0] / operation_attributes.input_width;
+    auto per_core_height = input.memory_config().shard_spec().value().shape[0] / operation_attributes.input_width;
     TT_FATAL(
         per_core_height >= operation_attributes.stride_hw[0],
         "Reinterleave: per_core_height {} must be larger than {}",
@@ -34,11 +34,11 @@ void ReinterleaveFromBatchOperation::validate_inputs(
         per_core_height,
         operation_attributes.stride_hw[0]);
     TT_FATAL(
-        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec.value().shape[0],
+        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec().value().shape[0],
         "Reinterleave: per_core_height {} * input_width {} must be equal to input shard_spec shape {}",
         per_core_height,
         operation_attributes.input_width,
-        input.memory_config().shard_spec.value().shape[0]);
+        input.memory_config().shard_spec().value().shape[0]);
 }
 
 ReinterleaveFromBatchOperation::program_factory_t ReinterleaveFromBatchOperation::select_program_factory(
@@ -59,7 +59,7 @@ void ReinterleaveFromBatchOperation::validate_on_program_cache_hit(
 ReinterleaveFromBatchOperation::spec_return_value_t ReinterleaveFromBatchOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    tt::log_warning(
+    log_warning(
         tt::LogOp,
         "ReinterleaveFromBatch::compute_output_specs logical_shape: {}: padded_shape: {}",
         input.get_logical_shape(),
@@ -102,7 +102,7 @@ ReinterleaveFromBatchOperation::spec_return_value_t ReinterleaveFromBatchOperati
 ReinterleaveFromBatchOperation::tensor_return_value_t ReinterleaveFromBatchOperation::create_output_tensors(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
-    tt::log_warning(tt::LogOp, "ReinterleaveFromBatch::create_output_tensors");
+    log_warning(tt::LogOp, "ReinterleaveFromBatch::create_output_tensors");
     return create_device_tensor(spec, tensor_args.input.device());
 }
 

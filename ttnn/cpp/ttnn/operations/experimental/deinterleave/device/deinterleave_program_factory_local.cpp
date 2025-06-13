@@ -1,5 +1,4 @@
 #include "deinterleave_device_operation.hpp"
-#include "tt-metalium/circular_buffer_types.hpp"
 #include "tt-metalium/kernel_types.hpp"
 #include "ttnn/operations/moreh/moreh_helper_functions.hpp"
 

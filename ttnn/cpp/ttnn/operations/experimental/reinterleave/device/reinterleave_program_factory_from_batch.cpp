@@ -33,8 +33,8 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
 
     uint32_t num_units = output.volume() / output.get_logical_shape()[-1];
 
-    tt::tt_metal::CoreRangeSet worker_grid = input.memory_config().shard_spec.value().grid;
-    auto num_units_per_core = input.memory_config().shard_spec.value().shape[0];
+    tt::tt_metal::CoreRangeSet worker_grid = input.memory_config().shard_spec().value().grid;
+    auto num_units_per_core = input.memory_config().shard_spec().value().shape[0];
 
     // dst buffer here is same as deinterleave src buffer
     // vice versa for src buffer here
@@ -68,9 +68,9 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
 
     // after deinterleave, tensor is narrower by width stride and taller by height stride
     auto output_per_core_width = operation_attributes.input_width * operation_attributes.stride_hw[1];
-    auto output_per_core_height = input.memory_config().shard_spec.value().shape[0] / operation_attributes.input_width /
-                                  operation_attributes.stride_hw[0];
-    tt::log_info(
+    auto output_per_core_height = input.memory_config().shard_spec().value().shape[0] /
+                                  operation_attributes.input_width / operation_attributes.stride_hw[0];
+    log_info(
         tt::LogOp,
         "DeinterleaveToBatchOperation::ProgramFactoryToBatch::create; stride_hw: {}; per core height {} per_core_width "
         "{}",
@@ -124,8 +124,8 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
     // a single core cannot contain data belonging to multiple batches, same constraint as on deinterleave
     TT_FATAL(in_batches <= num_of_shards, "Deinterleave: out_batches {} > num_of_shards {}", in_batches, num_of_shards);
 
-    tt::log_info(tt::LogOp, "Output buffer address {:#x}", output.buffer()->address());
-    tt::log_info(tt::LogOp, "Input buffer address {:#x}", input.buffer()->address());
+    log_info(tt::LogOp, "Output buffer address {:#x}", output.buffer()->address());
+    log_info(tt::LogOp, "Input buffer address {:#x}", input.buffer()->address());
 
     using CoreCoord = tt::tt_metal::CoreCoord;
 

@@ -94,6 +94,9 @@ void py_module(py::module& module) {
     ttnn::operations::experimental::conv3d::detail::py_bind_conv3d(module);
     ttnn::operations::experimental::reduction::cumprod::detail::bind_cumprod_operation(module);
 
+    ttnn::operations::experimental::deinterleave::bind_deinterleave_operation(module);
+    ttnn::operations::experimental::reinterleave::bind_reinterleave_operation(module);
+
     copy::detail::py_bind_typecast(module);
 
     paged_cache::detail::bind_experimental_paged_cache_operations(module);

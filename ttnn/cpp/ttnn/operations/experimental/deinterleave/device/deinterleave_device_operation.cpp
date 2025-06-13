@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "deinterleave_device_operation.hpp"
-#include "tt-metalium/logger.hpp"
+#include <tt-logger/tt-logger.hpp>
 #include "ttnn/operations/data_movement/common/common.hpp"
 
 namespace ttnn::operations::experimental::deinterleave {
@@ -21,15 +21,15 @@ void DeinterleaveToBatchOperation::validate_inputs(
     // sharding checks
     TT_FATAL(input.buffer() != nullptr, "Deinterleave: input must be allocated in buffer on device");
     TT_FATAL(
-        input.memory_config().memory_layout == TensorMemoryLayout::HEIGHT_SHARDED,
+        input.memory_config().memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED,
         "Deinterleave: input must be HEIGHT_SHARDED");
-    TT_FATAL(input.memory_config().shard_spec.has_value(), "Deinterleave: input must have shard_spec");
+    TT_FATAL(input.memory_config().shard_spec().has_value(), "Deinterleave: input must have shard_spec");
     TT_FATAL(
-        input.memory_config().shard_spec.value().orientation == ShardOrientation::ROW_MAJOR,
+        input.memory_config().shard_spec().value().orientation == ShardOrientation::ROW_MAJOR,
         "Deinterleave: input must have ROW_MAJOR orientation");
 
     // tensor shape constraints
-    auto per_core_height = input.memory_config().shard_spec.value().shape[0] / operation_attributes.input_width;
+    auto per_core_height = input.memory_config().shard_spec().value().shape[0] / operation_attributes.input_width;
     TT_FATAL(
         per_core_height >= operation_attributes.stride_hw[0],
         "Deinterleave: per_core_height {} must be larger than {}",
@@ -41,11 +41,11 @@ void DeinterleaveToBatchOperation::validate_inputs(
         per_core_height,
         operation_attributes.stride_hw[0]);
     TT_FATAL(
-        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec.value().shape[0],
+        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec().value().shape[0],
         "Deinterleave: per_core_height {} * input_width {} must be equal to input shard_spec shape {}",
         per_core_height,
         operation_attributes.input_width,
-        input.memory_config().shard_spec.value().shape[0]);
+        input.memory_config().shard_spec().value().shape[0]);
 }
 
 DeinterleaveToBatchOperation::program_factory_t DeinterleaveToBatchOperation::select_program_factory(
@@ -66,7 +66,7 @@ void DeinterleaveToBatchOperation::validate_on_program_cache_hit(
 DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs");
+    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs");
 
     // auto tensor_spec = TensorSpec(
     //     output_shape,
@@ -81,7 +81,7 @@ DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::
     //         input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), output_memory_config, output_shape,
     //         output_padded_shape));
 
-    tt::log_warning(
+    log_warning(
         tt::LogOp,
         "DeinterleaveToBatchOperation::compute_output_specs logical shape: {} padded shape: {}",
         input.get_logical_shape(),
@@ -101,7 +101,7 @@ DeinterleaveToBatchOperation::tensor_return_value_t DeinterleaveToBatchOperation
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
 
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
+    log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
     return create_device_tensor(spec, tensor_args.input.device());
 }
 
@@ -144,15 +144,15 @@ void DeinterleaveLocalOperation::validate_inputs(
     // sharding checks
     TT_FATAL(input.buffer() != nullptr, "Deinterleave: input must be allocated in buffer on device");
     TT_FATAL(
-        input.memory_config().memory_layout == TensorMemoryLayout::HEIGHT_SHARDED,
+        input.memory_config().memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED,
         "Deinterleave: input must be HEIGHT_SHARDED");
-    TT_FATAL(input.memory_config().shard_spec.has_value(), "Deinterleave: input must have shard_spec");
+    TT_FATAL(input.memory_config().shard_spec().has_value(), "Deinterleave: input must have shard_spec");
     TT_FATAL(
-        input.memory_config().shard_spec.value().orientation == ShardOrientation::ROW_MAJOR,
+        input.memory_config().shard_spec().value().orientation == ShardOrientation::ROW_MAJOR,
         "Deinterleave: input must have ROW_MAJOR orientation");
 
     // tensor shape constraints
-    auto per_core_height = input.memory_config().shard_spec.value().shape[0] / operation_attributes.input_width;
+    auto per_core_height = input.memory_config().shard_spec().value().shape[0] / operation_attributes.input_width;
     TT_FATAL(
         per_core_height >= operation_attributes.stride_hw[0],
         "Deinterleave: per_core_height {} must be larger than {}",
@@ -164,11 +164,11 @@ void DeinterleaveLocalOperation::validate_inputs(
         per_core_height,
         operation_attributes.stride_hw[0]);
     TT_FATAL(
-        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec.value().shape[0],
+        per_core_height * operation_attributes.input_width == input.memory_config().shard_spec().value().shape[0],
         "Deinterleave: per_core_height {} * input_width {} must be equal to input shard_spec shape {}",
         per_core_height,
         operation_attributes.input_width,
-        input.memory_config().shard_spec.value().shape[0]);
+        input.memory_config().shard_spec().value().shape[0]);
 }
 
 DeinterleaveLocalOperation::program_factory_t DeinterleaveLocalOperation::select_program_factory(
@@ -189,28 +189,26 @@ void DeinterleaveLocalOperation::validate_on_program_cache_hit(
 DeinterleaveLocalOperation::spec_return_value_t DeinterleaveLocalOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    tt::log_warning(
-        tt::LogOp, "DeinterleaveLocal::compute_output_specs; operation_attributes {}", operation_attributes);
+    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs; operation_attributes {}", operation_attributes);
 
-    auto input_shard_shape = input.memory_config().shard_spec.value().shape;
+    auto input_shard_shape = input.memory_config().shard_spec().value().shape;
 
-    tt::log_warning(
-        tt::LogOp, "DeinterleaveLocal::compute_output_specs; input.input_shard_shape {}", input_shard_shape);
+    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs; input.input_shard_shape {}", input_shard_shape);
 
     std::array<uint32_t, 2> output_shard_shape = {
-        input.memory_config().shard_spec.value().shape[0] / operation_attributes.stride_hw[0] /
+        input.memory_config().shard_spec().value().shape[0] / operation_attributes.stride_hw[0] /
             operation_attributes.stride_hw[1],
-        input.memory_config().shard_spec.value().shape[1]};
+        input.memory_config().shard_spec().value().shape[1]};
 
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::output_shard_shape {}", output_shard_shape);
+    log_warning(tt::LogOp, "DeinterleaveLocal::output_shard_shape {}", output_shard_shape);
 
     auto output_shard_spec = tt::tt_metal::ShardSpec(
-        input.shard_spec()->grid, output_shard_shape, input.memory_config().shard_spec.value().orientation);
+        input.shard_spec()->grid, output_shard_shape, input.memory_config().shard_spec().value().orientation);
 
     auto output_memory_config =
-        ttnn::MemoryConfig(input.memory_config().memory_layout, ttnn::BufferType::L1, output_shard_spec);
+        ttnn::MemoryConfig(input.memory_config().memory_layout(), ttnn::BufferType::L1, output_shard_spec);
 
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::output_memory_config {}", output_memory_config);
+    log_warning(tt::LogOp, "DeinterleaveLocal::output_memory_config {}", output_memory_config);
 
     TT_FATAL(
         input.get_logical_shape()[0] * input.get_logical_shape()[1] * input.get_logical_shape()[2] ==
@@ -237,7 +235,7 @@ DeinterleaveLocalOperation::spec_return_value_t DeinterleaveLocalOperation::comp
 
     int logical_num_channels = input.get_logical_shape()[3];
     int num_channels_padded = 32 * tt::div_up(logical_num_channels, 32);
-    tt::log_info(tt::LogOp, "Num channels padded: {} logical: {}", num_channels_padded, logical_num_channels);
+    log_info(tt::LogOp, "Num channels padded: {} logical: {}", num_channels_padded, logical_num_channels);
     auto output_padded_shape = ttnn::Shape(
         {input.get_logical_shape()[0],
          input.get_logical_shape()[1],
@@ -267,7 +265,7 @@ DeinterleaveLocalOperation::tensor_return_value_t DeinterleaveLocalOperation::cr
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
 
-    tt::log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
+    log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
     OptionalTensors output;
     for (auto i = 0; i < operation_attributes.stride_hw[0] * operation_attributes.stride_hw[1]; i++) {
         output.push_back(create_device_tensor(spec, tensor_args.input.device()));

@@ -173,6 +173,7 @@ set(TTNN_SRC_PYBIND
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/copy/typecast/typecast_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/dropout/dropout_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/experimental_${PY_BINDING}.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/deinterleave/deinterleave_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/matmul/attn_matmul/attn_matmul_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/matmul/group_attn_matmul/group_attn_matmul_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/paged_cache/paged_cache_${PY_BINDING}.cpp
@@ -183,6 +184,7 @@ set(TTNN_SRC_PYBIND
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/reduction/cumsum/cumsum_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/reduction/fast_reduce_nc/fast_reduce_nc_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/reduction/fast_reduce_nc/fast_reduce_nc_${PY_BINDING}.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/reinterleave/reinterleave_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/reshape/view_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/slice_write/slice_write_${PY_BINDING}.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/cpp/ttnn/operations/experimental/padded_slice/padded_slice_${PY_BINDING}.cpp
@@ -393,6 +395,14 @@ target_sources(
         cpp/ttnn/operations/generic/generic_op.cpp
         cpp/ttnn/operations/generic/device/generic_op_program_factory.cpp
         cpp/ttnn/operations/generic/device/generic_op_device_operation.cpp
+        cpp/ttnn/operations/experimental/deinterleave/deinterleave.cpp
+        cpp/ttnn/operations/experimental/deinterleave/device/deinterleave_device_operation.cpp
+        cpp/ttnn/operations/experimental/deinterleave/device/deinterleave_program_factory_to_batch.cpp
+        cpp/ttnn/operations/experimental/deinterleave/device/deinterleave_program_factory_local.cpp
+        cpp/ttnn/operations/experimental/reinterleave/reinterleave.cpp
+        cpp/ttnn/operations/experimental/reinterleave/device/reinterleave_device_operation.cpp
+        cpp/ttnn/operations/experimental/reinterleave/device/reinterleave_program_factory_from_batch.cpp
+        cpp/ttnn/operations/experimental/reinterleave/device/reinterleave_program_factory_local.cpp
         cpp/ttnn/operations/experimental/padded_slice/device/padded_slice_op.cpp
         cpp/ttnn/operations/experimental/padded_slice/device/padded_slice_program_factory.cpp
         cpp/ttnn/operations/experimental/padded_slice/padded_slice.cpp
