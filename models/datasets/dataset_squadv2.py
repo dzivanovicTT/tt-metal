@@ -6,6 +6,7 @@
 from typing import Any
 
 from datasets import load_dataset
+from datasets import load_from_disk
 from loguru import logger
 from torch.utils.data import Dataset
 
