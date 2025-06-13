@@ -639,19 +639,17 @@ def is_int32_overflow(tensor, scalar):
 @pytest.mark.parametrize(
     "input_shapes",
     (
-        # (torch.Size([])),
-        (torch.Size([12])),
-        # (torch.Size([64, 64])),
-        # (torch.Size([1, 1, 32, 32])),
-        # (torch.Size([1, 1, 320, 384])),
-        # (torch.Size([1, 3, 320, 384])),
+        (torch.Size([])),
+        (torch.Size([128])),
+        (torch.Size([64, 64])),
+        (torch.Size([1, 1, 32, 32])),
+        (torch.Size([1, 1, 320, 384])),
+        (torch.Size([1, 3, 320, 384])),
     ),
 )
-@pytest.mark.parametrize("scalar", [-1])
-# @pytest.mark.parametrize("scalar", [-100, -54, -1, 0, 1, 13, 29])
-@pytest.mark.parametrize("ttnn_op", [ttnn.gt, ttnn.lt])
-# @pytest.mark.parametrize("ttnn_op", [ttnn.ne, ttnn.eq, ttnn.gt, ttnn.lt])
-@pytest.mark.parametrize("use_legacy", [False])
+@pytest.mark.parametrize("scalar", [-100, -54, -1, 0, 1, 13, 29])
+@pytest.mark.parametrize("ttnn_op", [ttnn.ne, ttnn.eq, ttnn.gt, ttnn.lt])
+@pytest.mark.parametrize("use_legacy", [True, False])
 def test_unary_comp_ops(input_shapes, scalar, ttnn_op, use_legacy, device):
     torch.manual_seed(213919)
 
@@ -674,32 +672,6 @@ def test_unary_comp_ops(input_shapes, scalar, ttnn_op, use_legacy, device):
     golden_tensor = golden_function(in_data, scalar)
 
     output_tensor = ttnn.to_torch(output_tensor)
-    print(f"output_tensor: {output_tensor}")
-    print(f"golden_tensor: {golden_tensor}")
-    print(f"in_data: {in_data}")
-
-    # Add debug information
-    if not torch.equal(golden_tensor, output_tensor):
-        print(f"\nTest failed for operation: {ttnn_op.__name__}")
-        print(f"Scalar value: {scalar}")
-        print(f"Use legacy: {use_legacy}")
-        print(f"Input shape: {input_shapes}")
-        print("\nMismatched values:")
-        mismatch_mask = golden_tensor != output_tensor
-        if mismatch_mask.any():
-            print("Index | Input | Golden | Output")
-            print("-" * 40)
-            for idx in torch.nonzero(mismatch_mask).squeeze():
-                if input_shapes == torch.Size([]):  # Handle scalar case
-                    input_val = in_data.item()
-                    golden_val = golden_tensor.item()
-                    output_val = output_tensor.item()
-                    print(f"scalar | {input_val} | {golden_val} | {output_val}")
-                else:
-                    input_val = in_data[idx].item()
-                    golden_val = golden_tensor[idx].item()
-                    output_val = output_tensor[idx].item()
-                    print(f"{idx} | {input_val} | {golden_val} | {output_val}")
 
     assert torch.equal(golden_tensor, output_tensor)
 
