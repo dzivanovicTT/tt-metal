@@ -297,7 +297,7 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
              (uint32_t)dst_rollover_offset_dm1});
     }
 
-    return {std::move(program), {src_cb_id, dst_cb_id}};
+    return {std::move(program), {src_cb, dst_cb}};
 }
 
 void ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::override_runtime_arguments(
