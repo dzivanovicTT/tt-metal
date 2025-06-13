@@ -91,14 +91,10 @@ void kernel_main() {
     for (uint32_t b = 0; b < batch; ++b) {
         cb_reserve_back(sync_cb2, 1);
 #ifdef ENABLE_GLOBAL_CB
-        // RemoteReceiverCBInterface& remote_cb = get_remote_receiver_cb_interface(remote_cb_id);
-        // volatile tt_l1_ptr uint32_t* pages_acked_ptr =
-        //     reinterpret_cast<volatile tt_l1_ptr uint32_t*>(remote_cb.aligned_pages_acked_ptr);
-        // volatile tt_l1_ptr uint32_t* pages_sent_ptr =
-        // reinterpret_cast<volatile tt_l1_ptr uint32_t*>(remote_cb.aligned_pages_acked_ptr - L1_ALIGNMENT);
-        // DPRINT << "recv_pages_sent_ptr " << (uint)*pages_sent_ptr << " pages_acked_ptr " << (uint)*pages_acked_ptr
-        // <<ENDL();
-        experimental::remote_cb_wait_front(remote_cb_id, num_blocks);
+        {
+            DeviceZoneScopedN("waiting");
+            experimental::remote_cb_wait_front(remote_cb_id, num_blocks);
+        }
 #endif
 
         cb_push_back(sync_cb2, 1);

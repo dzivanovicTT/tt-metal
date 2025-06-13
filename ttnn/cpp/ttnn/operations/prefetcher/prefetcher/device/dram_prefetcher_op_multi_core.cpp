@@ -227,6 +227,9 @@ operation::ProgramWithCallbacks dram_prefetcher_multi_core(
         auto [page_size, num_pages] = get_max_page_size_and_num_pages(
             max_page_size, tensor_block_num_tiles[t], tt::tt_metal::detail::TileSize(tensor_data_formats[t]));
         page_sizes.push_back(page_size);
+
+        std::cout << "Tensor " << t << ": page_size = " << page_size << ", num_pages = " << num_pages << std::endl;
+
         block_num_pages.push_back(num_pages);
 
         uint32_t block_width_in_tiles = tensor_shapes[t][1];

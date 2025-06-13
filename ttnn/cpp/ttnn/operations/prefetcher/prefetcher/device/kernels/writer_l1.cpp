@@ -39,6 +39,7 @@ void kernel_main() {
     uint32_t noc = noc_index;
     for (uint32_t layer = 0; layer < num_layers; layer++) {
         for (uint32_t t = 0; t < num_tensors; t++) {
+            DeviceZoneScopedN("tensor");
             uint32_t curr_coalesced_page_size = coalesced_page_sizes[t];
             uint32_t curr_coalesced_num_pages = coalesced_num_pages[t];
             uint32_t curr_block_num_tiles = block_num_tiles[t];
@@ -46,34 +47,25 @@ void kernel_main() {
             uint32_t curr_block_height_in_tiles = block_height_in_tiles[t];
             uint32_t curr_block_size = curr_block_num_tiles * curr_single_tile_sizes;
             uint32_t curr_block_size_per_receiver = curr_block_size / num_receivers;
+            bool ff2 = false;  // curr_block_height_in_tiles == 5;
 
             experimental::resize_remote_sender_cb_interface<true>(remote_cb_id, curr_block_size_per_receiver, noc);
-
-            // RemoteSenderCBInterface& remote_cb = get_remote_sender_cb_interface(remote_cb_id);
-            // auto pages_sent_ptr =
-            //     reinterpret_cast<volatile tt_l1_ptr uint32_t*>(remote_cb.aligned_pages_sent_ptr);
-            // DPRINT << "send_pages_sent_ptr " << (uint)*pages_sent_ptr <<ENDL();
-            // DPRINT << "layer " << layer << " t " << t<<ENDL();
-            // DPRINT << "curr_coalesced_page_size " << curr_coalesced_page_size << " curr_coalesced_num_pages " <<
-            // curr_coalesced_num_pages << " curr_block_height_in_tiles " << curr_block_height_in_tiles<<ENDL();
-            experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
+            if (!ff2) {
+                DeviceZoneScopedN("waiting");
+                experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
+            }
 
             uint32_t num_pages = 0;
             for (uint32_t block = 0; block < num_blocks; ++block) {
                 {
                     cb_wait_front(local_cb_id, max_block_num_tiles);
+                    if (ff2) {
+                        DeviceZoneScopedN("waiting");
+                        experimental::remote_cb_reserve_back(remote_cb_id, 1);
+                    }
 
                     uint32_t local_cb_addr = get_read_ptr(local_cb_id);
-                    // experimental::remote_cb_push_back_and_write_pages<skip_ptr_update>(
-                    //     remote_cb_id,
-                    //     local_cb_addr,
-                    //     1,  // wrt to the size of the packet (curr_block_size)
-                    //     curr_block_height_in_tiles,
-                    //     curr_coalesced_num_pages,
-                    //     curr_coalesced_page_size,
-                    //     noc);
-
-                    auto pages_sent = experimental::remote_cb_write_pages<skip_ptr_update>(
+                    experimental::remote_cb_push_back_and_write_pages<skip_ptr_update>(
                         remote_cb_id,
                         local_cb_addr,
                         1,  // wrt to the size of the packet (curr_block_size)
@@ -81,7 +73,16 @@ void kernel_main() {
                         curr_coalesced_num_pages,
                         curr_coalesced_page_size,
                         noc);
-                    num_pages += pages_sent;
+
+                    // auto pages_sent = experimental::remote_cb_write_pages<skip_ptr_update>(
+                    //     remote_cb_id,
+                    //     local_cb_addr,
+                    //     1,  // wrt to the size of the packet (curr_block_size)
+                    //     curr_block_height_in_tiles,
+                    //     curr_coalesced_num_pages,
+                    //     curr_coalesced_page_size,
+                    //     noc);
+                    // num_pages += pages_sent;
 
                     noc_async_posted_writes_flushed();
 
@@ -93,7 +94,7 @@ void kernel_main() {
                 }
             }
 
-            experimental::remote_cb_push_back<skip_ptr_update>(remote_cb_id, num_pages, noc);
+            // experimental::remote_cb_push_back<skip_ptr_update>(remote_cb_id, num_pages, noc);
         }
     }
 
