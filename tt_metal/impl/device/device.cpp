@@ -555,6 +555,10 @@ void Device::reset_cores() {
         }
     }
 
+    std::cout << std::endl;
+    std::cout << " ------------------- reset_cores ------------------- " << std::endl;
+    std::cout << std::endl;
+
     // Early exiting dispatch cores should show RUN_MSG_DONE when they exit.
     for (auto &id_and_cores : device_to_early_exit_cores) {
         const int timeout_ms = 10000; // 10 seconds for now
@@ -808,6 +812,10 @@ void Device::initialize_and_launch_firmware() {
         tt::tt_metal::MetalContext::instance().get_cluster().deassert_risc_reset_at_core(
             tt_cxy_pair(this->id(), worker_core), reset_val);
     }
+
+    std::cout << std::endl;
+    std::cout << " ------------------- initialize_and_launch_firmware ------------------- " << std::endl;
+    std::cout << std::endl;
 
     // Wait until fw init is done, ensures the next launch msg doesn't get
     // written while fw is still in init
