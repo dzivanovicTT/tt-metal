@@ -123,7 +123,7 @@ MetalContext::MetalContext() {
         !distributed::multihost::DistributedContext::is_initialized()) {
         log_info(tt::LogMetal, "Initializing distributed context from MetalContext");
         distributed::multihost::DistributedContext::create(0, nullptr);
-        log_info(tt::LogMetal, "Metal Context initialized");
+        log_info(tt::LogMetal, " Context initialized {} {}", *distributed::multihost::DistributedContext::get_current_world()->rank(), *distributed::multihost::DistributedContext::get_current_world()->size());
     }
 }
 
