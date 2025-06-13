@@ -69,10 +69,10 @@ std::map<tt_fabric::FabricNodeId, chip_id_t> get_physical_chip_mapping() {
     };
     // TODO: NEED TO VERIFY THESE COORDINATES
     auto rank1_eth_coords = std::vector<eth_coord_t>{
-        eth_coord_t{0, 2, 0, 0, 0},
-        eth_coord_t{0, 3, 0, 0, 0},
-        eth_coord_t{0, 2, 1, 0, 0},
-        eth_coord_t{0, 3, 1, 0, 0}
+        eth_coord_t{0, 0, 0, 0, 0},
+        eth_coord_t{0, 1, 0, 0, 0},
+        eth_coord_t{0, 0, 1, 0, 0},
+        eth_coord_t{0, 1, 1, 0, 0},
     };
     auto chip_ids_rank0 = std::vector<chip_id_t>{
         0, 1, 4, 5
@@ -238,6 +238,11 @@ TEST_F(ControlPlaneMultihostTest, SystemMeshShape) {
 
 
 TEST_F(ControlPlaneMultihostTest, MeshDevice2x4) {
+    /*
+    if (host_rank_id_ == HostRankId{0}) {
+        std::this_thread::sleep_for(std::chrono::seconds(10));
+    }
+    */
     {
         //tt::tt_metal::detail::SetFabricConfig(tt::tt_metal::FabricConfig::DISABLED);
         auto mesh_device = MeshDevice::create(MeshDeviceConfig(MeshShape(2, 4)));

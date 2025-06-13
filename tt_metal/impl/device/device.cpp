@@ -79,7 +79,7 @@
 #include <umd/device/tt_silicon_driver_common.hpp>
 #include <umd/device/tt_xy_pair.h>
 #include <umd/device/types/xy_pair.h>
-
+#include <tt-metalium/distributed_context.hpp>
 namespace tt {
 enum class ARCH;
 
@@ -588,6 +588,10 @@ void Device::reset_cores() {
 void Device::initialize_and_launch_firmware() {
     ZoneScoped;
 
+    auto distributed_context = tt::tt_metal::distributed::multihost::DistributedContext::get_current_world();
+    auto mpi_rank = distributed_context->rank();
+    log_info(tt::LogMetal, "[Rank {}] initialize_and_launch_firmware device {}. Program cache is {}enabled", *mpi_rank, this->id_, this->program_cache_.is_enabled() ? "": "NOT ");
+
     launch_msg_t launch_msg;
     go_msg_t go_msg;
     std::memset(&launch_msg, 0, sizeof(launch_msg_t));
@@ -747,6 +751,7 @@ void Device::initialize_and_launch_firmware() {
                     this->id(), worker_core, core_info_vec, this->get_dev_addr(worker_core, HalL1MemAddrType::CORE_INFO));
                 this->initialize_firmware(HalProgrammableCoreType::TENSIX, worker_core, &launch_msg, &go_msg);
                 not_done_cores.insert(worker_core);
+                log_info(tt::LogMetal, "Not done worker core [worker]: {}", worker_core);
             }
         }
     }
@@ -778,6 +783,7 @@ void Device::initialize_and_launch_firmware() {
         if (!hal.get_eth_fw_is_cooperative()) {
             active_eth_cores.insert(phys_eth_core);
             not_done_cores.insert(phys_eth_core);
+            log_info(tt::LogMetal, "Not done [active-eth]: {}", phys_eth_core);
         }
     }
 
@@ -789,7 +795,9 @@ void Device::initialize_and_launch_firmware() {
             this->id(), phys_eth_core, core_info_vec, this->get_dev_addr(phys_eth_core, HalL1MemAddrType::CORE_INFO));
         this->initialize_firmware(HalProgrammableCoreType::IDLE_ETH, phys_eth_core, &launch_msg, &go_msg);
         not_done_cores.insert(phys_eth_core);
+        log_info(tt::LogMetal, "Not done [inactive-eth]: {}", phys_eth_core);
     }
+
 
     // Barrier between L1 writes above and deassert below
     tt::tt_metal::MetalContext::instance().get_cluster().l1_barrier(this->id());
@@ -814,11 +822,15 @@ void Device::initialize_and_launch_firmware() {
     log_debug(tt::LogMetal, "Waiting for firmware init complete");
     const int timeout_ms = 10000; // 10 seconds for now
     try {
+        for (const auto& core : not_done_cores) {
+            log_info(tt::LogMetal, "Still Waiting for firmware init complete for core: {}", core);
+        }
         llrt::internal_::wait_until_cores_done(this->id(), RUN_MSG_INIT, not_done_cores, timeout_ms);
     } catch (std::runtime_error &e) {
         TT_THROW("Device {} init: failed to initialize FW! Try resetting the board.", this->id());
     }
     log_debug(tt::LogMetal, "Firmware init complete");
+    log_info(tt::LogMetal, "[Rank {}] Finished initialize_and_launch_firmware device {}. Program cache is {}enabled", *mpi_rank, this->id_, this->program_cache_.is_enabled() ? "": "NOT ");
 }
 
 void Device::clear_l1_state() {
@@ -1043,7 +1055,12 @@ bool Device::initialize(
     tt::stl::Span<const std::uint32_t> l1_bank_remap,
     bool minimal) {
     ZoneScoped;
-    log_info(tt::LogMetal, "Initializing device {}. Program cache is {}enabled", this->id_, this->program_cache_.is_enabled() ? "": "NOT ");
+
+    auto distributed_context = tt::tt_metal::distributed::multihost::DistributedContext::get_current_world();
+    auto mpi_rank = distributed_context->rank();
+
+
+    log_info(tt::LogMetal, "[Rank {}] Initializing device {}. Program cache is {}enabled", *mpi_rank, this->id_, this->program_cache_.is_enabled() ? "": "NOT ");
     log_debug(tt::LogMetal, "Running with {} cqs ", num_hw_cqs);
     TT_FATAL(num_hw_cqs > 0 and num_hw_cqs <= dispatch_core_manager::MAX_NUM_HW_CQS, "num_hw_cqs can be between 1 and {}", dispatch_core_manager::MAX_NUM_HW_CQS);
     this->using_fast_dispatch_ = false;
@@ -1085,6 +1102,7 @@ bool Device::initialize(
     // state by reading a corrupted launch message. Routing firmware will never run in this case, causing UMD issued
     // transactions to hang.
     this->clear_launch_messages_on_eth_cores();
+    log_info(tt::LogMetal, "[Rank {}] Finished Initializing device {}. Program cache is {}enabled", *mpi_rank, this->id_, this->program_cache_.is_enabled() ? "": "NOT ");
 
     return true;
 }
