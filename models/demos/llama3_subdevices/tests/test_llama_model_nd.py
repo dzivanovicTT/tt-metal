@@ -74,6 +74,7 @@ is_RING_6U = os.environ.get("RING_6U", "0") == "1"
         {
             "dispatch_core_axis": ttnn.DispatchCoreAxis.COL,
             "worker_l1_size": 1344544,
+            "trace_region_size": 23887872,
             "fabric_config": ttnn.FabricConfig.FABRIC_1D_RING if is_RING_6U else ttnn.FabricConfig.FABRIC_1D,
         }
     ],
@@ -95,7 +96,7 @@ def test_llama_model_inference(
     dtype = ttnn.bfloat8_b
     mode_accuracy = optimizations == LlamaOptimizations.accuracy
     instruct = True
-    dummy_weights = True
+    dummy_weights = False
     model_args = TtModelArgs(
         mesh_device,
         instruct=instruct,
@@ -104,7 +105,7 @@ def test_llama_model_inference(
         max_seq_len=max_seq_len,
         max_batch_size=batch_size,
     )
-    model_args.n_layers = 1
+    model_args.n_layers = 80
 
     state_dict = model_args.load_state_dict()
     state_dict_prefix = model_args.get_state_dict_prefix("", None)
@@ -117,7 +118,7 @@ def test_llama_model_inference(
     embd = HostEmbedding(model_args)
     embd.load_state_dict({"emb.weight": state_dict[f"{state_dict_prefix}tok_embeddings.weight"]})
 
-    generation_start_pos = 0
+    generation_start_pos = 80
 
     page_table_tt = None
     paged_attention_config = None
@@ -156,6 +157,7 @@ def test_llama_model_inference(
         state_dict=state_dict,
         weight_cache_path=model_args.weight_cache_path(dtype),
         paged_attention_config=paged_attention_config,
+        enable_prefetcher_performance_mode=True,
     )
     tt_sampling = TTSampling(
         args=model_args,
@@ -186,30 +188,54 @@ def test_llama_model_inference(
         ),
     )
 
+    decode_input_reset = model_args.prepare_residual_tensor_decode(
+        tt_decode_input,
+        model_args.model_config["DECODE_RESIDUAL_MEMCFG"],
+    )
+    decode_input_reset = decode_input_reset.cpu()
+
+    decode_input = model_args.prepare_residual_tensor_decode(
+        tt_decode_input,
+        model_args.model_config["DECODE_RESIDUAL_MEMCFG"],
+    )
+
+    # Get cos/sin matrices for the current position of each user
+    rot_mats = tt_model.rope_setup.get_rm_rot_mats(current_pos)
+
+    def run_op():
+        # Run TT model
+        tt_out = tt_model(
+            decode_input,
+            current_pos_tensor,
+            rot_mats=rot_mats,
+            mode="decode",
+            page_table=page_table_tt,
+        )
+        # Sampling
+        tt_out_tok = tt_sampling(tt_out[0])
+
+        return tt_out_tok
+
+    # Compile the model
+    tt_out_tok = run_op()
+    logger.info("Model compiled.")
+
+    ttnn.copy_host_to_device_tensor(decode_input_reset, decode_input)
+
+    # Capture trace
+    logger.info("Capturing trace...")
+    trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
+    tt_out_tok = run_op()
+    ttnn.end_trace_capture(mesh_device, trace_id, cq_id=0)
+    logger.info("Trace captured.")
+
     try:
         outputs = []
         for i in range(num_iters):
             logger.info(f"[Llama3 Model] Generating token {i}")
 
-            decode_input = model_args.prepare_residual_tensor_decode(
-                tt_decode_input,
-                model_args.model_config["DECODE_RESIDUAL_MEMCFG"],
-            )
-
-            # Get cos/sin matrices for the current position of each user
-            rot_mats = tt_model.rope_setup.get_rm_rot_mats(current_pos)
-
-            # Run TT model
-            tt_out = tt_model(
-                decode_input,
-                current_pos_tensor,
-                rot_mats=rot_mats,
-                mode="decode",
-                page_table=page_table_tt,
-            )
-            # Sampling
-            tt_out_tok = tt_sampling(tt_out[0])
-
+            ttnn.copy_host_to_device_tensor(decode_input_reset, decode_input)
+            ttnn.execute_trace(mesh_device, trace_id, cq_id=0, blocking=False)
             tt_out_tok_device0 = ttnn.get_device_tensors(tt_out_tok)[0]
             tt_out_tok_cpu = tt_out_tok_device0.cpu(blocking=True, cq_id=0)
             tt_output_torch = ttnn.to_torch(
@@ -222,8 +248,16 @@ def test_llama_model_inference(
             outputs.append(tt_output_torch)
 
         ##### Check outputs #####
+        golden_path = "models/demos/llama3_subdevices/tests/golden_output.pth"
         for arr in [outputs]:
-            golden = arr[0]
+            if os.path.exists(golden_path):
+                logger.info(f"Loading golden output from {golden_path}")
+                golden = torch.load(golden_path)
+            else:
+                golden = arr[0]
+                logger.info(f"Using first iteration output as golden output")
+                torch.save(golden, golden_path)
+
             all_passing = True
             for i in range(len(arr)):
                 logger.info(f"Checking output for iteration {i}")
@@ -241,5 +275,10 @@ def test_llama_model_inference(
         logger.error(e)
     finally:
         tt_model.tt_ccl.close()
+
+    # Append whether the test passed or not
+    results_path = "models/demos/llama3_subdevices/tests/results.txt"
+    with open(results_path, "a") as f:
+        f.write(f"Test {'passed' if all_passing.item() else 'failed'}\n")
 
     assert all_passing, "Not all outputs are equal to the golden output"

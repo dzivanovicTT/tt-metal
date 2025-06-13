@@ -499,6 +499,19 @@ def test_llama_TG_perf_device(
     print_dict(avg_kernel_duration_model_tail_trace, "avg_kernel_duration_model_tail_trace")
     print_dict(avg_dispatch_duration_model_tail_trace, "avg_dispatch_duration_model_tail_trace")
 
+    # Save the above dicts to one json file for easier comparison
+    perf_results = {
+        "avg_kernel_duration_mid_layers_compilation": avg_kernel_duration_mid_layers_compilation,
+        "avg_kernel_duration_mid_layers_trace": avg_kernel_duration_mid_layers_trace,
+        "avg_dispatch_duration_mid_layers_trace": avg_dispatch_duration_mid_layers_trace,
+        "avg_kernel_duration_model_tail_compilation": avg_kernel_duration_model_tail_compilation,
+        "avg_kernel_duration_model_tail_trace": avg_kernel_duration_model_tail_trace,
+        "avg_dispatch_duration_model_tail_trace": avg_dispatch_duration_model_tail_trace,
+    }
+    with open(f"models/demos/llama3_subdevices/tests/decoder_perf_results_{galaxy_type.lower()}.json", "w") as f:
+        json.dump(perf_results, f, indent=4)
+    print(f"Saved perf results to models/demos/llama3_subdevices/tests/decoder_perf_results_{galaxy_type.lower()}.json")
+
     assert len(avg_kernel_duration_mid_layers_compilation) == len(
         perf_targets["decoder"]
     ), f"Expected {len(perf_targets['decoder'])} operations, got {len(avg_kernel_duration_mid_layers_compilation)}. If the number or type of operations changed, expected times must be updated."
