@@ -39,8 +39,11 @@ void kernel_main() {
     constexpr uint32_t barrier_threshold = get_barrier_read_threshold<tile_bytes, num_readers>();
     uint32_t barrier_count = 0;
     uint32_t curr_tile_id = start_id;
+    asm volatile("nop\nnop\nnop\nnop\nnop");
     cb_reserve_back(cb_id_in0, block_num_tiles);
+    asm volatile("nop\nnop\nnop\nnop\nnop");
     uint32_t l1_write_addr = get_write_ptr(cb_id_in0);
+    asm volatile("nop\nnop\nnop\nnop\nnop");
     for (uint32_t h = 0; h < block_height_tiles; h++) {
         uint32_t tile_id = curr_tile_id;
         for (uint32_t w = 0; w < block_width_tiles; w++) {

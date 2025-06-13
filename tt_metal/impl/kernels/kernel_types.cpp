@@ -14,7 +14,7 @@ namespace tt::tt_metal {
 ReaderDataMovementConfig::ReaderDataMovementConfig(
     std::vector<uint32_t> compile_args, std::map<std::string, std::string> defines, KernelBuildOptLevel opt_level) :
     DataMovementConfig{
-        .processor = DataMovementProcessor::RISCV_1,
+        .processor = DataMovementProcessor::RISCV_0,
         .noc = detail::GetPreferredNOCForDRAMRead(tt::tt_metal::MetalContext::instance().get_cluster().arch()),
         .noc_mode = NOC_MODE::DM_DEDICATED_NOC,
         .compile_args = std::move(compile_args),
@@ -24,7 +24,7 @@ ReaderDataMovementConfig::ReaderDataMovementConfig(
 WriterDataMovementConfig::WriterDataMovementConfig(
     std::vector<uint32_t> compile_args, std::map<std::string, std::string> defines, KernelBuildOptLevel opt_level) :
     DataMovementConfig{
-        .processor = DataMovementProcessor::RISCV_0,
+        .processor = DataMovementProcessor::RISCV_1,
         .noc = detail::GetPreferredNOCForDRAMWrite(tt::tt_metal::MetalContext::instance().get_cluster().arch()),
         .noc_mode = NOC_MODE::DM_DEDICATED_NOC,
         .compile_args = std::move(compile_args),

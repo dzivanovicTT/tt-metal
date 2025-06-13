@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <tt-metalium/kernel.hpp>
 #include <tt-metalium/tt_metal.hpp>
+#include "jit_build/jit_build_options.hpp"
 #include "llrt/rtoptions.hpp"
 #include "llrt/llrt.hpp"
 #include "dev_msgs.h"
