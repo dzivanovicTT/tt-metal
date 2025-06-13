@@ -270,9 +270,11 @@ class SegformerTrace2CQ:
 
         self.tt_outputs_host = []
 
-    def copy_input_to_device(self, input_consumed):
+    def copy_input_to_device(self, input_consumed, input=None):
+        if input is None:
+            input = self.tt_inputs_host
         ttnn.wait_for_event(1, input_consumed)
-        ttnn.copy_host_to_device_tensor(self.tt_inputs_host, self.tt_inputs_unpadded, cq_id=1)
+        ttnn.copy_host_to_device_tensor(input, self.tt_inputs_unpadded, cq_id=1)
         input_copied = ttnn.record_event(self.device, 1)
 
         ttnn.wait_for_event(0, input_copied)
@@ -326,6 +328,31 @@ class SegformerTrace2CQ:
         self.test_infra.dealloc_output()
 
         return read_done
+
+    def trace_execute_for_demo(self, capture_finished, input=None):
+        # copy of first input
+        copy_done = self.copy_input_to_device(capture_finished, input)
+
+        # reads from previous steps should have finished
+        read_done = ttnn.record_event(self.device, 0)
+        # start executing trace after data has been read
+        ttnn.wait_for_event(0, read_done)
+        ttnn.execute_trace(self.device, self.tid, cq_id=0, blocking=False)
+
+        # deallocate old and copy new input
+        self.test_infra.dealloc_input()
+        copy_done = self.copy_input_to_device(copy_done)
+
+        # read output
+        read_done = self.copy_output_to_host(read_done)
+
+        # last iteration without an extra input copy
+
+        ttnn.synchronize_device(self.device)
+
+        outputs = ttnn.from_device(self.test_infra.output_tensor.logits, blocking=True)
+
+        return outputs
 
     def trace_capture(self, compile_finished):
         copy_done = self.copy_input_to_device(compile_finished)
