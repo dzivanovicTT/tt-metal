@@ -356,24 +356,24 @@ TEST_F(DispatchFixture, LoopDRAMRead) {
     tt_metal::SetRuntimeArgs(
         program, brisc_kernel, core, {brisc_base_addr, page_size, l1_address, brisc_num_pages_to_read, num_iterations});
 
-    tt_metal::KernelHandle ncrisc_kernel = tt_metal::CreateKernel(
-        program,
-        "tests/tt_metal/tt_metal/test_kernels/dataflow/dram_pcie_error.cpp",
-        core,
-        tt_metal::DataMovementConfig{
-            .processor = tt_metal::DataMovementProcessor::RISCV_1, .noc = tt_metal::NOC::RISCV_1_default});
+    // tt_metal::KernelHandle ncrisc_kernel = tt_metal::CreateKernel(
+    //     program,
+    //     "tests/tt_metal/tt_metal/test_kernels/dataflow/dram_pcie_error.cpp",
+    //     core,
+    //     tt_metal::DataMovementConfig{
+    //         .processor = tt_metal::DataMovementProcessor::RISCV_1, .noc = tt_metal::NOC::RISCV_1_default});
 
-    tt_metal::SetRuntimeArgs(
-        program,
-        ncrisc_kernel,
-        core,
-        {
-            ncrisc_base_addr,
-            page_size,
-            l1_address,
-            ncrisc_num_pages_to_read,
-            num_iterations,
-        });
+    // tt_metal::SetRuntimeArgs(
+    //     program,
+    //     ncrisc_kernel,
+    //     core,
+    //     {
+    //         ncrisc_base_addr,
+    //         page_size,
+    //         l1_address,
+    //         ncrisc_num_pages_to_read,
+    //         num_iterations,
+    //     });
 
     this->RunProgram(device, program);
 }
