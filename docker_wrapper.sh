@@ -16,4 +16,4 @@ ssh -l asaigal "$HOST" sudo docker exec \
   -e TT_METAL_HOME=/home/asaigal/tt-metal-2 \
   -e PYTHONPATH=/home/asaigal/tt-metal-2 \
   -e TT_METAL_ENV=dev \
-  special-asaigal "$@"
+  asaigal-host-mapped "$@"

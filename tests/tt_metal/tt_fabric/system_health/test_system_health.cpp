@@ -35,7 +35,6 @@ std::pair<std::uint32_t, std::uint32_t> get_ubb_ids(chip_id_t chip_id) {
     return std::make_pair(0, 0);
 }
 
-<<<<<<< HEAD
 bool is_chip_on_edge_of_mesh(chip_id_t physical_chip_id, tt::ClusterType cluster_type) {
     const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
     if (cluster_type == tt::ClusterType::GALAXY) {
@@ -67,7 +66,8 @@ bool is_chip_on_corner_of_mesh(chip_id_t physical_chip_id, tt::ClusterType clust
             "is_chip_on_corner_of_mesh not implemented for {} cluster type",
             magic_enum::enum_name(cluster_type));
         return false;
-=======
+    }
+}
 
 TEST(Cluster, ReportIntermeshLinks) {
     const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
@@ -104,7 +104,6 @@ TEST(Cluster, ReportIntermeshLinks) {
                 log_info(tt::LogTest, "  Channel {} at {}", channel, eth_core.str());
             }
         }
->>>>>>> 4992f86204 (#0: Introduce new APIs to query inter-mesh ethernet links)
     }
 }
 
