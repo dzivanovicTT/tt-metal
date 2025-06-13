@@ -140,7 +140,6 @@ def split_conv_and_run(
                     out_channel_slice_output,
                     in_channel_slice_output,
                     output_tensor=out_channel_slice_output,
-                    use_legacy=True,  # until fix for https://github.com/tenstorrent/tt-metal/issues/22307
                 )
                 in_channel_slice_output.deallocate(True)
 
