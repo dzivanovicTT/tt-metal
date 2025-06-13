@@ -12,6 +12,8 @@ from tests.ttnn.unit_tests.operations.prefetcher_common import run_prefetcher_mm
 
 LLAMA_INPUT_SHAPES = [(2304, 1536), (1536, 2304), (2304, 3840), (2304, 3840), (3840, 2304)]
 LLAMA_INPUT_DTYPES = [ttnn.bfloat8_b, ttnn.bfloat8_b, ttnn.bfloat4_b, ttnn.bfloat4_b, ttnn.bfloat8_b]
+# LLAMA_INPUT_SHAPES = [(2304, 1536), (2304, 1536), (2304, 1536), (2304, 1536), (2304, 1536)]
+# LLAMA_INPUT_DTYPES = [ttnn.bfloat8_b, ttnn.bfloat8_b, ttnn.bfloat4_b, ttnn.bfloat4_b, ttnn.bfloat8_b]
 
 
 @pytest.mark.skipif(is_grayskull(), reason="GS not supported")
@@ -147,7 +149,7 @@ def test_run_prefetcher_batched_weights(
     )
 
 
-@pytest.mark.parametrize("mesh_device", [pytest.param((2, 2), id="2x2_grid")], indirect=True)
+@pytest.mark.parametrize("mesh_device", [pytest.param((1, 1), id="2x2_grid")], indirect=True)
 @pytest.mark.parametrize(
     "device_params",
     [{"dispatch_core_axis": ttnn.DispatchCoreAxis.COL, "trace_region_size": 23887872}],

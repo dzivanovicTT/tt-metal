@@ -379,7 +379,7 @@ def run_prefetcher_mm(
     logger.info("Compiling model")
     outputs_t = run_op()
 
-    ##### Capture Trace #####
+    # ##### Capture Trace #####
     logger.info("Capturing trace")
 
     trace_id = ttnn.begin_trace_capture(device, cq_id=0)

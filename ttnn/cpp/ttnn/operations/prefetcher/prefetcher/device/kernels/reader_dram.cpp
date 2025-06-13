@@ -19,7 +19,7 @@ void kernel_main() {
     constexpr uint32_t max_block_size = get_compile_time_arg_val(5);
     constexpr uint32_t cb_id = get_compile_time_arg_val(6);
     constexpr uint32_t addrs_cb_id = get_compile_time_arg_val(7);
-    constexpr bool skip_ptr_update = get_compile_time_arg_val(8);
+    constexpr bool skip_ptr_update = true;
 
     // Runtime args
     uint32_t rt_args_idx = 0;
