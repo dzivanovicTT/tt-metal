@@ -25,6 +25,8 @@ void kernel_main() {
     constexpr uint32_t remote_cb_id = get_compile_time_arg_val(6);
     constexpr bool skip_ptr_update = get_compile_time_arg_val(7);
 
+    constexpr uint32_t sync_cb_id = 3;
+
     // Runtime args
     // Note: Coalesced sizes -> wrt to receiver cores, sizes -> wrt to dram reader cores
     uint32_t rt_args_idx = 0;
@@ -49,6 +51,7 @@ void kernel_main() {
             experimental::resize_remote_sender_cb_interface<true>(remote_cb_id, curr_block_size_per_receiver, noc);
             experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
 
+            uint32_t num_pages = 0;
             for (uint32_t block = 0; block < num_blocks; ++block) {
                 {
                     cb_wait_front(local_cb_id, max_block_num_tiles);
@@ -63,22 +66,24 @@ void kernel_main() {
                         curr_coalesced_page_size,
                         noc);
 
+                    noc_async_posted_writes_flushed();
+
                     cb_pop_front(local_cb_id, max_block_num_tiles);
                 }
             }
         }
     }
 
-    experimental::remote_cb_sender_barrier(remote_cb_id);
-
     experimental::update_remote_cb_config_in_l1(remote_cb_id);
 
     // reset noc counters here because we didn't properly update ptrs for better perf.
-    if constexpr (skip_ptr_update) {
-        if (noc_mode == DM_DEDICATED_NOC) {
-            ncrisc_noc_counters_init();
-        } else {
-            dynamic_noc_local_state_init();
-        }
+    if (noc_mode == DM_DEDICATED_NOC) {
+        ncrisc_noc_counters_init();
+    } else {
+        dynamic_noc_local_state_init();
     }
+
+    // signal reader can exit, since reader cannot exit early due to the ongoing traffic on the same noc.
+    cb_reserve_back(sync_cb_id, 1);
+    cb_push_back(sync_cb_id, 1);
 }
