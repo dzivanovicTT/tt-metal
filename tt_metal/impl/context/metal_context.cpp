@@ -19,6 +19,7 @@
 #include <tt-metalium/tt_metal.hpp>
 #include <tt-metalium/control_plane.hpp>
 #include "tt_metal/fabric/fabric_host_utils.hpp"
+#include <tt-metalium/distributed_context.hpp>
 #include <filesystem>
 #include <tt-metalium/device_pool.hpp>
 
@@ -118,6 +119,12 @@ MetalContext::MetalContext() {
         Cluster::is_base_routing_fw_enabled(Cluster::get_cluster_type_from_cluster_desc(rtoptions_));
     hal_ = std::make_unique<Hal>(get_platform_architecture(rtoptions_), is_base_routing_fw_enabled);
     cluster_ = std::make_unique<Cluster>(rtoptions_, *hal_);
+    if (distributed::multihost::DistributedContext::using_mpi_environment() &&
+        !distributed::multihost::DistributedContext::is_initialized()) {
+        log_info(tt::LogMetal, "Initializing distributed context from MetalContext");
+        distributed::multihost::DistributedContext::create(0, nullptr);
+        log_info(tt::LogMetal, "Metal Context initialized");
+    }
 }
 
 MetalContext::~MetalContext() {

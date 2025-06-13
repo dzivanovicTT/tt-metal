@@ -150,6 +150,13 @@ public:
     static void create(int argc, char** argv);
     static const ContextPtr& get_current_world();
     static void set_current_world(const ContextPtr& ctx);
+
+    // Returns true if the distributed context has already been initialized
+    static bool is_initialized();
+
+    // Returns true if the environment is using MPI
+    static bool using_mpi_environment();
+
     //--- Topology ------------------------------------------------------------
     [[nodiscard]] virtual Rank rank() const = 0;
     [[nodiscard]] virtual Size size() const = 0;
