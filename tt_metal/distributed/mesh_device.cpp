@@ -207,8 +207,11 @@ std::shared_ptr<MeshDevice> MeshDevice::create(
     const DispatchCoreConfig& dispatch_core_config,
     tt::stl::Span<const std::uint32_t> l1_bank_remap,
     size_t worker_l1_size) {
+    std::cout << "TRYING TO CREATE ScopedDevices" << std::endl;
     auto scoped_devices = std::make_shared<ScopedDevices>(
         l1_small_size, trace_region_size, num_command_queues, worker_l1_size, dispatch_core_config, config);
+    std::cout << "ScopedDevices created" << std::endl;
+
     auto root_devices = scoped_devices->root_devices();
     MeshContainer<IDevice*> devices(config.mesh_shape(), root_devices);
     auto mesh_device = std::make_shared<MeshDevice>(

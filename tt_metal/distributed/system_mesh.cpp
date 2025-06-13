@@ -134,6 +134,8 @@ std::vector<chip_id_t> SystemMesh::SingleHostImpl::get_mapped_physical_device_id
         }
     }();
 
+    
+
     if (is_line_topology(shape)) {
         // TODO: consider if we can do this in 3D.
         TT_FATAL(system_shape.dims() == 2, "Line topology is only supported for 2D meshes");
@@ -148,6 +150,7 @@ std::vector<chip_id_t> SystemMesh::SingleHostImpl::get_mapped_physical_device_id
         auto line_length = shape.mesh_size();
         for (const auto& logical_coordinate :
              MeshDeviceView::get_line_coordinates(line_length, system_mesh_2d, system_offset_2d)) {
+            
             auto physical_device_id = get_physical_device_id(logical_coordinate);
             physical_device_ids.push_back(physical_device_id);
 
@@ -234,7 +237,12 @@ public:
         const MeshShape& shape, const std::optional<MeshCoordinate>& offset = std::nullopt) const override;
     chip_id_t get_physical_device_id(const MeshCoordinate& coord) const override;
     uint32_t get_physical_mesh_id(const MeshCoordinate& coord) const override;
+    bool is_local_coordinate(const MeshCoordinate& coord) const;
 };
+
+bool SystemMesh::DistributedImpl::is_local_coordinate(const MeshCoordinate& coord) const {
+    return global_to_local(coord, physical_coordinates_.shape(), local_offset_).has_value();
+}
 
 std::unique_ptr<SystemMesh::Impl> SystemMesh::Impl::create() {
     if (distributed::multihost::DistributedContext::using_mpi_environment()) {
@@ -328,11 +336,13 @@ std::vector<chip_id_t> SystemMesh::DistributedImpl::get_mapped_physical_device_i
         auto line_length = shape.mesh_size();
         for (const auto& logical_coordinate :
              MeshDeviceView::get_line_coordinates(line_length, system_mesh_2d, system_offset_2d)) {
-            auto physical_device_id = get_physical_device_id(logical_coordinate);
-            physical_device_ids.push_back(physical_device_id);
+            if (is_local_coordinate(logical_coordinate)) {
+                auto physical_device_id = get_physical_device_id(logical_coordinate);
+                physical_device_ids.push_back(physical_device_id);
 
-            log_debug(
-                LogMetal, "Logical coordinate: {}, Physical device ID: {}", logical_coordinate, physical_device_id);
+                log_debug(
+                    LogMetal, "Logical coordinate: {}, Physical device ID: {}", logical_coordinate, physical_device_id);
+            }
         }
         return physical_device_ids;
     }
@@ -382,16 +392,20 @@ std::vector<chip_id_t> SystemMesh::DistributedImpl::get_mapped_physical_device_i
         for (int i = 0; i < shape[0]; i++) {
             for (int j = 0; j < shape[1]; j++) {
                 auto system_coord = MeshCoordinate(j, i);
-                auto physical_device_id = get_physical_device_id(system_coord);
-                physical_device_ids.push_back(physical_device_id);
-                log_debug(LogMetal, "Logical coordinate: {}, Physical device ID: {}", system_coord, physical_device_id);
+                if (is_local_coordinate(system_coord)) {
+                    auto physical_device_id = get_physical_device_id(system_coord);
+                    physical_device_ids.push_back(physical_device_id);
+                    log_debug(LogMetal, "Logical coordinate: {}, Physical device ID: {}", system_coord, physical_device_id);
+                }
             }
         }
     } else {
         for (const auto& system_coord : system_range) {
-            auto physical_device_id = get_physical_device_id(system_coord);
-            physical_device_ids.push_back(physical_device_id);
-            log_debug(LogMetal, "Logical coordinate: {}, Physical device ID: {}", system_coord, physical_device_id);
+            if (is_local_coordinate(system_coord)) {
+                auto physical_device_id = get_physical_device_id(system_coord);
+                physical_device_ids.push_back(physical_device_id);
+                log_debug(LogMetal, "Logical coordinate: {}, Physical device ID: {}", system_coord, physical_device_id);
+            }
         }
     }
 
