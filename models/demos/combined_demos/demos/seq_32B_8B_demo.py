@@ -347,7 +347,7 @@ def run_inference(generator, model_args, page_table, tt_kv_cache, tokenizer, pro
     "mesh_device",
     [
         {"N150": (1, 1), "N300": (1, 2), "N150x4": (1, 4), "T3K": (1, 8), "TG": (8, 4)}.get(
-            os.environ.get("MESH_DEVICE"), (1, 2)  # Default to single device
+            os.environ.get("MESH_DEVICE"), (1, 8)  # Default to single device
         )
     ],
     indirect=True,
@@ -378,14 +378,14 @@ def test_combined_llama_demo(mesh_device, use_program_cache, reset_seeds):
     # Setup first model
     model1_setup_start = time.time()
     generator1, model_args1, page_table1, tt_kv_cache1, tokenizer1 = setup_model(
-        mesh_device, "meta-llama/Llama-3.2-1B-Instruct", instruct=True, batch_size=1, max_seq_len=2048, data_parallel=1
+        mesh_device, "/home/ttuser/atupe/QwQ-32B", instruct=True, batch_size=1, max_seq_len=2048, data_parallel=1
     )
     model1_setup_time = time.time() - model1_setup_start
     model1_setup_times.append(model1_setup_time)
 
     switching_start = time.time()
     generator2, model_args2, page_table2, tt_kv_cache2, tokenizer2 = setup_model(
-        mesh_device, "meta-llama/Llama-3.2-3B-Instruct", instruct=True, batch_size=1, max_seq_len=2048, data_parallel=1
+        mesh_device, "meta-llama/Llama-3.1-8B", instruct=True, batch_size=1, max_seq_len=2048, data_parallel=1
     )
     switching_time = time.time() - switching_start
     switching_times.append(switching_time)
