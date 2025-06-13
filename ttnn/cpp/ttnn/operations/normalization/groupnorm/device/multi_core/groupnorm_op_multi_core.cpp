@@ -782,7 +782,7 @@ operation::ProgramWithCallbacks groupnorm_multi_core_sharded(
         (std::uint32_t)num_datum_row_per_group - (block_wt - 1) * TILE_WIDTH};
     // compute kernel
     bool fp32_dest_acc_en = false;
-    bool math_approx_mode = true;
+    bool math_approx_mode = false;
     auto mcast_sender_compute_kernels_id = CreateKernel(
         program,
         "ttnn/cpp/ttnn/operations/normalization/groupnorm/device/kernels/compute/groupnorm_sharded_v2.cpp",
@@ -2037,7 +2037,7 @@ operation::ProgramWithCallbacks groupnorm_multi_core(
     };
     // compute kernel
     bool fp32_dest_acc_en = false;
-    bool math_approx_mode = true;
+    bool math_approx_mode = false;
     auto mcast_sender_compute_kernels_id_group_1 = CreateKernel(
         program,
         "ttnn/cpp/ttnn/operations/normalization/groupnorm/device/kernels/compute/groupnorm.cpp",
