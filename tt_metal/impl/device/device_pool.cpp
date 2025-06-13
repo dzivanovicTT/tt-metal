@@ -276,7 +276,16 @@ void DevicePool::initialize(
     _inst->add_devices_to_pool(device_ids);
     tt::tt_metal::MetalContext::instance().get_cluster().set_internal_routing_info_for_ethernet_cores(
         true, target_mmio_ids);
+
+    std::cout << std::endl;
+    std::cout << " ------------------- DevicePool initialize 1 ------------------- " << std::endl;
+    std::cout << std::endl;
+
     _inst->init_firmware_on_active_devices();
+
+    std::cout << std::endl;
+    std::cout << " ------------------- DevicePool initialize 2 ------------------- " << std::endl;
+    std::cout << std::endl;
 }
 
 void DevicePool::initialize_fabric_and_dispatch_fw() const {
@@ -301,10 +310,19 @@ void DevicePool::initialize_host(IDevice* dev) const {
     DprintServerAttach(dev->id());
     watcher_init(dev->id());
 
+    std::cout << std::endl;
+    std::cout << " ------------------- initialize_host 1 ------------------- " << std::endl;
+    std::cout << std::endl;
+
     // TODO: as optimization, investigate removing all this call for already initialized devivces
     if (!tt_metal::MetalContext::instance().rtoptions().get_skip_reset_cores_on_init()) {
         dev->reset_cores();
     }
+
+    std::cout << std::endl;
+    std::cout << " ------------------- initialize_host 2 ------------------- " << std::endl;
+    std::cout << std::endl;
+
     dev->initialize_and_launch_firmware();
 
     watcher_attach(dev->id());
@@ -567,7 +585,17 @@ void DevicePool::init_firmware_on_active_devices() const {
 
         auto tunnels_from_mmio =
             tt::tt_metal::MetalContext::instance().get_cluster().get_tunnels_from_mmio_device(mmio_device_id);
+
+        std::cout << std::endl;
+        std::cout << " ------------------- init_firmware_on_active_devices 1 ------------------- " << std::endl;
+        std::cout << std::endl;
+
         this->initialize_host(dev);
+
+        std::cout << std::endl;
+        std::cout << " ------------------- init_firmware_on_active_devices 2 ------------------- " << std::endl;
+        std::cout << std::endl;
+
         if (not this->skip_remote_devices) {
             for (uint32_t t = 0; t < tunnels_from_mmio.size(); t++) {
                 // Need to create devices from farthest to the closest.
@@ -575,7 +603,18 @@ void DevicePool::init_firmware_on_active_devices() const {
                     uint32_t mmio_controlled_device_id = tunnels_from_mmio[t][ts];
                     log_debug(tt::LogMetal, "Tunnel {} Device {} Tunnel Stop: {}", t, mmio_controlled_device_id, ts);
                     auto device = get_device(mmio_controlled_device_id);
+
+                    std::cout << std::endl;
+                    std::cout << " ------------------- init_firmware_on_active_devices 3 ------------------- "
+                              << std::endl;
+                    std::cout << std::endl;
+
                     this->initialize_host(device);
+
+                    std::cout << std::endl;
+                    std::cout << " ------------------- init_firmware_on_active_devices 4 ------------------- "
+                              << std::endl;
+                    std::cout << std::endl;
                 }
             }
         }
