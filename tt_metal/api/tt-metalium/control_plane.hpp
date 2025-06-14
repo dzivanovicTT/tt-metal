@@ -15,6 +15,11 @@ namespace tt::tt_fabric {
 
 class FabricContext;
 
+struct LocalMeshInfo {
+    MeshId mesh_id;
+    HostRankId host_rank;
+};
+
 class ControlPlane {
 public:
     explicit ControlPlane(const std::string& mesh_graph_desc_yaml_file);
@@ -88,6 +93,7 @@ public:
 
 private:
     uint16_t routing_mode_ = 0;  // ROUTING_MODE_UNDEFINED
+    std::optional<LocalMeshInfo> local_mesh_info_;
     // TODO: remove this from local node control plane. Can get it from the global control plane
     std::unique_ptr<RoutingTableGenerator> routing_table_generator_;
 

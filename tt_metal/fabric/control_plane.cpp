@@ -87,6 +87,26 @@ bool is_chip_on_corner_of_mesh(
 }
 
 ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
+    const char* mesh_id_env = std::getenv("TT_METAL_MESH_ID");
+    const char* host_rank_id_env = std::getenv("TT_METAL_HOST_RANK_ID");
+    if (mesh_id_env && host_rank_id_env) {
+        try {
+            MeshId mesh_id{static_cast<uint32_t>(std::stoi(mesh_id_env))};
+            HostRankId host_rank{static_cast<uint32_t>(std::stoi(host_rank_id_env))};
+            local_mesh_info_ = LocalMeshInfo{mesh_id, host_rank};
+            log_debug(
+                tt::LogFabric,
+                "Control Plane: Initialized with local mesh info - MeshId: {}, HostRankId: {}",
+                *mesh_id,
+                *host_rank);
+        } catch (const std::exception& e) {
+            log_warning(
+                tt::LogFabric,
+                "Control Plane: Failed to parse TT_METAL_MESH_ID or TT_METAL_HOST_RANK_ID: {}",
+                e.what());
+        }
+    }
+
     this->routing_table_generator_ = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_file);
     // Printing, only enabled with log_debug
     this->routing_table_generator_->mesh_graph->print_connectivity();
@@ -102,7 +122,25 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
 ControlPlane::ControlPlane(
     const std::string& mesh_graph_desc_file,
     const std::map<FabricNodeId, chip_id_t>& logical_mesh_chip_id_to_physical_chip_id_mapping) {
-    // std::cout << "Create routing table generator" << std::endl;
+    const char* mesh_id_env = std::getenv("TT_METAL_MESH_ID");
+    const char* host_rank_id_env = std::getenv("TT_METAL_HOST_RANK_ID");
+    if (mesh_id_env && host_rank_id_env) {
+        try {
+            MeshId mesh_id{static_cast<uint32_t>(std::stoi(mesh_id_env))};
+            HostRankId host_rank{static_cast<uint32_t>(std::stoi(host_rank_id_env))};
+            local_mesh_info_ = LocalMeshInfo{mesh_id, host_rank};
+            log_debug(
+                tt::LogFabric,
+                "Control Plane: Initialized with local mesh info - MeshId: {}, HostRankId: {}",
+                *mesh_id,
+                *host_rank);
+        } catch (const std::exception& e) {
+            log_warning(
+                tt::LogFabric,
+                "Control Plane: Failed to parse TT_METAL_MESH_ID or TT_METAL_HOST_RANK_ID: {}",
+                e.what());
+        }
+    }
     this->routing_table_generator_ = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_file);
     // Printing, only enabled with log_debug
     this->routing_table_generator_->mesh_graph->print_connectivity();
