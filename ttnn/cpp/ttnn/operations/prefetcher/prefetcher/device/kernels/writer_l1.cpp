@@ -23,6 +23,7 @@ void kernel_main() {
     constexpr uint32_t max_block_num_tiles = get_compile_time_arg_val(4);
     constexpr uint32_t local_cb_id = get_compile_time_arg_val(5);
     constexpr uint32_t remote_cb_id = get_compile_time_arg_val(6);
+    constexpr uint32_t sync_cb_id = 3;
     constexpr bool skip_ptr_update = true;
 
     // Runtime args
@@ -47,6 +48,14 @@ void kernel_main() {
             uint32_t curr_block_size_per_receiver = curr_block_size / num_receivers;
 
             experimental::resize_remote_sender_cb_interface<true>(remote_cb_id, curr_block_size_per_receiver, noc);
+
+            // RemoteSenderCBInterface& remote_cb = get_remote_sender_cb_interface(remote_cb_id);
+            // auto pages_sent_ptr =
+            //     reinterpret_cast<volatile tt_l1_ptr uint32_t*>(remote_cb.aligned_pages_sent_ptr);
+            // DPRINT << "send_pages_sent_ptr " << (uint)*pages_sent_ptr <<ENDL();
+            // DPRINT << "layer " << layer << " t " << t<<ENDL();
+            // DPRINT << "curr_coalesced_page_size " << curr_coalesced_page_size << " curr_coalesced_num_pages " <<
+            // curr_coalesced_num_pages << " curr_block_height_in_tiles " << curr_block_height_in_tiles<<ENDL();
             experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
 
             uint32_t num_pages = 0;
@@ -63,6 +72,7 @@ void kernel_main() {
                     //     curr_coalesced_num_pages,
                     //     curr_coalesced_page_size,
                     //     noc);
+
                     auto pages_sent = experimental::remote_cb_write_pages<skip_ptr_update>(
                         remote_cb_id,
                         local_cb_addr,
@@ -71,27 +81,27 @@ void kernel_main() {
                         curr_coalesced_num_pages,
                         curr_coalesced_page_size,
                         noc);
-
                     num_pages += pages_sent;
 
-                    // experimental::remote_cb_push_back<skip_ptr_update>(
-                    //     remote_cb_id,
-                    //     1,
-                    //     noc);
+                    noc_async_posted_writes_flushed();
+
+                    // uint32_t noc_sent = noc_nonposted_writes_num_issued[noc];
+                    // uint32_t noc_hw = NOC_STATUS_READ_REG(noc, NIU_MST_NONPOSTED_WR_REQ_SENT);
+                    // DPRINT << "noc_sent " << noc_sent << " noc_hw " << noc_hw <<ENDL();
 
                     cb_pop_front(local_cb_id, max_block_num_tiles);
                 }
             }
 
             experimental::remote_cb_push_back<skip_ptr_update>(remote_cb_id, num_pages, noc);
-
-            // for (int i=0; i<10000;++i){
-            //     asm volatile("nop");  // Just a delay to ensure all writes are flushed before the next iteration
-            // }
         }
     }
 
+    DPRINT << "remote_cb_sender_barrier" << ENDL();
+
     experimental::remote_cb_sender_barrier(remote_cb_id);
+
+    DPRINT << "Done remote_cb_sender_barrier" << ENDL();
 
     experimental::update_remote_cb_config_in_l1(remote_cb_id);
 
@@ -103,4 +113,7 @@ void kernel_main() {
         dynamic_noc_local_state_init();
     }
     // }
+
+    cb_reserve_back(sync_cb_id, 1);
+    cb_push_back(sync_cb_id, 1);
 }

@@ -131,6 +131,12 @@ operation::ProgramWithCallbacks dram_prefetcher_multi_core(
 
     auto reader_cb = CreateCircularBuffer(program, reader_core_range, reader_cb_config);
 
+    uint32_t sync_cb_index = tt::CBIndex::c_3;
+    CircularBufferConfig sync_cb_confg =
+        CircularBufferConfig(16, {{sync_cb_index, tt::DataFormat::Float16_b}}).set_page_size(sync_cb_index, 16);
+
+    auto sync_cb = CreateCircularBuffer(program, reader_core_range, sync_cb_confg);
+
     /* tensor addresses cb setup */
     uint32_t tensor_addrs_single_tile_size = sizeof(uint32_t);
     uint32_t tensor_addrs_cb_num_tiles =
