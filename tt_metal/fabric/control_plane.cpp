@@ -94,7 +94,7 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
             MeshId mesh_id{static_cast<uint32_t>(std::stoi(mesh_id_env))};
             HostRankId host_rank{static_cast<uint32_t>(std::stoi(host_rank_id_env))};
             local_mesh_info_ = LocalMeshInfo{mesh_id, host_rank};
-            log_debug(
+            log_info(
                 tt::LogFabric,
                 "Control Plane: Initialized with local mesh info - MeshId: {}, HostRankId: {}",
                 *mesh_id,
@@ -129,7 +129,7 @@ ControlPlane::ControlPlane(
             MeshId mesh_id{static_cast<uint32_t>(std::stoi(mesh_id_env))};
             HostRankId host_rank{static_cast<uint32_t>(std::stoi(host_rank_id_env))};
             local_mesh_info_ = LocalMeshInfo{mesh_id, host_rank};
-            log_debug(
+            log_info(
                 tt::LogFabric,
                 "Control Plane: Initialized with local mesh info - MeshId: {}, HostRankId: {}",
                 *mesh_id,
@@ -521,8 +521,8 @@ void ControlPlane::convert_fabric_routing_table_to_chip_routing_table() {
 
     const auto& router_intra_mesh_routing_table = this->routing_table_generator_->get_intra_mesh_table();
     for (std::uint32_t mesh_id = 0; mesh_id < router_intra_mesh_routing_table.size(); mesh_id++) {
-        if (mesh_id != 0) {
-            continue;
+        if (*(local_mesh_info_.value().mesh_id) != mesh_id) {
+            continue;  // Only convert routing tables for local mesh
         }
         for (std::uint32_t src_chip_id = 0; src_chip_id < router_intra_mesh_routing_table[mesh_id].size();
              src_chip_id++) {
@@ -579,8 +579,8 @@ void ControlPlane::convert_fabric_routing_table_to_chip_routing_table() {
 
     const auto& router_inter_mesh_routing_table = this->routing_table_generator_->get_inter_mesh_table();
     for (std::uint32_t src_mesh_id = 0; src_mesh_id < router_inter_mesh_routing_table.size(); src_mesh_id++) {
-        if (src_mesh_id != 0) {
-            continue;
+        if (*(local_mesh_info_.value().mesh_id) != src_mesh_id) {
+            continue;  // Only convert routing tables for local mesh
         }
         for (std::uint32_t src_chip_id = 0; src_chip_id < router_inter_mesh_routing_table[src_mesh_id].size();
              src_chip_id++) {
@@ -695,7 +695,7 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
         }
     }
     for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
-        if (mesh_id != 0) {
+        if (*(local_mesh_info_.value().mesh_id) != mesh_id) {
             continue;
         }
         // std::cout << "Init intramesh connections for: " << mesh_id << std::endl;
@@ -726,8 +726,8 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
     }
     // std::cout << "Done init intramesh connections" << std::endl;
     for (std::uint32_t mesh_id = 0; mesh_id < inter_mesh_connectivity.size(); mesh_id++) {
-        if (mesh_id != 0) {
-            continue;
+        if (*(local_mesh_info_.value().mesh_id) != mesh_id) {
+            continue;  // Only convert routing tables for local mesh
         }
         // std::cout << "Lookup intermesh connections for:  " << mesh_id << std::endl;
         for (std::uint32_t chip_id = 0; chip_id < inter_mesh_connectivity[mesh_id].size(); chip_id++) {
