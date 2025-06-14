@@ -296,7 +296,7 @@ public:
         size_t my_noc_x,
         size_t my_noc_y,
         size_t my_chip_id,
-        size_t peer_chip_id,
+        bool is_handshake_master,
 
         const std::array<std::optional<size_t>, FabricEriscDatamoverConfig::max_downstream_edms>&
             receiver_channels_downstream_flow_control_semaphore_id,
@@ -319,7 +319,7 @@ public:
         tt::tt_metal::Program& program,
         const CoreCoord& ethernet_core,
         chip_id_t local_chip_id,
-        chip_id_t peer_chip_id,
+        bool is_hanshake_master,
         const FabricEriscDatamoverConfig& config,
         bool build_in_worker_connection_mode = false,
         bool dateline_connection = false,
@@ -360,7 +360,7 @@ public:
     FabricEriscDatamoverConfig config;
 
     size_t my_chip_id = 0;
-    size_t peer_chip_id = 0;
+    bool is_handshake_master = false;
     size_t handshake_address = 0;
     size_t channel_buffer_size = 0;
 

@@ -736,13 +736,19 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
             // std::cout << "Lookup intermesh links for: " << physical_chip_id << std::endl;
             auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(physical_chip_id);
             for (const auto& [eth_coord, eth_chan] : intermesh_links) {
-                // std::cout << "Got Link: " << eth_chan << std::endl;
                 tt::umd::CoreCoord eth_core = tt::tt_metal::MetalContext::instance().get_cluster().get_soc_desc(physical_chip_id).get_eth_core_for_channel(eth_chan, CoordSystem::LOGICAL);
-                // std::cout << "Eth coord: " << eth_coord.str() << std::endl;
-                // std::cout << "Eth core: " << eth_core.str() << std::endl;
-                
+                RoutingDirection intermesh_routing_direction = RoutingDirection::NONE;
+                // This is hardocoded to 2 2x2 meshes, where mesh 0 and mesh 1 are horizontally adjacent.
+                // TODO: Use an MPI handshake here to exchange mesh IDs and intermesh routing tables.
+                if (mesh_id == 0) {
+                    intermesh_routing_direction = RoutingDirection::E;  // For mesh 0, all inter-mesh links are east
+                } else if (mesh_id == 1) {
+                    intermesh_routing_direction = RoutingDirection::W;  // For mesh 1, all inter-mesh links are west
+                } else {
+                    TT_FATAL(false, "Expected mesh_id to be 0 or 1 for inter-mesh links, got {}", mesh_id);
+                }
                 FabricNodeId fabric_node_id{MeshId{mesh_id}, chip_id};
-                this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)[RoutingDirection::E].push_back(eth_chan);        
+                this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)[intermesh_routing_direction].push_back(eth_chan);        
             }
         }
     }
