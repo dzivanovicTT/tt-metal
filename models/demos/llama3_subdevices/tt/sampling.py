@@ -4,7 +4,10 @@
 
 import torch
 import ttnn
+import os
 from models.common.lightweightmodule import LightweightModule
+
+is_RING_6U = os.environ.get("RING_6U", "0") == "1"
 
 
 class TTSampling(LightweightModule):
@@ -55,7 +58,7 @@ class TTSampling(LightweightModule):
         topk_values_gathered = self.tt_ccl.line_all_gather(
             topk_values,
             dim=3,
-            num_links=2,
+            num_links=4 if is_RING_6U else 2,
             cluster_axis=0,
             memory_config=ttnn.DRAM_MEMORY_CONFIG,
             buffer_key="SAMPLING_VALUES",
@@ -78,7 +81,7 @@ class TTSampling(LightweightModule):
         topk_indices_gathered = self.tt_ccl.line_all_gather(
             topk_indices,
             dim=3,
-            num_links=2,
+            num_links=4 if is_RING_6U else 2,
             cluster_axis=0,
             memory_config=ttnn.DRAM_MEMORY_CONFIG,
             buffer_key="SAMPLING_INDICES",

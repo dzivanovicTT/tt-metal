@@ -19,7 +19,8 @@ void kernel_main() {
     constexpr uint32_t max_block_size = get_compile_time_arg_val(5);
     constexpr uint32_t cb_id = get_compile_time_arg_val(6);
     constexpr uint32_t addrs_cb_id = get_compile_time_arg_val(7);
-    constexpr bool skip_ptr_update = get_compile_time_arg_val(8);
+    constexpr uint32_t sync_cb_id = 3;
+    constexpr bool skip_ptr_update = true;
 
     // Runtime args
     uint32_t rt_args_idx = 0;
@@ -107,4 +108,19 @@ void kernel_main() {
             cb_push_back(cb_id, max_block_num_tiles);
         }
     }
+
+    cb_wait_front(sync_cb_id, 1);
+    cb_pop_front(sync_cb_id, 1);
+
+    if (noc_mode == DM_DEDICATED_NOC) {
+        ncrisc_noc_counters_init();
+    } else {
+        dynamic_noc_local_state_init();
+    }
+
+    // if (noc_mode == DM_DEDICATED_NOC) {
+    //     uint32_t reads_num_issued = NOC_STATUS_READ_REG(noc_index, NIU_MST_RD_RESP_RECEIVED);
+    //     noc_reads_num_issued[noc_index] = reads_num_issued;
+    // } else {
+    // }
 }
