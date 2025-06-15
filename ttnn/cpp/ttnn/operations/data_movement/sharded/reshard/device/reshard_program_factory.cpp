@@ -400,14 +400,36 @@ operation::ProgramWithCallbacks reshard_multi_core_same_width(const Tensor& inpu
         device->allocator()->get_bank_ids_from_logical_core(remote_buffer_type, remote_cores[remote_core_idx])[0];
 
     std::array<tt::tt_metal::KernelHandle, 2> kernels = {kernel_id_0, kernel_id_1};
+    std::array<float, 2> kernel_ratios = {0.70f, 0.30f};
     uint32_t local_units_left = num_units;
     for (const auto& core : local_cores) {
         uint32_t local_units_per_core = std::min(local_units_left, local_units_per_shard);
         local_units_left -= local_units_per_core;
-        uint32_t local_units_per_kernel = tt::div_up(local_units_per_core, kernels.size());
+        // dont split local units per core evenly
+
+        // Compute float shares first
+        float total_ratio = kernel_ratios[0] + kernel_ratios[1];
+        std::array<uint32_t, 2> kernel_pieces;
+
+        uint32_t units_assigned = 0;
+        for (size_t i = 0; i < kernel_ratios.size(); ++i) {
+            // Round to nearest uint32_t
+            kernel_pieces[i] = static_cast<uint32_t>(std::round(kernel_ratios[i] / total_ratio * local_units_per_core));
+            units_assigned += kernel_pieces[i];
+        }
+
+        // Adjust last kernel to absorb rounding errors
+        if (units_assigned > local_units_per_core) {
+            kernel_pieces.back() -= (units_assigned - local_units_per_core);
+        } else if (units_assigned < local_units_per_core) {
+            kernel_pieces.back() += (local_units_per_core - units_assigned);
+        }
+
         uint32_t local_start_offset = 0;
-        for (const auto& kernel_id : kernels) {
+        for (int i = 0; i < kernels.size(); i++) {
             std::vector<uint32_t> kernel_args = {remote_address, 0, 0};
+            uint32_t local_units_per_kernel = kernel_pieces[i];
+
             uint32_t local_units_to_transfer = std::min(local_units_per_core, local_units_per_kernel);
             if (local_units_to_transfer != 0) {
                 uint32_t num_transfers = 0;
@@ -435,7 +457,7 @@ operation::ProgramWithCallbacks reshard_multi_core_same_width(const Tensor& inpu
                 }
                 kernel_args[2] = num_transfers;
             }
-            SetRuntimeArgs(program, kernel_id, core, kernel_args);
+            SetRuntimeArgs(program, kernels[i], core, kernel_args);
         }
     }
 
