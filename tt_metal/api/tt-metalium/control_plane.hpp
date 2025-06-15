@@ -89,6 +89,11 @@ public:
 
     FabricContext& get_fabric_context() const;
 
+    LocalMeshInfo get_local_mesh_info() const {
+        TT_FATAL(local_mesh_info_.has_value(), "Local mesh info is not initialized");
+        return local_mesh_info_.value();
+    }
+
     void clear_fabric_context();
 
 private:
