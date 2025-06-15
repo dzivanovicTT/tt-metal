@@ -115,8 +115,8 @@ void kernel_main() {
             uint32_t tiles_read = 0;
             uint32_t tiles_to_read = num_pages_per_bank + (banks_read < banks_with_extra_page);
             while (tiles_read < tiles_to_read) {
+                cb_wait_front(cb_output_id, packet_size_in_pages);
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-                cb_wait_front(cb_output_id, num_pages_to_read);
                 size_t l1_read_addr = get_read_ptr(cb_output_id);
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     uint32_t packet_size_in_pages = std::min(num_pages_to_read - j, contig_pages_advanced);
@@ -145,7 +145,7 @@ void kernel_main() {
                     }
                     tiles_read += packet_size_in_pages;
                 }
-                cb_pop_front(cb_output_id, num_pages_to_read);
+                cb_pop_front(cb_output_id, packet_size_in_pages);
             }
             banks_read++;
         }
@@ -228,8 +228,8 @@ void kernel_main() {
                 uint32_t tiles_read = 0;
                 uint32_t tiles_to_read = num_pages_per_bank + (banks_read < banks_with_extra_page);
                 while (tiles_read < tiles_to_read) {
+                    cb_wait_front(cb_output_id, packet_size_in_pages);
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-                    cb_wait_front(cb_output_id, num_pages_to_read);
                     size_t l1_read_addr = get_read_ptr(cb_output_id);
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                         uint32_t packet_size_in_pages = std::min(num_pages_to_read - j, contig_pages_advanced);
@@ -245,7 +245,7 @@ void kernel_main() {
                         }
                         tiles_read += packet_size_in_pages;
                     }
-                    cb_pop_front(cb_output_id, num_pages_to_read);
+                    cb_pop_front(cb_output_id, packet_size_in_pages);
                 }
                 banks_read++;
             }
