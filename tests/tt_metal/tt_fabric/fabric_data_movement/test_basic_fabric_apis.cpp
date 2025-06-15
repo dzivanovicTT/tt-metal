@@ -787,9 +787,12 @@ TEST_P(T3kCustomMeshGraphFabric2DDynamicFixture, TestCustomMultiMeshMcast) {
         FabricNodeId(MeshId{1}, 0)
     };
     std::vector<McastRoutingInfo> routing_info = {McastRoutingInfo{.mcast_dir = RoutingDirection::E, .num_mcast_hops = 1}};
-
+    std::vector<std::vector<FabricNodeId>> mcast_group_node_ids = {
+                                                                    {FabricNodeId(MeshId{1}, 3)},
+                                                                    {FabricNodeId(MeshId{1}, 1)}
+                                                                  };
     for (uint32_t i = 0; i < 20; i++) {
-        RunMultiMeshLineMcast(this, mcast_req_nodes[i % 4], mcast_start_nodes[i % 2], routing_info);
+        RunMultiMeshLineMcast(this, mcast_req_nodes[i % 4], mcast_start_nodes[i % 2], routing_info, mcast_group_node_ids[i % 2]);
     }
 }
 
