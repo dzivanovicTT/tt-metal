@@ -99,6 +99,7 @@ void kernel_main() {
 
     // loop over for num packets
     for (uint32_t i = 0; i < num_packets; i++) {
+        time_seed = prng_next(time_seed);
         DPRINT << "Send packet" << ENDL();
         send_packet(
             fwd_packet_header,
