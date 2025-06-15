@@ -66,7 +66,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
 
     auto per_core_width = operation_attributes.input_width;
     auto per_core_height = input.memory_config().shard_spec().value().shape[0] / operation_attributes.input_width;
-    log_info(
+    log_debug(
         tt::LogOp,
         "DeinterleaveToBatchOperation::ProgramFactoryToBatch::create; stride_hw: {}; per core height {} per_core_width "
         "{}",
@@ -122,8 +122,8 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
     TT_FATAL(
         out_batches <= num_of_shards, "Deinterleave: out_batches {} > num_of_shards {}", out_batches, num_of_shards);
 
-    log_info(tt::LogOp, "Output buffer address {:#x}", output.buffer()->address());
-    log_info(tt::LogOp, "Input buffer address {:#x}", input.buffer()->address());
+    log_debug(tt::LogOp, "Output buffer address {:#x}", output.buffer()->address());
+    log_debug(tt::LogOp, "Input buffer address {:#x}", input.buffer()->address());
 
     using CoreCoord = tt::tt_metal::CoreCoord;
 
@@ -209,7 +209,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
         uint32_t dst_rollover_offset_dm1 =
             (dst_batch % 2 == 0) ? dst_b1_size_bytes : 0;  // div by 2 for two data movement processors
 
-        log_info(
+        log_debug(
             tt::LogOp,
             "DeinterleaveToBatchOperation::ProgramFactoryToBatch::create; core: {} myid {}, start {}-{}, end {}-{}, "
             "dst_batch "
@@ -244,12 +244,12 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
             end.y,
             device_grid.y);
 
-        log_info(
+        log_debug(
             tt::LogOp,
             "src_width_stride {}, src_height_offset_to_next {}",
             src_width_stride,
             src_height_offset_to_next);
-        log_info(
+        log_debug(
             tt::LogOp,
             "dst_batch {}, src_offset_dm0 {}, src_offset_dm1 {}, dst_b1_size_bytes {}, dst_offset_dm0 {}, "
             "dst_offset_dm1 {}",

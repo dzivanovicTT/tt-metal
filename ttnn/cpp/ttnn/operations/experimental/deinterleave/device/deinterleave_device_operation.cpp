@@ -66,7 +66,7 @@ void DeinterleaveToBatchOperation::validate_on_program_cache_hit(
 DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs");
+    log_debug(tt::LogOp, "DeinterleaveLocal::compute_output_specs");
 
     // auto tensor_spec = TensorSpec(
     //     output_shape,
@@ -81,7 +81,7 @@ DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::
     //         input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), output_memory_config, output_shape,
     //         output_padded_shape));
 
-    log_warning(
+    log_debug(
         tt::LogOp,
         "DeinterleaveToBatchOperation::compute_output_specs logical shape: {} padded shape: {}",
         input.get_logical_shape(),
@@ -101,7 +101,7 @@ DeinterleaveToBatchOperation::tensor_return_value_t DeinterleaveToBatchOperation
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
 
-    log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
+    log_debug(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
     return create_device_tensor(spec, tensor_args.input.device());
 }
 
@@ -189,18 +189,18 @@ void DeinterleaveLocalOperation::validate_on_program_cache_hit(
 DeinterleaveLocalOperation::spec_return_value_t DeinterleaveLocalOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs; operation_attributes {}", operation_attributes);
+    log_debug(tt::LogOp, "DeinterleaveLocal::compute_output_specs; operation_attributes {}", operation_attributes);
 
     auto input_shard_shape = input.memory_config().shard_spec().value().shape;
 
-    log_warning(tt::LogOp, "DeinterleaveLocal::compute_output_specs; input.input_shard_shape {}", input_shard_shape);
+    log_debug(tt::LogOp, "DeinterleaveLocal::compute_output_specs; input.input_shard_shape {}", input_shard_shape);
 
     std::array<uint32_t, 2> output_shard_shape = {
         input.memory_config().shard_spec().value().shape[0] / operation_attributes.stride_hw[0] /
             operation_attributes.stride_hw[1],
         input.memory_config().shard_spec().value().shape[1]};
 
-    log_warning(tt::LogOp, "DeinterleaveLocal::output_shard_shape {}", output_shard_shape);
+    log_debug(tt::LogOp, "DeinterleaveLocal::output_shard_shape {}", output_shard_shape);
 
     auto output_shard_spec = tt::tt_metal::ShardSpec(
         input.shard_spec()->grid, output_shard_shape, input.memory_config().shard_spec().value().orientation);
@@ -208,7 +208,7 @@ DeinterleaveLocalOperation::spec_return_value_t DeinterleaveLocalOperation::comp
     auto output_memory_config =
         ttnn::MemoryConfig(input.memory_config().memory_layout(), ttnn::BufferType::L1, output_shard_spec);
 
-    log_warning(tt::LogOp, "DeinterleaveLocal::output_memory_config {}", output_memory_config);
+    log_debug(tt::LogOp, "DeinterleaveLocal::output_memory_config {}", output_memory_config);
 
     TT_FATAL(
         input.get_logical_shape()[0] * input.get_logical_shape()[1] * input.get_logical_shape()[2] ==
@@ -265,7 +265,7 @@ DeinterleaveLocalOperation::tensor_return_value_t DeinterleaveLocalOperation::cr
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
 
-    log_warning(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
+    log_debug(tt::LogOp, "DeinterleaveLocal::create_output_tensors");
     OptionalTensors output;
     for (auto i = 0; i < operation_attributes.stride_hw[0] * operation_attributes.stride_hw[1]; i++) {
         output.push_back(create_device_tensor(spec, tensor_args.input.device()));

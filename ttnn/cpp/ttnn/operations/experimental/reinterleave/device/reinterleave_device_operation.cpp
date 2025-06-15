@@ -59,7 +59,7 @@ void ReinterleaveFromBatchOperation::validate_on_program_cache_hit(
 ReinterleaveFromBatchOperation::spec_return_value_t ReinterleaveFromBatchOperation::compute_output_specs(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     const auto& input = tensor_args.input;
-    log_warning(
+    log_debug(
         tt::LogOp,
         "ReinterleaveFromBatch::compute_output_specs logical_shape: {}: padded_shape: {}",
         input.get_logical_shape(),
@@ -102,7 +102,7 @@ ReinterleaveFromBatchOperation::spec_return_value_t ReinterleaveFromBatchOperati
 ReinterleaveFromBatchOperation::tensor_return_value_t ReinterleaveFromBatchOperation::create_output_tensors(
     const operation_attributes_t& operation_attributes, const tensor_args_t& tensor_args) {
     auto spec = compute_output_specs(operation_attributes, tensor_args);
-    log_warning(tt::LogOp, "ReinterleaveFromBatch::create_output_tensors");
+    log_debug(tt::LogOp, "ReinterleaveFromBatch::create_output_tensors");
     return create_device_tensor(spec, tensor_args.input.device());
 }
 
