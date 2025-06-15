@@ -190,9 +190,9 @@ void kernel_main() {
 
     // loop over for num packets
     for (uint32_t i = 0; i < num_packets; i++) {
-// #ifndef BENCHMARK_MODE
-//         time_seed = 0; // prng_next(time_seed);
-// #endif
+#ifndef BENCHMARK_MODE
+        time_seed = prng_next(time_seed);
+#endif
         if constexpr (mcast_mode) {
             // fwd packet
             send_packet(
