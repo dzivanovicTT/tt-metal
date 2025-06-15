@@ -25,6 +25,9 @@ class Attention(LightweightModule):
         configuration,
         paged_attention_config=None,
         use_paged_kv_cache=False,
+        from_remote_semaphore_handles=None,
+        to_remote_semaphore_handles=None,
+        worker_sub_device_id=None,
     ):
         super().__init__()
 
@@ -50,6 +53,10 @@ class Attention(LightweightModule):
         self.batch_size_per_device_group = (
             max(self.max_batch_size // self.num_device_groups, 1) if self.TG else self.max_batch_size
         )
+
+        self.from_remote_semaphore_handles = from_remote_semaphore_handles
+        self.to_remote_semaphore_handles = to_remote_semaphore_handles
+        self.worker_sub_device_id = worker_sub_device_id
 
         self.n_local_heads = self.n_heads // self.num_devices_per_group
         self.n_local_kv_heads = self.n_kv_heads // self.num_devices_per_group
@@ -381,7 +388,6 @@ class Attention(LightweightModule):
         x: (seq_len, 1, batch, dim)
         current_pos: (batch_size), current token position in the sequence for each user
         """
-
         ###
         # QKV matmuls
         # Use HiFi2 for DRAM-sharded matmuls as they are otherwise flop-bound. Loses 1 bit of activation precision.
@@ -530,6 +536,7 @@ class Attention(LightweightModule):
         ttnn.deallocate(attn_output_1G4D)
 
         if self.use_fused_all_gather_matmul:
+            # TODO: (GR) Not for prefill
             attn_output_cat = ttnn.to_memory_config(
                 attn_output_cat, self.model_config["ATTN_ALL_GATHER_MATMUL_OUTPUT_MEMCFG"]
             )
@@ -812,12 +819,24 @@ class Attention(LightweightModule):
 
         # Non fused All Gather Matmul
         if self.use_fused_all_gather_matmul:  # is true for Ring topology
-            attn_output_11SH = ttnn.all_gather(
+            # assert False, "attention ccl"
+            # TODO: (GR) For Prefill
+            # attn_output_11SH = ttnn.all_gather(
+            #     attn_output_11SH,
+            #     dim=3,
+            #     num_links=1,
+            #     topology=self.ccl_topology,
+            #     memory_config=ttnn.DRAM_MEMORY_CONFIG,
+            # )
+
+            attn_output_11SH = ttnn.experimental.all_gather_async(
                 attn_output_11SH,
                 dim=3,
+                multi_device_global_semaphore=self.from_remote_semaphore_handles,
                 num_links=1,
-                topology=self.ccl_topology,
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                topology=self.ccl_topology,
+                subdevice_id=self.worker_sub_device_id,
             )
 
         output_11SH = ttnn.linear(
@@ -845,6 +864,9 @@ class Attention(LightweightModule):
                 topology=self.ccl_topology,
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
                 dtype=self.ccl_dtype,
+                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
+                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+                worker_sub_device_id=self.worker_sub_device_id,
             )
 
         return output_11SH

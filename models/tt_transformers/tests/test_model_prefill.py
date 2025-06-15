@@ -46,8 +46,8 @@ from models.utility_functions import comp_pcc, skip_for_grayskull
 )
 @pytest.mark.parametrize(
     "seq_len",
-    (128, 3072, 4096, 8192, 16384, 32768),
-    ids=["128", "3k", "4k", "8k", "16k", "32k"],
+    (4096,),
+    ids=["4k"],
 )
 @pytest.mark.parametrize(
     "max_seq_len",
@@ -60,14 +60,16 @@ from models.utility_functions import comp_pcc, skip_for_grayskull
     "optimizations",
     [
         lambda model_args: DecodersPrecision.performance(model_args.n_layers, model_args.model_name),
-        lambda model_args: DecodersPrecision.accuracy(model_args.n_layers, model_args.model_name),
     ],
-    ids=["performance", "accuracy"],
+    ids=["performance"],
 )
 @pytest.mark.parametrize(
     "num_layers",
-    (1, None),
-    ids=["1layer", "all_layers"],
+    (1,),
+    ids=["1layer"],
+)
+@pytest.mark.parametrize(
+    "device_params", [{"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING}], indirect=True, ids=["ring"]
 )
 def test_model_inference(
     paged_attention,

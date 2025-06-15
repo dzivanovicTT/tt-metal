@@ -39,6 +39,25 @@ class Transformer(LightweightModule):
         self.grid_size = self.args.max_grid_size
         state_dict_prefix = args.get_state_dict_prefix("", None)
 
+        self.compute_grid_size = mesh_device.compute_with_storage_grid_size()
+        self.ccl_sub_device_crs = ttnn.CoreRangeSet(
+            {
+                ttnn.CoreRange(
+                    ttnn.CoreCoord(0, 0), ttnn.CoreCoord(self.compute_grid_size.x - 1, self.compute_grid_size.y - 1)
+                )
+            }
+        )
+
+        self.worker_sub_device_id = ttnn.SubDeviceId(0)
+        self.from_remote_semaphore_handles = ttnn.create_global_semaphore(mesh_device, self.ccl_sub_device_crs, 0)
+        self.to_remote_semaphore_handles = ttnn.create_global_semaphore(mesh_device, self.ccl_sub_device_crs, 0)
+
+        self.worker_sub_device = ttnn.SubDevice([self.ccl_sub_device_crs])
+        self.sub_device_stall_group = [self.worker_sub_device_id]
+        self.sub_device_manager = mesh_device.create_sub_device_manager([self.worker_sub_device], 0)
+        self.mesh_device.load_sub_device_manager(self.sub_device_manager)
+        self.mesh_device.set_sub_device_stall_group([self.worker_sub_device_id])
+
         self.embd = Embedding(
             mesh_device=mesh_device,
             args=args,
@@ -69,6 +88,9 @@ class Transformer(LightweightModule):
                 transformation_mats=self.trans_mats_dict,
                 paged_attention_config=paged_attention_config,
                 use_paged_kv_cache=use_paged_kv_cache,
+                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
+                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+                worker_sub_device_id=self.worker_sub_device_id,
             )
             for i in tqdm(range(self.n_layers))
         ]
@@ -86,9 +108,15 @@ class Transformer(LightweightModule):
                 sharded_program_config=self.model_config["SHARDED_NORM_LM_HEAD_PRGM_CFG"],
                 sharded_output_config=self.model_config["LM_HEAD_INPUT_MEMCFG"],
                 ccl_topology=self.args.ccl_topology(),
+                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
+                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+                worker_sub_device_id=self.worker_sub_device_id,
             ),
             args,
             args.is_galaxy,
+            from_remote_semaphore_handles=self.from_remote_semaphore_handles,
+            to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+            worker_sub_device_id=self.worker_sub_device_id,
         )
 
         self.lm_head = LMHead(
@@ -99,6 +127,9 @@ class Transformer(LightweightModule):
             state_dict_prefix=state_dict_prefix,
             weight_cache_path=weight_cache_path,
             max_columns_per_device=self.args.max_columns_per_device_lm_head,
+            from_remote_semaphore_handles=self.from_remote_semaphore_handles,
+            to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+            worker_sub_device_id=self.worker_sub_device_id,
         )
 
     def prepare_inputs_prefill(self, tokens, start_pos=0, page_table=None, chunk_page_table=None):
@@ -328,6 +359,7 @@ class Transformer(LightweightModule):
                     topology=self.args.ccl_topology(),
                 )
             else:
+                # TODO: (GR) Not for prefill
                 tt_logits = ttnn.all_gather(tt_logits, dim=3, num_links=1, topology=self.args.ccl_topology())
         tt_logits = ttnn.untilize(tt_logits, use_multicore=True)
 

@@ -48,6 +48,8 @@ class TtLlamaCrossAttentionTransformerBlock(LightweightModule):
             norm_eps=configuration.norm_eps,
         )
 
+        assert False, "Catch 1"
+
         self.attention_norm = DistributedNorm(
             RMSNorm(
                 device=mesh_device,
