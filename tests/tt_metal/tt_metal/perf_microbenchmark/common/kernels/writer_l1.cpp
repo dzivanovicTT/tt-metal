@@ -51,7 +51,7 @@ void kernel_main() {
         uint32_t curr_receiver_block_num_tiles = curr_block_num_tiles / num_receivers;
 
         uint32_t curr_block_size = curr_receiver_block_num_tiles * curr_page_size;
-        experimental::resize_remote_sender_cb_interface(remote_cb_id, curr_block_size, noc_index);
+        experimental::resize_remote_sender_cb_interface(remote_cb_id, curr_block_size);
 
         for (uint32_t block = 0; block < curr_num_blocks; ++block) {
             cb_wait_front(cb_id, curr_block_num_tiles);

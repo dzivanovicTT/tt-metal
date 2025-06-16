@@ -48,7 +48,7 @@ void kernel_main() {
             uint32_t curr_block_size = curr_block_num_tiles * curr_single_tile_sizes;
             uint32_t curr_block_size_per_receiver = curr_block_size / num_receivers;
 
-            experimental::resize_remote_sender_cb_interface<true>(remote_cb_id, curr_block_size_per_receiver, noc);
+            experimental::resize_remote_sender_cb_interface(remote_cb_id, curr_block_size_per_receiver);
             experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
 
             uint32_t num_pages = 0;

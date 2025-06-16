@@ -101,102 +101,31 @@ FORCE_INLINE void update_pages_acked(
 }  // namespace detail
 
 template <bool update_remote_over_noc = false>
-FORCE_INLINE void resize_remote_sender_cb_interface(
-    uint32_t cb_id,
-    uint32_t page_size,
-    uint8_t noc,
-    uint8_t nm = detail::default_noc_mode,
-    bool posted = true,
-    uint8_t cmd_buf = detail::default_cmd_buf) {
+FORCE_INLINE void resize_remote_sender_cb_interface(uint32_t cb_id, uint32_t page_size) {
     ASSERT(page_size % REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE == 0);
     RemoteSenderCBInterface& sender_cb_interface = get_remote_sender_cb_interface(cb_id);
     uint32_t fifo_size = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(sender_cb_interface.config_ptr)[3];
     uint32_t fifo_start_addr = sender_cb_interface.fifo_start_addr;
     uint32_t fifo_wr_ptr = sender_cb_interface.fifo_wr_ptr;
-    uint32_t cb_size_page_aligned = fifo_size - fifo_size % page_size;
-    uint32_t fifo_limit_page_aligned = fifo_start_addr + cb_size_page_aligned;
+    uint32_t fifo_limit = fifo_start_addr + fifo_size;
+    uint32_t num_pages_to_fifo_limit = (fifo_limit - fifo_wr_ptr) / page_size;
+    uint32_t fifo_limit_page_aligned = fifo_wr_ptr + num_pages_to_fifo_limit * page_size;
 
-    uint32_t next_fifo_wr_ptr = fifo_start_addr + align(fifo_wr_ptr - fifo_start_addr, page_size);
-    if constexpr (update_remote_over_noc) {
-        uint32_t aligned_page_adjustment = 0;
-        if (next_fifo_wr_ptr >= fifo_limit_page_aligned) {
-            aligned_page_adjustment =
-                (fifo_start_addr + fifo_size - fifo_wr_ptr) / REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE;
-            next_fifo_wr_ptr = fifo_start_addr;
-        } else if (next_fifo_wr_ptr != fifo_wr_ptr) {
-            aligned_page_adjustment = (next_fifo_wr_ptr - fifo_wr_ptr) / REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE;
-        }
-        if (aligned_page_adjustment != 0) {
-            if (nm == DM_DYNAMIC_NOC) {
-                detail::update_pages_sent<DM_DYNAMIC_NOC>(
-                    sender_cb_interface, aligned_page_adjustment, noc, posted, cmd_buf);
-            } else {
-                detail::update_pages_sent<DM_DEDICATED_NOC>(
-                    sender_cb_interface, aligned_page_adjustment, noc, posted, cmd_buf);
-            }
-        }
-    } else if (next_fifo_wr_ptr >= fifo_limit_page_aligned) {
-        next_fifo_wr_ptr = fifo_start_addr;
-    }
-    sender_cb_interface.fifo_wr_ptr = next_fifo_wr_ptr;
     sender_cb_interface.fifo_limit_page_aligned = fifo_limit_page_aligned;
     sender_cb_interface.fifo_page_size = page_size;
 }
 
 template <bool update_remote_over_noc = false>
-FORCE_INLINE void resize_remote_receiver_cb_interface(
-    uint32_t cb_id,
-    uint32_t page_size,
-    uint8_t noc,
-    uint8_t nm = detail::default_noc_mode,
-    bool posted = true,
-    uint8_t cmd_buf = detail::default_cmd_buf) {
+FORCE_INLINE void resize_remote_receiver_cb_interface(uint32_t cb_id, uint32_t page_size) {
     ASSERT(page_size % REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE == 0);
     RemoteReceiverCBInterface& receiver_cb_interface = get_remote_receiver_cb_interface(cb_id);
     uint32_t fifo_size = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(receiver_cb_interface.config_ptr)[3];
     uint32_t fifo_start_addr = receiver_cb_interface.fifo_start_addr;
     uint32_t fifo_rd_ptr = receiver_cb_interface.fifo_rd_ptr;
-    uint32_t cb_size_page_aligned = fifo_size - fifo_size % page_size;
-    uint32_t fifo_limit_page_aligned = fifo_start_addr + cb_size_page_aligned;
+    uint32_t fifo_limit = fifo_start_addr + fifo_size;
+    uint32_t num_pages_to_fifo_limit = (fifo_limit - fifo_rd_ptr) / page_size;
+    uint32_t fifo_limit_page_aligned = fifo_rd_ptr + num_pages_to_fifo_limit * page_size;
 
-    uint32_t next_fifo_rd_ptr = fifo_start_addr + align(fifo_rd_ptr - fifo_start_addr, page_size);
-    if constexpr (update_remote_over_noc) {
-        uint32_t aligned_page_adjustment = 0;
-        if (next_fifo_rd_ptr >= fifo_limit_page_aligned) {
-            aligned_page_adjustment =
-                (fifo_start_addr + fifo_size - fifo_rd_ptr) / REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE;
-            next_fifo_rd_ptr = fifo_start_addr;
-        } else if (next_fifo_rd_ptr != fifo_rd_ptr) {
-            aligned_page_adjustment = (next_fifo_rd_ptr - fifo_rd_ptr) / REMOTE_CIRCULAR_BUFFER_ALIGNED_PAGE_SIZE;
-        }
-        if (aligned_page_adjustment != 0) {
-            // wait for sender to send the credits first?
-            uint32_t pages_acked = 0;
-            uint32_t pages_sent = 0;
-            uint32_t num_pages_recv = 0;
-            volatile tt_l1_ptr uint32_t* pages_acked_ptr =
-                reinterpret_cast<volatile tt_l1_ptr uint32_t*>(receiver_cb_interface.aligned_pages_acked_ptr);
-            volatile tt_l1_ptr uint32_t* pages_sent_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(
-                receiver_cb_interface.aligned_pages_acked_ptr - L1_ALIGNMENT);
-            do {
-                invalidate_l1_cache();
-                pages_acked = *pages_acked_ptr;
-                pages_sent = *pages_sent_ptr;
-                num_pages_recv = pages_sent - pages_acked;
-            } while (num_pages_recv < aligned_page_adjustment);
-
-            if (nm == DM_DYNAMIC_NOC) {
-                detail::update_pages_acked<DM_DYNAMIC_NOC>(
-                    receiver_cb_interface, aligned_page_adjustment, noc, posted, cmd_buf);
-            } else {
-                detail::update_pages_acked<DM_DEDICATED_NOC>(
-                    receiver_cb_interface, aligned_page_adjustment, noc, posted, cmd_buf);
-            }
-        }
-    } else if (next_fifo_rd_ptr >= fifo_limit_page_aligned) {
-        next_fifo_rd_ptr = fifo_start_addr;
-    }
-    receiver_cb_interface.fifo_rd_ptr = next_fifo_rd_ptr;
     receiver_cb_interface.fifo_limit_page_aligned = fifo_limit_page_aligned;
     receiver_cb_interface.fifo_page_size = page_size;
 }
@@ -388,7 +317,6 @@ FORCE_INLINE void align_local_cbs_to_remote_cb(
     uint32_t fifo_ptr = remote_cb.fifo_rd_ptr >> cb_addr_shift;
     for (uint32_t i = 0; i < num_local_cbs; i++) {
         LocalCBInterface& local_cb = get_local_cb_interface(local_cb_indices[i]);
-        ASSERT(fifo_size % local_cb.fifo_page_size == 0);
         uint32_t fifo_num_pages = fifo_size / local_cb.fifo_page_size;
         local_cb.fifo_limit = fifo_limit;
         local_cb.fifo_size = fifo_size;
