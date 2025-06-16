@@ -9,8 +9,7 @@
 #include "ttnn/operations/ccl/ccl_host_types.hpp"
 #include "ttnn/distributed/types.hpp"
 
-namespace ttnn {
-namespace ccl {
+namespace tt::tt_fabric {
 
 class EdmLineFabricOpInterface {
 public:
@@ -132,5 +131,4 @@ void initialize_edm_fabric(
 void teardown_edm_fabric(
     distributed::MeshDevice* mesh_device, bool wrap_fabric_around_mesh = false, Topology topology = Topology::Linear);
 
-};  // namespace ccl
-};  // namespace ttnn
+}  // namespace tt::tt_fabric

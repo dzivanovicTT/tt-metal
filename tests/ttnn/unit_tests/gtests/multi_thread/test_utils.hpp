@@ -37,13 +37,13 @@ void setup_test_with_persistent_fabric(
     std::optional<SubdeviceInfo>& subdevice_managers,
     std::optional<std::vector<Program>>& fabric_programs,
     std::vector<Program*>& fabric_program_ptrs,
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface>& line_fabric,
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface>& line_fabric,
     std::optional<size_t> num_links = std::nullopt);
 
 void persistent_fabric_teardown_sequence(
     const std::vector<IDevice*>& devices,
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric,
+    tt::tt_fabric::EdmLineFabricOpInterface& line_fabric,
     tt::tt_fabric::TerminationSignal termination_mode = tt::tt_fabric::TerminationSignal::GRACEFULLY_TERMINATE);
 
 std::tuple<

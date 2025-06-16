@@ -806,7 +806,7 @@ void generate_multi_input_test_worker_kernels_for_local_tensor_write(
 bool RunLocalTestWithMultiInputReaders(
     const std::vector<tt_metal::IDevice*>& devices,
     std::vector<Program>& programs,
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface>& line_fabric,
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface>& line_fabric,
 
     Tensor& input_tensor0,
     Tensor& input_tensor1,
@@ -896,8 +896,9 @@ bool RunLocalTestWithMultiInputReaders(
     const size_t num_pages_per_edm_buffer = 2;
 
     std::optional<tt::tt_fabric::SenderWorkerAdapterSpec> chip0_worker_forward_fabric_connection =
-        fabric_enabled ? line_fabric->uniquely_connect_worker(devices[0], ttnn::ccl::EdmLineFabricOpInterface::FORWARD)
-                       : std::optional<tt::tt_fabric::SenderWorkerAdapterSpec>{std::nullopt};
+        fabric_enabled
+            ? line_fabric->uniquely_connect_worker(devices[0], tt::tt_fabric::EdmLineFabricOpInterface::FORWARD)
+            : std::optional<tt::tt_fabric::SenderWorkerAdapterSpec>{std::nullopt};
 
     std::optional<tt::tt_fabric::SenderWorkerAdapterSpec> chip0_worker_backward_fabric_connection = std::nullopt;
 
@@ -985,7 +986,7 @@ bool RunLineFabricTest(
     bool dest_is_dram,
 
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric) {
+    tt::tt_fabric::EdmLineFabricOpInterface& line_fabric) {
     std::size_t tensor_size_bytes = num_pages_total * page_size;
 
     const std::size_t edm_buffer_size_no_header =
@@ -1060,7 +1061,7 @@ bool RunLineFabricTest(
     log_trace(tt::LogTest, "Worker {}. On Core x={},y={}", 0, worker_core.x, worker_core.y);
 
     auto chip0_worker_fabric_connection =
-        line_fabric.uniquely_connect_worker(devices[0], ttnn::ccl::EdmLineFabricOpInterface::FORWARD);
+        line_fabric.uniquely_connect_worker(devices[0], tt::tt_fabric::EdmLineFabricOpInterface::FORWARD);
 
     const std::size_t pages_per_send = chip0_worker_fabric_connection.buffer_size_bytes / page_size;
     generate_sender_worker_kernels(
@@ -1111,7 +1112,7 @@ bool RunLineFabricTest(
 void persistent_fabric_teardown_sequence(
     const std::vector<IDevice*>& devices,
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric,
+    tt::tt_fabric::EdmLineFabricOpInterface& line_fabric,
     tt::tt_fabric::TerminationSignal termination_mode = tt::tt_fabric::TerminationSignal::GRACEFULLY_TERMINATE) {
     log_info(tt::LogTest, "Tearing down fabric");
 
@@ -1133,7 +1134,7 @@ void setup_test_with_persistent_fabric(
     std::optional<SubdeviceInfo>& subdevice_managers,
     std::optional<std::vector<Program>>& fabric_programs,
     std::vector<Program*>& fabric_program_ptrs,
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface>& line_fabric,
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface>& line_fabric,
     std::optional<size_t> num_links = std::nullopt,
     ttnn::ccl::Topology topology = ttnn::ccl::Topology::Linear,
     size_t switch_interval = 0,
@@ -1151,7 +1152,7 @@ void setup_test_with_persistent_fabric(
             return &p;
         });
 
-    line_fabric = ttnn::ccl::EdmLineFabricOpInterface(
+    line_fabric = tt::tt_fabric::EdmLineFabricOpInterface(
         devices,
         fabric_program_ptrs,
         num_links.value_or(1),
@@ -1214,7 +1215,7 @@ int TestLineFabricEntrypoint(
     std::optional<SubdeviceInfo> subdevice_managers = std::nullopt;
     std::optional<std::vector<Program>> fabric_programs;
     std::vector<Program*> fabric_program_ptrs;
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface> line_fabric;
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface> line_fabric;
     setup_test_with_persistent_fabric(devices, subdevice_managers, fabric_programs, fabric_program_ptrs, line_fabric);
 
     auto launch_workers = [&](std::vector<Program>& _programs) -> bool {
@@ -1447,7 +1448,7 @@ inline bool TestMultiInputReaderKernel(
     std::optional<SubdeviceInfo> subdevice_managers = std::nullopt;
     std::optional<std::vector<Program>> fabric_programs;
     std::vector<Program*> fabric_program_ptrs;
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface> line_fabric;
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface> line_fabric;
     if (test_mode != TwoInputReaderKernelWriteMode::LOCAL_WRITEBACK) {
         setup_test_with_persistent_fabric(
             devices, subdevice_managers, fabric_programs, fabric_program_ptrs, line_fabric);

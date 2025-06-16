@@ -617,7 +617,7 @@ bool RunLineFabricTest(
     bool dest_is_dram,
 
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric) {
+    tt::tt_fabric::EdmLineFabricOpInterface& line_fabric) {
     std::size_t tensor_size_bytes = num_pages_total * page_size;
 
     const std::size_t edm_buffer_size_no_header =
@@ -692,7 +692,7 @@ bool RunLineFabricTest(
     log_trace(tt::LogTest, "Worker {}. On Core x={},y={}", 0, worker_core.x, worker_core.y);
 
     auto chip0_worker_fabric_connection =
-        line_fabric.uniquely_connect_worker(devices[0], ttnn::ccl::EdmLineFabricOpInterface::FORWARD);
+        line_fabric.uniquely_connect_worker(devices[0], tt::tt_fabric::EdmLineFabricOpInterface::FORWARD);
 
     const std::size_t pages_per_send = chip0_worker_fabric_connection.buffer_size_bytes / page_size;
     generate_sender_worker_kernels(
@@ -743,7 +743,7 @@ bool RunLineFabricTest(
 void persistent_fabric_teardown_sequence(
     const std::vector<IDevice*>& devices,
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric,
+    tt::tt_fabric::EdmLineFabricOpInterface& line_fabric,
     tt::tt_fabric::TerminationSignal termination_mode = tt::tt_fabric::TerminationSignal::GRACEFULLY_TERMINATE) {
     log_info(tt::LogTest, "Tearing down fabric");
 
@@ -765,7 +765,7 @@ void setup_test_with_persistent_fabric(
     std::optional<SubdeviceInfo>& subdevice_managers,
     std::optional<std::vector<Program>>& fabric_programs,
     std::vector<Program*>& fabric_program_ptrs,
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface>& line_fabric,
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface>& line_fabric,
     std::optional<size_t> num_links = std::nullopt,
     tt::tt_fabric::Topology topology = tt::tt_fabric::Topology::Linear,
     size_t switch_interval = 0,
@@ -783,7 +783,7 @@ void setup_test_with_persistent_fabric(
             return &p;
         });
 
-    line_fabric = ttnn::ccl::EdmLineFabricOpInterface(
+    line_fabric = tt::tt_fabric::EdmLineFabricOpInterface(
         devices,
         fabric_program_ptrs,
         num_links.value_or(1),
@@ -846,7 +846,7 @@ int TestLineFabricEntrypoint(
     std::optional<SubdeviceInfo> subdevice_managers = std::nullopt;
     std::optional<std::vector<Program>> fabric_programs;
     std::vector<Program*> fabric_program_ptrs;
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface> line_fabric;
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface> line_fabric;
     setup_test_with_persistent_fabric(devices, subdevice_managers, fabric_programs, fabric_program_ptrs, line_fabric);
 
     auto launch_workers = [&](std::vector<Program>& _programs) -> bool {
@@ -1526,7 +1526,7 @@ void Run1DFabricPacketSendTest(
         use_galaxy, use_tg, line_size, topology, view, params.num_fabric_rows, params.num_fabric_cols);
 
     // Persistent Fabric Setup
-    std::optional<ttnn::ccl::EdmLineFabricOpInterface> fabric_handle = std::nullopt;
+    std::optional<tt::tt_fabric::EdmLineFabricOpInterface> fabric_handle = std::nullopt;
     std::optional<SubdeviceInfo> subdevice_managers = std::nullopt;
     std::optional<std::vector<Program>> fabric_programs = std::nullopt;
     if (!use_device_init_fabric) {
@@ -1655,10 +1655,10 @@ void Run1DFabricPacketSendTest(
             const size_t sync_core_noc_x = device->worker_core_from_logical_core(worker_cores_vec[0]).x;
             const size_t sync_core_noc_y = device->worker_core_from_logical_core(worker_cores_vec[0]).y;
 
-            std::optional<ttnn::ccl::EdmLineFabricOpInterface> local_device_fabric_handle = std::nullopt;
+            std::optional<tt::tt_fabric::EdmLineFabricOpInterface> local_device_fabric_handle = std::nullopt;
             if (!use_device_init_fabric) {
                 local_device_fabric_handle =
-                    ttnn::ccl::EdmLineFabricOpInterface::build_program_builder_worker_connection_fabric(
+                    tt::tt_fabric::EdmLineFabricOpInterface::build_program_builder_worker_connection_fabric(
                         device,
                         worker_config.forward_device,
                         worker_config.backward_device,
@@ -1708,7 +1708,7 @@ void Run1DFabricPacketSendTest(
                                              IDevice* connected_device,
                                              // not updated to CCL line direction because this is a metal/fabric level
                                              // test
-                                             ttnn::ccl::EdmLineFabricOpInterface::Direction direction,
+                                             tt::tt_fabric::EdmLineFabricOpInterface::Direction direction,
                                              std::vector<uint32_t>& rt_args_out) {
                 rt_args_out.push_back(is_connected_in_direction);
                 if (is_connected_in_direction) {
@@ -1810,14 +1810,14 @@ void Run1DFabricPacketSendTest(
                     l,
                     worker_config.has_forward_connection,
                     worker_config.forward_device,
-                    ttnn::ccl::EdmLineFabricOpInterface::FORWARD,
+                    tt::tt_fabric::EdmLineFabricOpInterface::FORWARD,
                     rt_args);
                 build_connection_args(
                     worker_core,
                     l,
                     worker_config.has_backward_connection,
                     worker_config.backward_device,
-                    ttnn::ccl::EdmLineFabricOpInterface::BACKWARD,
+                    tt::tt_fabric::EdmLineFabricOpInterface::BACKWARD,
                     rt_args);
 
                 if (params.line_sync) {
@@ -2157,7 +2157,7 @@ void generate_1d_fabric_on_full_mesh_worker_rt_args(
                                      size_t link,
                                      bool is_connected_in_direction,
                                      IDevice* connected_device,
-                                     ttnn::ccl::EdmLineFabricOpInterface::Direction direction,
+                                     tt::tt_fabric::EdmLineFabricOpInterface::Direction direction,
                                      std::vector<uint32_t>& rt_args_out) {
         rt_args_out.push_back(is_connected_in_direction);
         if (is_connected_in_direction) {
@@ -2233,14 +2233,14 @@ void generate_1d_fabric_on_full_mesh_worker_rt_args(
             l,
             worker_config.has_forward_connection,
             worker_config.forward_device,
-            ttnn::ccl::EdmLineFabricOpInterface::FORWARD,
+            tt::tt_fabric::EdmLineFabricOpInterface::FORWARD,
             rt_args);
         build_connection_args(
             worker_core,
             l,
             worker_config.has_backward_connection,
             worker_config.backward_device,
-            ttnn::ccl::EdmLineFabricOpInterface::BACKWARD,
+            tt::tt_fabric::EdmLineFabricOpInterface::BACKWARD,
             rt_args);
 
         if (params.line_sync) {
