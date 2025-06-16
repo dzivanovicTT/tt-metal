@@ -18,13 +18,10 @@ HostBuffer get_host_buffer(const Tensor& tensor) {
         tt::stl::overloaded{
             [](const HostStorage& storage) { return storage.buffer; },
             [](const MultiDeviceHostStorage& storage) {
-                std::vector<HostBuffer> buffers;
-                storage.distributed_buffer().apply([&buffers](const HostBuffer& shard) { buffers.push_back(shard); });
                 TT_FATAL(
-                    buffers.size() == 1,
-                    "Can't get a single buffer from multi device host storage of size: {}",
-                    buffers.size());
-                return buffers.front();
+                    storage.distributed_buffer().shape().mesh_size() == 1,
+                    "Can't get a single buffer from multi device host storage");
+                return *storage.get_shard_at_origin();
             },
             [](const auto&) -> HostBuffer { TT_THROW("Tensor must have HostStorage or MultiDeviceHostStorage"); },
         },

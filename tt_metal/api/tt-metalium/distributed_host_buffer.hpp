@@ -84,12 +84,10 @@ private:
     DistributedHostBuffer(
         distributed::MeshShape global_shape,
         distributed::MeshCoordinate local_offset,
-        distributed::MeshContainer<Shard> local_shards,
-        std::set<distributed::MeshCoordinate> populated_shards) :
+        distributed::MeshContainer<Shard> local_shards) :
         global_shape_(std::move(global_shape)),
         local_offset_(std::move(local_offset)),
-        local_shards_(std::move(local_shards)),
-        populated_shards_(std::move(populated_shards)) {}
+        local_shards_(std::move(local_shards)) {}
 
     distributed::MeshShape global_shape_;
     distributed::MeshCoordinate local_offset_;
