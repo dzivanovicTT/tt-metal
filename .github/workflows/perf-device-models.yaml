@@ -4,12 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       run_cnn_models:
-        description: 'Run all CNN performance tests'
+        description: 'CNNs'
         required: false
         default: true
         type: boolean
       run_other_models:
-        description: 'Run all other model performance tests'
+        description: 'Other'
         required: false
         default: true
         type: boolean
