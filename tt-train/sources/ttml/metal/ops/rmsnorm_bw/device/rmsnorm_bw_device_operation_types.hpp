@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <optional>
-
 #include "metal/ttnn_all_includes.hpp"
 
 namespace ttml::metal::ops::rmsnorm_bw::device {

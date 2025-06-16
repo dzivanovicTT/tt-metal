@@ -57,7 +57,7 @@ autograd::TensorPtr rmsnorm(const autograd::TensorPtr &tensor, const autograd::T
         // std::cerr << "Within Grad RMSNorm backward rms_a" << std::endl;
         // rms_a.print();
 
-        auto grads = ttml::metal::rmsnorm_bw(tensor->get_value(), gamma->get_value(), rms_a, dL_dout, epsilon);
+        auto grads = ttml::metal::rmsnorm_bw(tensor->get_value(), gamma->get_value(), rms_a, dL_dout);
         // std::cerr << "RMSNorm grads done" << std::endl;
 
         // std::cerr << grads[0].has_value() << " " << grads[1].has_value() << std::endl;
