@@ -423,69 +423,74 @@ def dump_running_ops(dev: Device, inspector_data: InspectorData | None):
             launch_msg_rd_ptr = mem_access(brisc_elf, "mailboxes->launch_msg_rd_ptr", loc_mem_reader)[0][0]
 
             # Refer to tt_metal/api/tt-metalium/dev_msgs.h for struct kernel_config_msg_t
-            kernel_config_base = mem_access(
-                brisc_elf,
-                f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.kernel_config_base[{ProgrammableCoreTypes_TENSIX}]",
-                loc_mem_reader,
-            )[0][
-                0
-            ]  # Indexed with enum ProgrammableCoreType - tt_metal/hw/inc/*/core_config.h
-            kernel_text_offset = mem_access(
-                brisc_elf,
-                f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.kernel_text_offset[{proc_type}]",
-                loc_mem_reader,
-            )[0][
-                0
-            ]  # Size 5 (NUM_PROCESSORS_PER_CORE_TYPE) - seems to be DM0,DM1,MATH0,MATH1,MATH2
-            watcher_kernel_id = (
-                mem_access(
+            try:
+                kernel_config_base = mem_access(
                     brisc_elf,
-                    f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.watcher_kernel_ids[{proc_class}]",
+                    f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.kernel_config_base[{ProgrammableCoreTypes_TENSIX}]",
                     loc_mem_reader,
-                )[0][0]
-                & 0xFFFF
-            )  # enum dispatch_core_processor_classes
-            kernel = next((k for k in inspector_data.kernels if k.watcher_kernel_id == watcher_kernel_id), None)
-            kernel_name = kernel.name if kernel else ""
+                )[0][
+                    0
+                ]  # Indexed with enum ProgrammableCoreType - tt_metal/hw/inc/*/core_config.h
+                kernel_text_offset = mem_access(
+                    brisc_elf,
+                    f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.kernel_text_offset[{proc_type}]",
+                    loc_mem_reader,
+                )[0][
+                    0
+                ]  # Size 5 (NUM_PROCESSORS_PER_CORE_TYPE) - seems to be DM0,DM1,MATH0,MATH1,MATH2
+                watcher_kernel_id = (
+                    mem_access(
+                        brisc_elf,
+                        f"mailboxes->launch[{launch_msg_rd_ptr}].kernel_config.watcher_kernel_ids[{proc_class}]",
+                        loc_mem_reader,
+                    )[0][0]
+                    & 0xFFFF
+                )  # enum dispatch_core_processor_classes
+                kernel = next((k for k in inspector_data.kernels if k.watcher_kernel_id == watcher_kernel_id), None)
+                kernel_name = kernel.name if kernel else ""
 
-            cs = []
-            fw_elf_path = a_kernel_path + f"../../../firmware/{proc_name.lower()}/{proc_name.lower()}.elf"
-            fw_elf_path = os.path.realpath(fw_elf_path)
-            kernel_path = ""
+                cs = []
+                fw_elf_path = a_kernel_path + f"../../../firmware/{proc_name.lower()}/{proc_name.lower()}.elf"
+                fw_elf_path = os.path.realpath(fw_elf_path)
+                kernel_path = ""
 
-            if kernel_name:
-                assert kernel is not None, f"Kernel with watcher_kernel_id {watcher_kernel_id} not found."
-                kernel_path = kernel.path + f"/{proc_name.lower()}/{proc_name.lower()}.elf"
-                kernel_path = os.path.realpath(kernel_path)
-                if not os.path.exists(kernel_path):
-                    raiseTTTriageError(f"Kernel ELF file {kernel_path} does not exist.")
+                if kernel_name:
+                    assert kernel is not None, f"Kernel with watcher_kernel_id {watcher_kernel_id} not found."
+                    kernel_path = kernel.path + f"/{proc_name.lower()}/{proc_name.lower()}.elf"
+                    kernel_path = os.path.realpath(kernel_path)
+                    if not os.path.exists(kernel_path):
+                        raiseTTTriageError(f"Kernel ELF file {kernel_path} does not exist.")
 
-                pc = pcs[loc][proc_name.lower() + "_pc"]
-                if VVERBOSE:
-                    print(f".", end="", flush=True)
+                    pc = pcs[loc][proc_name.lower() + "_pc"]
+                    if VVERBOSE:
+                        print(f".", end="", flush=True)
 
-                    if fw_elf_path not in elf_cache:
-                        elf_cache[fw_elf_path] = parse_elf(fw_elf_path, context)
-                    if kernel_path not in elf_cache:
-                        elf_cache[kernel_path] = parse_elf(kernel_path, context)
-                    if proc_name == "NCRISC" and type(dev) == WormholeDevice:
-                        kernel_offset = 0xFFC00000
-                    else:
-                        kernel_offset = kernel_config_base + kernel_text_offset
+                        if fw_elf_path not in elf_cache:
+                            elf_cache[fw_elf_path] = parse_elf(fw_elf_path, context)
+                        if kernel_path not in elf_cache:
+                            elf_cache[kernel_path] = parse_elf(kernel_path, context)
+                        if proc_name == "NCRISC" and type(dev) == WormholeDevice:
+                            kernel_offset = 0xFFC00000
+                        else:
+                            kernel_offset = kernel_config_base + kernel_text_offset
 
-                    cs = top_callstack(
-                        pc, [elf_cache[fw_elf_path], elf_cache[kernel_path]], [None, kernel_offset], context=context
-                    )
-            else:
-                pc = pcs[loc][proc_name.lower() + "_pc"]
-                if VVERBOSE:
-                    print(f".", end="", flush=True)
+                        cs = top_callstack(
+                            pc, [elf_cache[fw_elf_path], elf_cache[kernel_path]], [None, kernel_offset], context=context
+                        )
+                else:
+                    pc = pcs[loc][proc_name.lower() + "_pc"]
+                    if VVERBOSE:
+                        print(f".", end="", flush=True)
 
-                    if fw_elf_path not in elf_cache:
-                        elf_cache[fw_elf_path] = parse_elf(fw_elf_path, context)
+                        if fw_elf_path not in elf_cache:
+                            elf_cache[fw_elf_path] = parse_elf(fw_elf_path, context)
 
-                    cs = top_callstack(pc, elf_cache[fw_elf_path], context=context)
-
+                        cs = top_callstack(pc, elf_cache[fw_elf_path], context=context)
+            except KeyError as e:
+                print(
+                    f"{RED}Error reading kernel config for {loc.to_str('logical')} {proc_name}: {e}{RST}. "
+                    f"Skipping this location."
+                )
             if VVERBOSE:
                 pc = pcs[loc][proc_name.lower() + "_pc"]
                 row = [

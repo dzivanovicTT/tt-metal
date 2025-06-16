@@ -17,6 +17,8 @@ from models.experimental.stable_diffusion_xl_base.tt.model_configs import ModelO
 from models.experimental.stable_diffusion_xl_base.tests.test_common import SDXL_L1_SMALL_SIZE
 import os
 import gc
+import getpass
+import debugpy
 
 
 # Copied from sdxl pipeline
@@ -128,6 +130,8 @@ def run_demo_inference(
     # 0. Set up default height and width for unet
     height = 1024
     width = 1024
+
+    debugpy.listen(("0.0.0.0", 5678))
 
     # 1. Load components
     pipeline = DiffusionPipeline.from_pretrained(
@@ -403,6 +407,16 @@ def run_demo_inference(
     images = []
     logger.info("Starting ttnn inference...")
     for iter in range(len(prompts)):
+        if iter == 265:
+            while True:
+                if debugpy.is_client_connected():  # Only break if attached
+                    debugpy.breakpoint()  # Acts like a regular breakpoint in IDE
+                entered = getpass.getpass("Enter password to continue: ")
+                if entered == "pass":
+                    print("Correct! Continuing execution...")
+                    break
+                else:
+                    print("Incorrect password. Try again.")
         logger.info(f"Running inference for prompt {iter + 1}/{len(prompts)}: {prompts[iter]}")
         for i, t in tqdm(enumerate(ttnn_timesteps), total=len(ttnn_timesteps)):
             unet_outputs = []
