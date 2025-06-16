@@ -6,6 +6,7 @@ import torch.nn as nn
 import ttnn
 
 from models.experimental.stable_diffusion_xl_base.tt.sdxl_utility import prepare_linear_params
+import tracy
 
 
 class TtGEGLU(nn.Module):
@@ -38,12 +39,45 @@ class TtGEGLU(nn.Module):
         )
         ttnn.deallocate(input_tensor)
 
-        hidden_states = ttnn.sharded_to_interleaved(hidden_states, ttnn.L1_MEMORY_CONFIG)
-        gate = hidden_states[:, :, :, hidden_states.shape[3] // 2 :]
-        hidden_states = hidden_states[:, :, :, : hidden_states.shape[3] // 2]
-        gate = ttnn.gelu(gate)
+        # {'output_mem_config': 'MemoryConfig(memory_layout=TensorMemoryLayout::INTERLEAVED;buffer_type=BufferType::L1;shard_spec=std::nullopt;nd_shard_spec=std::nullopt;created_with_nd_shard_spec=0)'; 'slice_end': 'Shape([1; 1; 1024; 10240])'; 'slice_start': 'Shape([0; 0; 0; 5120])'; 'step': 'Shape([1; 1; 1; 1])'}
+
+        print("hidden_states shape pre split:", hidden_states.shape, hidden_states.dtype)
+        hidden_states = ttnn.sharded_to_interleaved(hidden_states, ttnn.DRAM_MEMORY_CONFIG)
+        tracy.signpost("Split op1?")
+
+        shard_shape_2 = (hidden_states.shape[2] // 8, hidden_states.shape[3] // 2 // 8)
+        print("Shard shape 2:", shard_shape_2)
+        mem_cfg_2 = ttnn.create_sharded_memory_config(
+            shard_shape_2,
+            core_grid=ttnn.CoreGrid(y=8, x=8),
+            strategy=ttnn.ShardStrategy.WIDTH if hidden_states.shape[-1] == 1280 else ttnn.ShardStrategy.BLOCK,
+            orientation=ttnn.ShardOrientation.ROW_MAJOR,
+            use_height_and_width_as_shard_shape=True,
+        )
+        gate = ttnn.slice(
+            hidden_states,
+            [0, 0, 0, hidden_states.shape[3] // 2],
+            [hidden_states.shape[0], hidden_states.shape[1], hidden_states.shape[2], hidden_states.shape[3]],
+            # step=[1, 1, 1, 1],
+            memory_config=mem_cfg_2,
+        )
+
+        #        gate = hidden_states[:, :, :, hidden_states.shape[3] // 2 :]
+        print("Gate post split shape:", gate.shape)
+        tracy.signpost("Split op2?")
+
+        hidden_states = ttnn.slice(
+            hidden_states,
+            [0, 0, 0, 0],
+            [hidden_states.shape[0], hidden_states.shape[1], hidden_states.shape[2], hidden_states.shape[3] // 2],
+            # step=[1, 1, 1, 1],
+            memory_config=mem_cfg_2,
+        )
+
+        # hidden_states = hidden_states[:, :, :, : hidden_states.shape[3] // 2]
+        gate = ttnn.gelu(gate, memory_config=mem_cfg_2)
 
         # ttnn.split not working properly
         # hidden_states, gate = ttnn.split(hidden_states, ceil(hidden_states.shape[3] / 2), 3)
 
-        return ttnn.multiply(hidden_states, gate)
+        return ttnn.mul_(hidden_states, gate)

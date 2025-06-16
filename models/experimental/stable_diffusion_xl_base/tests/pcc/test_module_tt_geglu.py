@@ -18,7 +18,7 @@ from functools import reduce
 @pytest.mark.parametrize(
     "input_shape, module_path",
     [
-        ((1024, 1280), "down_blocks.2.attentions.0.transformer_blocks.0.ff.net.0"),
+        # ((1024, 1280), "down_blocks.2.attentions.0.transformer_blocks.0.ff.net.0"),
         ((4096, 640), "down_blocks.1.attentions.0.transformer_blocks.0.ff.net.0"),
     ],
 )

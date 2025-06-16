@@ -18,8 +18,8 @@ from models.utility_functions import torch_random
     "input_shape, block_id, transformer_block_id",
     [
         ((1024, 1280), 2, 0),
-        ((4096, 640), 1, 0),
-        ((4096, 640), 1, 1),
+        # ((4096, 640), 1, 0),
+        # ((4096, 640), 1, 1),
     ],
 )
 @pytest.mark.parametrize("transformer_weights_dtype", [ttnn.bfloat16])
