@@ -553,6 +553,7 @@ void DevicePool::wait_for_fabric_router_sync() const {
                 wait_for_handshake(get_device(tunnels_from_mmio[i][j]));
             }
         }
+
         wait_for_handshake(dev);
     }
 }

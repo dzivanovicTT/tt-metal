@@ -354,7 +354,7 @@ void RunTestLineMcast(
     for (const auto& mesh : user_meshes) {
         auto mesh_shape = control_plane.get_physical_mesh_shape(mesh);
         // Need at least 8 chips for all mcast tests
-        if (mesh_shape.mesh_size() >= 4) {
+        if (mesh_shape.mesh_size() >= 8) {
             system_accomodates_mcast = true;
             break;
         }
@@ -462,7 +462,7 @@ void RunTestLineMcast(
 
     std::vector<uint32_t> sender_runtime_args = {
         worker_mem_map.packet_header_address,
-    worker_mem_map.source_l1_buffer_address,
+        worker_mem_map.source_l1_buffer_address,
         worker_mem_map.packet_payload_size_bytes,
         num_packets,
         receiver_noc_encoding,

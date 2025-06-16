@@ -507,11 +507,9 @@ FORCE_INLINE bool can_forward_packet_completely(
         auto dest_mesh_id = packet_header->dst_start_mesh_id;
         tt_l1_ptr fabric_router_l1_config_t* routing_table =
             reinterpret_cast<tt_l1_ptr fabric_router_l1_config_t*>(eth_l1_mem::address_map::FABRIC_ROUTER_CONFIG_BASE);
-        DPRINT << "Sending packet" << ENDL();
+
         if (dest_mesh_id != routing_table->my_mesh_id) {
-            DPRINT << "Got Dest Mesh ID: " << dest_mesh_id << " " << routing_table->my_mesh_id << " " << dest_chip_id << ENDL();
             uint32_t downstream_channel = routing_table->inter_mesh_table.dest_entry[dest_mesh_id];
-            DPRINT << "Downstream channel: " << downstream_channel << ENDL();
             ASSERT(downstream_channel != INVALID_DIRECTION);
             auto downstream_direction = port_direction_table[downstream_channel];
             return downstream_edm_interface[downstream_direction].edm_has_space_for_packet();
