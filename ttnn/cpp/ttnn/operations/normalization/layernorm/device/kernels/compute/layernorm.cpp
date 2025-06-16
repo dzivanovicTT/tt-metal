@@ -157,10 +157,7 @@ void MAIN {
             tile_regs_acquire();
             cb_wait_front(cb_x, blk);
             for (uint32_t wtr = 0; wtr < blk; wtr++) {
-                // UNPACK(tt::compute::common::print_full_tile(cb_x, wtr, true));
-                // UNPACK(tt::compute::common::print_full_tile(cb_scaler, 0, true));
                 mul_tiles_bcast_scalar(cb_x, cb_scaler, wtr, 0, wtr);
-                // dprint_tensix_dest_reg(wtr);
             }
             cb_pop_front(cb_x, blk);
             tile_regs_commit();
@@ -189,10 +186,7 @@ void MAIN {
                     tile_regs_acquire();
                 }
                 cb_wait_front(cb_ex, 2);
-                // UNPACK(tt::compute::common::print_full_tile(cb_ex, 0, true));
-                // UNPACK(tt::compute::common::print_full_tile(cb_ex, 1, true));
                 add_tiles(cb_ex, cb_ex, 0, 1, dstreg);
-                // dprint_tensix_dest_reg(dstreg);
                 cb_pop_front(cb_ex, 2);
                 // If we have an odd cb_length, we want to add the third tile to the result of the first two
                 if (i == 0 && (cb_length & 1) == 1) {
@@ -230,11 +224,8 @@ void MAIN {
         cb_reserve_back(cb_ex, onetile);
         reduce_init_delta<false>(cb_ex, cb_scaler, cb_spare_sum);
         cb_wait_front(cb_ex, onetile);
-        // UNPACK(tt::compute::common::print_full_tile(cb_ex, 0, true));
-        // UNPACK(tt::compute::common::print_full_tile(cb_scaler, 1, true));
         tile_regs_acquire();
         reduce_tile(cb_ex, cb_scaler, 0, scaler0 + 1, dst0);
-        // dprint_tensix_dest_reg(dst0);
         cb_pop_front(cb_ex, 1);
         tile_regs_commit();
         tile_regs_wait();
@@ -253,7 +244,7 @@ void MAIN {
         }
         cb_wait_front(cb_ex, 1);  // should have 1 tile
         DPRINT << "FIN RED" << ENDL();
-        // UNPACK(tt::compute::common::print_full_tile(cb_ex, 0, true));
+        // NOTES: average Data is good here
         cb_reserve_back(cb_xmm, Wt);
         sub_bcast_cols_init_short(cb_x, cb_ex);
         for (uint32_t wt = 0; wt < Wt; wt += blk) {
@@ -283,7 +274,6 @@ void MAIN {
             ACQ();
             for (uint32_t wtr = 0; wtr < blk; wtr++) {
                 mul_tiles(cb_xmm, cb_xmm, wt + wtr, wt + wtr, wtr);
-                // mul_tiles(cb_xmm, cb_col1, wt+wtr, wt+wtr, wtr);
                 pack_tile(wtr, cb_xmm2);
             }
             cb_push_back(cb_xmm2, blk);
@@ -295,7 +285,7 @@ void MAIN {
         mul_tiles_bcast_scalar_init_short(cb_xmm2, cb_scaler);
         for (uint32_t wt = 0; wt < Wt; wt += blk) {
             tile_regs_acquire();
-            cb_wait_front(cb_xmm, blk);
+            cb_wait_front(cb_xmm2, blk);
             cb_reserve_back(cb_ex2, blk);
             for (uint32_t wtr = 0; wtr < blk; wtr++) {
                 mul_tiles_bcast_scalar(cb_xmm2, cb_scaler, wtr, 0, wtr);
@@ -357,8 +347,6 @@ void MAIN {
                     tile_regs_acquire();
                 }
                 cb_wait_front(cb_ex2, 2);
-                // UNPACK(tt::compute::common::print_full_tile(cb_ex2, 0, true));
-                // UNPACK(tt::compute::common::print_full_tile(cb_ex2, 1, true));
                 add_tiles(cb_ex2, cb_ex2, 0, 1, dstreg);
                 // dprint_tensix_dest_reg(dstreg);
                 cb_pop_front(cb_ex2, 2);
@@ -403,12 +391,12 @@ void MAIN {
         tile_regs_commit();
         tile_regs_wait();
         pack_tile(dst0, cb_spare_sum);
-        reduce_revert_delta(cb_spare_sum);
         cb_pop_front(cb_ex2, 1);
         cb_push_back(cb_spare_sum, 1);
         tile_regs_release();
         std::swap(cb_ex2, cb_spare_sum);
         cb_wait_front(cb_ex2, 1);
+        reduce_revert_delta(cb_spare_sum);
         DPRINT << "VAR: " << ENDL();
         // UNPACK(tt::compute::common::print_full_tile(cb_ex2, 0, true));
 

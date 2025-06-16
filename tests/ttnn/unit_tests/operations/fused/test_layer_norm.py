@@ -21,9 +21,16 @@ def test_layer_norm(device, h, w):
     torch.manual_seed(0)
 
     torch_input_tensor = torch.rand((h, w), dtype=torch.bfloat16)
+
     torch_output_tensor = torch.nn.functional.layer_norm(torch_input_tensor, normalized_shape=[w])
+    torch.set_printoptions(profile="full")
+    print(
+        (torch_input_tensor - torch.mean(torch_input_tensor, dim=-1, keepdim=True))
+        * (torch_input_tensor - torch.mean(torch_input_tensor, dim=-1, keepdim=True))
+    )
 
     input_tensor = ttnn.from_torch(torch_input_tensor, layout=ttnn.TILE_LAYOUT, device=device)
+
     output_tensor = ttnn.layer_norm(input_tensor)
     output_tensor = ttnn.to_layout(output_tensor, ttnn.ROW_MAJOR_LAYOUT)
     output_tensor = ttnn.from_device(output_tensor)
