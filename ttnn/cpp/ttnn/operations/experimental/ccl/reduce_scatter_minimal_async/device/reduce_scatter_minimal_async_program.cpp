@@ -129,15 +129,9 @@ tt::tt_metal::operation::ProgramWithCallbacks reduce_scatter_minimal_async_helpe
     const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
     // Will be reworked
-    uint32_t num_pages_per_packet;
-    uint32_t tile_granularity;
-    if ((batch_slice_num_pages / num_links) % 4 != 0) {
-        num_pages_per_packet = 2;
-        tile_granularity = 2;
-    } else {
-        num_pages_per_packet = 4;
-        tile_granularity = 4;
-    }
+    uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
+    uint32_t tile_granularity = 4 * num_pages_per_packet;
+
     uint32_t cb_num_pages = 3 * tile_granularity;  // double buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
