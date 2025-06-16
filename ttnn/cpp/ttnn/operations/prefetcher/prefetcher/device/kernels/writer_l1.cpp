@@ -49,12 +49,11 @@ void kernel_main() {
             uint32_t curr_block_size_per_receiver = curr_block_size / num_receivers;
 
             experimental::resize_remote_sender_cb_interface(remote_cb_id, curr_block_size_per_receiver);
-            experimental::remote_cb_reserve_back(remote_cb_id, num_blocks);
 
-            uint32_t num_pages = 0;
             for (uint32_t block = 0; block < num_blocks; ++block) {
                 {
                     cb_wait_front(local_cb_id, max_block_num_tiles);
+                    experimental::remote_cb_reserve_back(remote_cb_id, 1);
 
                     uint32_t local_cb_addr = get_read_ptr(local_cb_id);
                     experimental::remote_cb_push_back_and_write_pages<skip_ptr_update>(
