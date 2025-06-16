@@ -240,6 +240,7 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     Tensor& output,
     Pool2DType pool_type,
     uint32_t in_n,
+    uint32_t in_c,
     uint32_t in_h,
     uint32_t in_w,
     uint32_t out_h,
@@ -301,9 +302,6 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
         (!is_partial_tile && !is_large_kernel) ? tt::constants::TILE_HEIGHT : tt::constants::TILE_HEIGHT / 2;
     TT_FATAL(nblocks == 1, "Multiple blocks not yet supported");
 
-    if (input_shape[3] < tt::constants::TILE_WIDTH) {
-        TT_FATAL(input_shape[3] == 16, "Error");
-    }
     const uint32_t out_w_loop_count = std::ceil((float)out_w / nblocks);
 
     // distributing out_hw across the grid
@@ -705,6 +703,7 @@ Pool2D::MultiCore::cached_program_t Pool2D::MultiCore::create(
         sliding_window::move_config_tensor_to_device(reader_indices, parallel_config, is_block_sharded, input.device());
 
     auto in_n = sliding_window_config.batch_size;
+    auto in_c = sliding_window_config.channels;
     auto in_h = sliding_window_config.input_hw.first;
     auto in_w = sliding_window_config.input_hw.second;
     auto kernel_size_h = sliding_window_config.window_hw.first;
@@ -727,6 +726,7 @@ Pool2D::MultiCore::cached_program_t Pool2D::MultiCore::create(
         output_tensor,
         pool_type,
         in_n,
+        in_c,
         in_h,
         in_w,
         out_h,

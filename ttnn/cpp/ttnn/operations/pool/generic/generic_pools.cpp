@@ -4,6 +4,7 @@
 
 #include "generic_pools.hpp"
 
+#include <cstdint>
 #include <optional>
 #include <tt-metalium/buffer_types.hpp>
 #include "ttnn/operations/conv/conv2d/conv2d_utils.hpp"
@@ -42,6 +43,7 @@ static Tensor pool2d_invoke(
     uint32_t dilation_w = dilation.has_value() ? dilation.value().at(1) : 1;
     sliding_window::SlidingWindowConfig sliding_window_config{
         .batch_size = batch_size,
+        .channels = channels,
         .input_hw = {input_h, input_w},
         .window_hw = {kernel_size.at(0), kernel_size.at(1)},
         .stride_hw = {stride.at(0), stride.at(1)},
@@ -51,8 +53,18 @@ static Tensor pool2d_invoke(
         .is_avg_pool = pool_type == Pool2DType::AVG_POOL2D,
     };
     auto output_shape = sliding_window_config.get_output_shape();  // last dim/width is 0
-    auto input_tensor_sharded = input_tensor;
-
+    auto input_shape = sliding_window_config.get_input_shape();
+    auto input_tensor_shape = input_tensor.logical_shape();
+    auto input_padded_shape = ttnn::Shape(
+        {input_tensor_shape[0],
+         input_tensor_shape[1],
+         input_tensor_shape[2],
+         tt::round_up(input_tensor_shape[3], 32)});  // padded to TILE_WIDTH
+    auto input_padded_tensor = input_tensor;
+    // input_padded_tensor = input_padded_tensor.pad(input_tensor_shape, input_padded_shape,
+    // get_bf16_pool_init_value(pool_type));
+    input_padded_tensor = input_padded_tensor.reshape(input_tensor_shape, input_padded_shape);
+    auto input_tensor_sharded = input_padded_tensor;
     // pool output is row major
     bool is_out_tiled = false;
     bool is_in_tiled = input_tensor.dtype() == DataType::BFLOAT8_B;  // input tiled for bfp8_b
@@ -61,6 +73,7 @@ static Tensor pool2d_invoke(
     MemoryConfig out_memory_config = input_tensor_sharded.memory_config();
     uint32_t num_cores_nhw = 0;
     uint32_t num_cores_c = 0;
+    uint32_t channels_padded = input_padded_shape[3];
 
     TensorMemoryLayout shard_layout = TensorMemoryLayout::HEIGHT_SHARDED;  // default to height sharding
     if (!out_memory_config.shard_spec().has_value()) {
@@ -76,10 +89,10 @@ static Tensor pool2d_invoke(
         parallel_config = conv::determine_parallel_config(
             shard_layout,
             batch_size,
-            channels,
+            channels_padded,
             output_shape[1],
             output_shape[2],
-            channels,
+            channels_padded,
             input_tensor.device()->compute_with_storage_grid_size(),
             ShardOrientation::ROW_MAJOR,
             false,
@@ -88,7 +101,7 @@ static Tensor pool2d_invoke(
         num_cores_nhw = conv::get_num_cores_nhw_from_parallel_config(parallel_config);
         num_cores_c = conv::get_num_cores_channels_from_parallel_config(parallel_config);
         auto sharded_mem_config = conv::create_sharded_memory_config_from_parallel_config(
-            input_tensor_sharded.padded_shape(), parallel_config, is_in_tiled ? tt::constants::TILE_HEIGHT : 1);
+            input_padded_shape, parallel_config, is_in_tiled ? tt::constants::TILE_HEIGHT : 1);
         input_tensor_sharded = ttnn::to_memory_config(
             input_tensor_sharded, sharded_mem_config, std::nullopt);  // this converts interleaved to sharded
         out_memory_config = input_tensor_sharded.memory_config();
@@ -113,7 +126,7 @@ static Tensor pool2d_invoke(
         input_tensor.dtype() == DataType::BFLOAT8_B
             ? tt::round_up(channels / num_cores_c, tt::constants::TILE_WIDTH)
             : tt::round_up(
-                  channels / num_cores_c *
+                  channels_padded / num_cores_c *
                       tt::datum_size(tt::tt_metal::datatype_to_dataformat_converter(input_tensor.dtype())),
                   tt::constants::TILE_WIDTH);
     uint32_t output_nhw = output_shape[0] * output_shape[1] * output_shape[2];
@@ -131,6 +144,7 @@ static Tensor pool2d_invoke(
         shard_spec.grid, {output_shard_height_padded, output_shard_width_padded}, ShardOrientation::ROW_MAJOR});
     sliding_window_config = sliding_window::SlidingWindowConfig{
         .batch_size = batch_size,
+        .channels = channels,
         .input_hw = {input_h, input_w},
         .window_hw = {kernel_size.at(0), kernel_size.at(1)},
         .stride_hw = {stride.at(0), stride.at(1)},
@@ -143,6 +157,7 @@ static Tensor pool2d_invoke(
         .ceil_mode = ceil_mode,
         .is_avg_pool = pool_type == Pool2DType::AVG_POOL2D,
     };
+    auto input_nesto = input_tensor.logical_shape();
 
     // Call the halo uop
     auto haloed_tensor = ttnn::halo(
@@ -155,6 +170,7 @@ static Tensor pool2d_invoke(
         input_tensor_sharded.memory_config(),
         is_out_tiled,
         in_place_halo);
+    input_nesto = input_tensor.logical_shape();
 
     auto output_tensor = ttnn::prim::pool2d(
         queue_id,
@@ -165,6 +181,7 @@ static Tensor pool2d_invoke(
         out_memory_config,
         count_include_pad,
         divisor_override);
+    input_nesto = haloed_tensor.logical_shape();
 
     if (memory_config.has_value() && memory_config.value() != out_memory_config) {
         output_tensor = ttnn::to_memory_config(output_tensor, memory_config.value(), std::nullopt);
