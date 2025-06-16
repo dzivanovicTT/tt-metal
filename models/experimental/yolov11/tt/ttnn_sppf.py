@@ -11,7 +11,7 @@ class SPPF:
     def __init__(self, device, parameter, conv_pt):
         self.parameter = parameter
         self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1)
-        self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2)
+        self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2, reshard=True)
 
     def __call__(self, device, x):
         x = self.cv1(device, x)
@@ -53,9 +53,22 @@ class SPPF:
         )
         use_sharded_concat = True
         if use_sharded_concat:
-            y = sharded_concat([x1, m1, m2, m3])
+            y = sharded_concat([x1, m1, m2, m3], to_interleaved=False)
         else:
             y = ttnn.concat([x1, m1, m2, m3], dim=-1, memory_config=ttnn.L1_MEMORY_CONFIG)
+
+        # print(y.memory_config())
+        # shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(7, 0)),ttnn.CoreRange(ttnn.CoreCoord(0, 1), ttnn.CoreCoord(4,1))})
+        # shard_spec = ttnn.ShardSpec(
+        #     shard_grid,(32,512) , ttnn.ShardOrientation.ROW_MAJOR
+        # )
+        # input_mem_config = ttnn.MemoryConfig(
+        #     ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
+        # )
+        # input_mem_config.shard_spec.mode = ttnn.ShardMode.LOGICAL
+        # print("inn",input_mem_config)
+        # x = ttnn.to_memory_config(x,input_mem_config)
+        # x = ttnn.to_layout(x,ttnn.TILE_LAYOUT)
         x = self.cv2(device, y)
 
         deallocate_tensors(x1, m1, m2, m3)

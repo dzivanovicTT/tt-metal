@@ -22,16 +22,16 @@ from models.utility_functions import run_for_wormhole_b0
 @pytest.mark.parametrize(
     "resolution",
     [
-        ([1, 3, 224, 224]),
-        # ([1, 3, 640, 640]),
+        # ([1, 3, 224, 224]),
+        ([1, 3, 640, 640]),
     ],
 )
 @run_for_wormhole_b0()
 @pytest.mark.parametrize(
     "use_weights_from_ultralytics",
     [
-        # True,
-        False
+        True,
+        # False
     ],
 )
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 79104}], indirect=True)
@@ -55,6 +55,9 @@ def test_yolov11(device, use_program_cache, reset_seeds, resolution, use_weights
     ttnn_output = ttnn_model(ttnn_input)
     ttnn_output = ttnn.to_torch(ttnn_output)
     print("final shapesa re", torch_output.shape, ttnn_output.shape)
-    ttnn_output = ttnn_output.reshape(1, 7, 7, 256).permute(0, 3, 1, 2)
+    # if resolution[2]==224:
+    #     ttnn_output = ttnn_output.reshape(1, 7, 7, 256).permute(0, 3, 1, 2)
+    # else:
+    #     ttnn_output = ttnn_output.reshape(1, 20, 20, 256).permute(0, 3, 1, 2)
     # ttnn_output = ttnn_output.reshape(torch_output.shape)
-    assert_with_pcc(torch_output, ttnn_output, 0.99)
+    assert_with_pcc(torch_output, ttnn_output, 1.0)

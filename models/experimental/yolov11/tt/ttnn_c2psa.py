@@ -8,6 +8,13 @@ from models.experimental.yolov11.tt.common import Conv, deallocate_tensors
 from models.experimental.yolov11.tt.ttnn_psa import PSABlock
 
 
+def p(x, a="x"):
+    print(f"{a}'s  shape: {x.shape}")
+    print(f"{a}'s  layout: {x.layout}")
+    print(f"{a}'s  dtype: {x.dtype}")
+    print(f"{a}'s config: {x.memory_config()}")
+
+
 class C2PSA:
     def __init__(self, device, parameter, conv_pt):
         self.out_channel_0 = parameter.cv1.conv.out_channels
@@ -17,8 +24,13 @@ class C2PSA:
 
     def __call__(self, device, x):
         x = self.cv1(device, x)
+        x = ttnn.sharded_to_interleaved(x, ttnn.L1_MEMORY_CONFIG)
+        p(x, "after 1st conv")
         a, b = x[:, :, :, : int(self.out_channel_0 / 2)], x[:, :, :, int(self.out_channel_0 / 2) :]
+        p(a, "a")
+        p(b, "b")
         x = self.psablock(device, b)
+        p(x, "psa out")
         x = ttnn.sharded_to_interleaved(x, memory_config=ttnn.L1_MEMORY_CONFIG)
         x = ttnn.concat((a, x), dim=-1, memory_config=ttnn.L1_MEMORY_CONFIG)
         x = self.cv2(device, x)

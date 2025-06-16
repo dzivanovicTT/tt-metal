@@ -91,6 +91,7 @@ def test_yolo_v11_c3k(
     ttnn_module = ttnn_c3k(device=device, parameter=parameters.conv_args, conv_pt=parameters)
     ttnn_output = ttnn_module(x=ttnn_input, device=device)
     ttnn_output = ttnn.to_torch(ttnn_output)
+    print("outsss", ttnn_output.shape, torch_output.shape)
     ttnn_output = ttnn_output.permute(0, 3, 1, 2)
     ttnn_output = ttnn_output.reshape(torch_output.shape)
     assert_with_pcc(torch_output, ttnn_output, 0.99)

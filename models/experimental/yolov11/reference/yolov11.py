@@ -880,7 +880,6 @@ class YoloV11(nn.Module):
         x6 = x
         x = self.model[7](x)  # 7
         x = self.model[8](x)  # 8
-        return x
         x = self.model[9](x)  # 9
         x = self.model[10](x)  # 10
         x10 = x
@@ -900,6 +899,7 @@ class YoloV11(nn.Module):
         x = torch.cat((x, x10), 1)  # 21
         x = self.model[22](x)  # 22
         x22 = x
+        # return x
         x = self.model[23](x16, x19, x22)  # 23
         return x
 

@@ -22,15 +22,11 @@ class C3k2:
 
         if is_bk_enabled:
             self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1, reshard=reshard)
-            self.cv2 = Conv(
-                device,
-                parameter.cv2,
-                conv_pt.cv2,
-            )
+            self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2, reshard=True)
             self.k = Bottleneck(device, parameter[0], conv_pt.m[0])
         else:
-            self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1)
-            self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2)
+            self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1, reshard=True)
+            self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2, reshard=True)
             self.c3k = C3K(device, parameter[0], conv_pt.m[0])
 
     def __call__(self, device, x):
@@ -42,9 +38,9 @@ class C3k2:
         y1 = x[:, :, :, : x.shape[-1] // 2]
         y2 = x[:, :, :, x.shape[-1] // 2 : x.shape[-1]]
         if self.is_bk_enabled:
-            y2 = ttnn.to_layout(y2, layout=ttnn.TILE_LAYOUT)
+            p(y2, "inputttt")
             y3 = self.k(device, y2)
-            y3 = ttnn.sharded_to_interleaved(y3, ttnn.L1_MEMORY_CONFIG)  # to support concat sharded
+            # y3 = ttnn.sharded_to_interleaved(y3, ttnn.L1_MEMORY_CONFIG)  #
         else:
             y3 = self.c3k(device, y2)
 
@@ -54,9 +50,15 @@ class C3k2:
             y3 = ttnn.to_layout(y3, ttnn.ROW_MAJOR_LAYOUT)
         use_shard_concat = True
         if use_shard_concat:
-            x = sharded_concat([y1, y2, y3])
+            to_interleaved = True if y1.shape[2] == 25600 else False
+            x = sharded_concat([y1, y2, y3], to_interleaved=to_interleaved)
         else:
+            y3 = ttnn.sharded_to_interleaved(y3, ttnn.L1_MEMORY_CONFIG)
             x = ttnn.concat((y1, y2, y3), 3, memory_config=ttnn.L1_MEMORY_CONFIG)
+        # reshard and check if padding happens, if it's the case, slice in interleaved
+
+        p(x, "finallll")
+
         x = self.cv2(device, x)
 
         deallocate_tensors(y1, y2, y3)

@@ -60,10 +60,10 @@ def save_yolo_predictions_by_model(result, save_dir, image_path, model_name):
     "source, model_type,resolution",
     [
         # 224*224
-        ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "torch_model", [3, 224, 224]),
-        ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "tt_model", [3, 224, 224]),
-        ("models/experimental/yolov11/demo/images/dog.jpg", "torch_model", [3, 224, 224]),
-        ("models/experimental/yolov11/demo/images/dog.jpg", "tt_model", [3, 224, 224]),
+        # ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "torch_model", [3, 224, 224]),
+        # ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "tt_model", [3, 224, 224]),
+        # ("models/experimental/yolov11/demo/images/dog.jpg", "torch_model", [3, 224, 224]),
+        # ("models/experimental/yolov11/demo/images/dog.jpg", "tt_model", [3, 224, 224]),
         # # 640*640
         ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "torch_model", [3, 640, 640]),
         ("models/experimental/yolov11/demo/images/cycle_girl.jpg", "tt_model", [3, 640, 640]),

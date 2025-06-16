@@ -55,7 +55,9 @@ class Yolov11_Conv2D:
         shard_layout=ttnn.TensorMemoryLayout.HEIGHT_SHARDED,
         is_detect=False,
         is_dfl=False,
+        memory_configl1=False,
     ):
+        self.memory_configl1 = memory_configl1
         self.is_detect = is_detect
         self.is_dfl = is_dfl
         self.conv = conv
@@ -118,29 +120,58 @@ class Yolov11_Conv2D:
         kernel_size = [self.kernel_size[0], self.kernel_size[1]]
         stride = [self.stride[0], self.stride[1]]
         padding = [self.padding[0], self.padding[1]]
-        [x, [output_height, output_width], [self.weight, self.bias]] = ttnn.conv2d(
-            input_tensor=x,
-            weight_tensor=self.weight,
-            bias_tensor=self.bias,
-            device=self.device,
-            in_channels=self.in_channels,
-            out_channels=self.out_channels,
-            input_height=input_height,
-            input_width=input_width,
-            batch_size=batch_size,
-            kernel_size=kernel_size,
-            stride=stride,
-            padding=padding,
-            conv_config=self.conv_config,
-            groups=self.groups,
-            compute_config=self.compute_config,
-            return_output_dim=True,
-            return_weights_and_bias=True,
-        )
+        if self.memory_configl1:
+            [x, [output_height, output_width], [self.weight, self.bias]] = ttnn.conv2d(
+                input_tensor=x,
+                weight_tensor=self.weight,
+                bias_tensor=self.bias,
+                device=self.device,
+                in_channels=self.in_channels,
+                out_channels=self.out_channels,
+                input_height=input_height,
+                input_width=input_width,
+                batch_size=batch_size,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding,
+                conv_config=self.conv_config,
+                groups=self.groups,
+                compute_config=self.compute_config,
+                return_output_dim=True,
+                return_weights_and_bias=True,
+                memory_config=ttnn.L1_MEMORY_CONFIG,
+            )
+        else:
+            [x, [output_height, output_width], [self.weight, self.bias]] = ttnn.conv2d(
+                input_tensor=x,
+                weight_tensor=self.weight,
+                bias_tensor=self.bias,
+                device=self.device,
+                in_channels=self.in_channels,
+                out_channels=self.out_channels,
+                input_height=input_height,
+                input_width=input_width,
+                batch_size=batch_size,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding,
+                conv_config=self.conv_config,
+                groups=self.groups,
+                compute_config=self.compute_config,
+                return_output_dim=True,
+                return_weights_and_bias=True,
+            )
+            hw = output_height * output_width
+            if x.shape[2] != hw:
+                print("slicing output")
+                x = ttnn.sharded_to_interleaved(x, ttnn.L1_MEMORY_CONFIG)
+                x = x[:, :, :hw, :]
         return x
 
 
-def sharded_concat(input_tensors, num_cores=64, dim=3):  # expected input tensors to be in fp16, RM, same (h*w)
+def sharded_concat(
+    input_tensors, num_cores=64, dim=3, to_interleaved=True
+):  # expected input tensors to be in fp16, RM, same (h*w)
     shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(7, 7))})
     in_shard_width = input_tensors[0].shape[-1]
     shard_height = (input_tensors[0].shape[2] + num_cores - 1) // num_cores
@@ -161,7 +192,8 @@ def sharded_concat(input_tensors, num_cores=64, dim=3):  # expected input tensor
         use_height_and_width_as_shard_shape=True,
     )
     output = ttnn.concat(input_tensors, dim, memory_config=output_sharded_memory_config)
-    output = ttnn.sharded_to_interleaved(output, memory_config=ttnn.L1_MEMORY_CONFIG)
+    if to_interleaved:
+        output = ttnn.sharded_to_interleaved(output, memory_config=ttnn.L1_MEMORY_CONFIG)
 
     return output
 
