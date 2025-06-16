@@ -384,6 +384,10 @@ operation::ProgramWithCallbacks layernorm_multi_core(
             CircularBufferConfig(im1_t * single_tile_size, {{tt::CBIndex::c_18, cb_data_format}})
                 .set_page_size(tt::CBIndex::c_18, single_tile_size);
         CreateCircularBuffer(program, all_cores, cb_intermed1_config);
+        CircularBufferConfig cb_spare_sum_config =
+            CircularBufferConfig((im1_t)*single_tile_size, {{tt::CBIndex::c_25, cb_data_format}})
+                .set_page_size(tt::CBIndex::c_25, single_tile_size);
+        CreateCircularBuffer(program, all_cores, cb_spare_sum_config);
     }
     CircularBufferConfig cb_in2_config =
         CircularBufferConfig(in2_t * bfloat16_tile_size, {{tt::CBIndex::c_2, tt::DataFormat::Float16_b}})

@@ -57,8 +57,9 @@ void MAIN {
 #else
     constexpr uint32_t cb_xmm = tt::CBIndex::c_24;  // x minus mean
 #endif
-    constexpr auto cb_ex = tt::CBIndex::c_18;      // E[x]
-    constexpr auto cb_ex2 = tt::CBIndex::c_19;     // E[(x-E[x])^2]
+    auto cb_ex = tt::CBIndex::c_18;                // E[x]
+    auto cb_ex2 = tt::CBIndex::c_19;               // E[(x-E[x])^2]
+    auto cb_spare_sum = tt::CBIndex::c_25;         // E[(x-E[x])^2]
     constexpr auto cb_xmm2 = tt::CBIndex::c_20;    // xmm^2
     constexpr auto cb_ex2pe = tt::CBIndex::c_21;   // E[(x-E[x])^2]+eps
     constexpr auto cb_fusion = tt::CBIndex::c_22;  // stream gamma/beta
@@ -172,11 +173,10 @@ void MAIN {
             tile_regs_release();
         }
 
-        DPRINT << "----------------Now Reduce---------" << ENDL();
+        DPRINT << "RED" << ENDL();
         reconfig_data_format(cb_ex, cb_ex);
-        pack_reconfig_data_format(cb_ex);
+        // pack_reconfig_data_format(cb_spare_sum);
         // 4 dst regs if FP32 and 8 is BFLOAT 16
-        add_tiles_init(cb_ex, cb_ex);
         uint32_t cb_reduce_input = cb_x;
         uint32_t cb_length = Wt;
         constexpr uint32_t num_dst_regs = FLOAT32_DTYPE ? 4 : 8;
@@ -184,6 +184,7 @@ void MAIN {
             uint32_t dstreg = 0;
             for (uint32_t i = 0; i < cb_length; i += 2) {
                 // We acquire dst regs only if we are processing new block
+                add_tiles_init(cb_ex, cb_ex);
                 if (dstreg == 0) {
                     tile_regs_acquire();
                 }
@@ -199,18 +200,18 @@ void MAIN {
                     binary_dest_reuse_tiles_init<ELWADD, EltwiseBinaryReuseDestType::DEST_TO_SRCB>(cb_ex);
                     binary_dest_reuse_tiles<ELWADD, EltwiseBinaryReuseDestType::DEST_TO_SRCB>(cb_ex, 0, dst0);
                     cb_pop_front(cb_ex, 1);
-                    add_tiles_init(cb_ex, cb_ex);
                     // We decriment here since we no longer have an odd tile, it just is added to dst0
                     cb_length--;
                 }
                 // We commit our registers either when we are finished or we are about to run out of dst registers
                 if (dstreg == num_dst_regs - 1 || i + 2 == cb_length) {
+                    cb_reserve_back(cb_spare_sum, dstreg + 1);
                     tile_regs_wait();
                     tile_regs_commit();
                     for (uint32_t dst = 0; dst < dstreg + 1; dst++) {
-                        pack_tile(dst, cb_ex);
+                        pack_tile(dst, cb_spare_sum);
                     }
-                    cb_push_back(cb_ex, dstreg + 1);
+                    cb_push_back(cb_spare_sum, dstreg + 1);
                     tile_regs_release();
                     dstreg = 0;
                 }
@@ -221,23 +222,26 @@ void MAIN {
             }
             // We are okay with floor divide since we subtracted one if cb_length is odd
             cb_length = cb_length / 2;
+            std::swap(cb_ex, cb_spare_sum);
         }
         // TODO change this to a cb
         reconfig_data_format(cb_ex, cb_scaler);
-        pack_reconfig_data_format(cb_ex);
+        pack_reconfig_data_format(cb_spare_sum);
         cb_reserve_back(cb_ex, onetile);
-        reduce_init_delta<false>(cb_ex, cb_scaler, cb_ex);
+        reduce_init_delta<false>(cb_ex, cb_scaler, cb_spare_sum);
         cb_wait_front(cb_ex, onetile);
         // UNPACK(tt::compute::common::print_full_tile(cb_ex, 0, true));
         // UNPACK(tt::compute::common::print_full_tile(cb_scaler, 1, true));
         tile_regs_acquire();
         reduce_tile(cb_ex, cb_scaler, 0, scaler0 + 1, dst0);
+        // dprint_tensix_dest_reg(dst0);
         cb_pop_front(cb_ex, 1);
         tile_regs_commit();
         tile_regs_wait();
-        pack_tile(dst0, cb_ex);
-        reduce_revert_delta(cb_ex);
-        cb_push_back(cb_ex, 1);
+        pack_tile(dst0, cb_spare_sum);
+        reduce_revert_delta(cb_spare_sum);
+        cb_push_back(cb_spare_sum, 1);
+        std::swap(cb_ex, cb_spare_sum);
         tile_regs_release();
 
         /*
@@ -248,7 +252,7 @@ void MAIN {
             reconfig_data_format(cb_x, cb_ex);
         }
         cb_wait_front(cb_ex, 1);  // should have 1 tile
-        DPRINT << "----------------FINAL Reduce---------" << ENDL();
+        DPRINT << "FIN RED" << ENDL();
         // UNPACK(tt::compute::common::print_full_tile(cb_ex, 0, true));
         cb_reserve_back(cb_xmm, Wt);
         sub_bcast_cols_init_short(cb_x, cb_ex);
@@ -287,21 +291,19 @@ void MAIN {
         }
 
         reconfig_data_format(cb_xmm2, cb_scaler);
-        pack_reconfig_data_format(cb_ex2);
+        // pack_reconfig_data_format(cb_ex2);
         mul_tiles_bcast_scalar_init_short(cb_xmm2, cb_scaler);
         for (uint32_t wt = 0; wt < Wt; wt += blk) {
             tile_regs_acquire();
             cb_wait_front(cb_xmm, blk);
+            cb_reserve_back(cb_ex2, blk);
             for (uint32_t wtr = 0; wtr < blk; wtr++) {
-                // UNPACK(tt::compute::common::print_full_tile(cb_xmm2, wtr, true));
-                // UNPACK(tt::compute::common::print_full_tile(cb_scaler, 0, true));
                 mul_tiles_bcast_scalar(cb_xmm2, cb_scaler, wtr, 0, wtr);
-                // dprint_tensix_dest_reg(wtr);
+                dprint_tensix_dest_reg(wtr);
             }
             cb_pop_front(cb_xmm2, blk);
             tile_regs_commit();
             tile_regs_wait();
-            cb_reserve_back(cb_ex2, blk);
             for (uint32_t wtr = 0; wtr < blk; wtr++) {
                 pack_tile(wtr, cb_ex2);
             }
@@ -340,17 +342,17 @@ void MAIN {
         //   If its not const, it will change
         // We first reduce input from cb_x, then store the intermediates in cb_ex
 
-        DPRINT << "----------------Now Reduce---------" << ENDL();
+        DPRINT << "Red" << ENDL();
         reconfig_data_format(cb_ex2, cb_ex2);
-        pack_reconfig_data_format(cb_ex2);
+        // pack_reconfig_data_format(cb_spare_sum);
         // 4 dst regs if FP32 and 8 is BFLOAT 16
-        add_tiles_init(cb_ex2, cb_ex2);
         cb_length = Wt;
         // constexpr uint32_t num_dst_regs = FLOAT32_DTYPE ? 4 : 8;
         while (cb_length > 1) {
             uint32_t dstreg = 0;
             for (uint32_t i = 0; i < cb_length; i += 2) {
                 // We acquire dst regs only if we are processing new block
+                add_tiles_init(cb_ex2, cb_ex2);
                 if (dstreg == 0) {
                     tile_regs_acquire();
                 }
@@ -366,18 +368,18 @@ void MAIN {
                     binary_dest_reuse_tiles_init<ELWADD, EltwiseBinaryReuseDestType::DEST_TO_SRCB>(cb_ex2);
                     binary_dest_reuse_tiles<ELWADD, EltwiseBinaryReuseDestType::DEST_TO_SRCB>(cb_ex2, 0, dst0);
                     cb_pop_front(cb_ex2, 1);
-                    add_tiles_init(cb_ex, cb_ex2);
                     // We decriment here since we no longer have an odd tile, it just is added to dst0
                     cb_length--;
                 }
                 // We commit our registers either when we are finished or we are about to run out of dst registers
                 if (dstreg == num_dst_regs - 1 || i + 2 == cb_length) {
+                    cb_reserve_back(cb_spare_sum, dstreg + 1);
                     tile_regs_wait();
                     tile_regs_commit();
                     for (uint32_t dst = 0; dst < dstreg + 1; dst++) {
-                        pack_tile(dst, cb_ex2);
+                        pack_tile(dst, cb_spare_sum);
                     }
-                    cb_push_back(cb_ex2, dstreg + 1);
+                    cb_push_back(cb_spare_sum, dstreg + 1);
                     tile_regs_release();
                     dstreg = 0;
                 }
@@ -388,22 +390,27 @@ void MAIN {
             }
             // We are okay with floor divide since we subtracted one if cb_length is odd
             cb_length = cb_length / 2;
+            std::swap(cb_ex2, cb_spare_sum);
         }
         // TODO change this to a cb
         reconfig_data_format(cb_ex2, cb_scaler);
-        cb_reserve_back(cb_ex2, onetile);
+        cb_reserve_back(cb_spare_sum, onetile);
         cb_wait_front(cb_ex2, onetile);
-        reduce_init_delta<false>(cb_ex2, cb_scaler, cb_ex2);
+        // UNPACK(tt::compute::common::print_full_tile(cb_ex2, 0, true));
+        reduce_init_delta<false>(cb_ex2, cb_scaler, cb_spare_sum);
         tile_regs_acquire();
         reduce_tile(cb_ex2, cb_scaler, 0, scaler0 + 1, dst0);
         tile_regs_commit();
         tile_regs_wait();
-        pack_tile(dst0, cb_ex2);
-        reduce_revert_delta(cb_ex2);
+        pack_tile(dst0, cb_spare_sum);
+        reduce_revert_delta(cb_spare_sum);
         cb_pop_front(cb_ex2, 1);
-        cb_push_back(cb_ex2, 1);
+        cb_push_back(cb_spare_sum, 1);
         tile_regs_release();
+        std::swap(cb_ex2, cb_spare_sum);
         cb_wait_front(cb_ex2, 1);
+        DPRINT << "VAR: " << ENDL();
+        // UNPACK(tt::compute::common::print_full_tile(cb_ex2, 0, true));
 
         // end
         if constexpr (FLOAT32_DTYPE) {
