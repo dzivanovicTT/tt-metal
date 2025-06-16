@@ -14,7 +14,7 @@
 #include "ttnn/operations/ccl/ccl_common.hpp"
 #include "ttnn/operations/ccl/ccl_op_fusion.hpp"
 #include <tt-metalium/global_semaphore.hpp>
-#include "cpp/ttnn/global_semaphore.hpp"
+#include "ttnn/global_semaphore.hpp"
 
 #include "ttnn/run_operation.hpp"
 
@@ -111,7 +111,6 @@ struct AllReduceCreateQkvHeads {
 std::tuple<CoreRangeSet, std::vector<CoreCoord>> choose_worker_cores_fuse(
     size_t num_links,
     size_t num_workers_per_link,
-    bool persistent_fabric_mode,
     IDevice* device,
     const std::optional<tt::tt_metal::SubDeviceId>& sub_device_id,
     const std::optional<CoreRangeSet>& reserved_core_range = std::nullopt);

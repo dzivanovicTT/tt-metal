@@ -15,7 +15,17 @@ from models.experimental.stable_diffusion_xl_base.tt.sdxl_utility import (
 
 
 class TtTransformer2DModel(nn.Module):
-    def __init__(self, device, state_dict, module_path, query_dim, num_attn_heads, out_dim):
+    def __init__(
+        self,
+        device,
+        state_dict,
+        module_path,
+        model_config,
+        query_dim,
+        num_attn_heads,
+        out_dim,
+        weights_dtype=ttnn.bfloat16,
+    ):
         super().__init__()
 
         self.device = device
@@ -32,7 +42,14 @@ class TtTransformer2DModel(nn.Module):
         for i in range(self.num_layers):
             self.transformer_blocks.append(
                 TtBasicTransformerBlock(
-                    device, state_dict, f"{module_path}.transformer_blocks.{i}", query_dim, num_attn_heads, out_dim
+                    device,
+                    state_dict,
+                    f"{module_path}.transformer_blocks.{i}",
+                    model_config,
+                    query_dim,
+                    num_attn_heads,
+                    out_dim,
+                    weights_dtype=weights_dtype,
                 )
             )
 
@@ -43,11 +60,16 @@ class TtTransformer2DModel(nn.Module):
 
         weights = state_dict[f"{module_path}.proj_in.weight"].unsqueeze(0).unsqueeze(0)
         bias = state_dict[f"{module_path}.proj_in.bias"]
-        self.tt_weights_in, self.tt_bias_in = prepare_linear_params(device, weights, bias, ttnn.bfloat8_b)
+        self.tt_weights_in, self.tt_bias_in = prepare_linear_params(device, weights, bias, weights_dtype)
 
         weights = state_dict[f"{module_path}.proj_out.weight"].unsqueeze(0).unsqueeze(0)
         bias = state_dict[f"{module_path}.proj_out.bias"]
-        self.tt_weights_out, self.tt_bias_out = prepare_linear_params(device, weights, bias, ttnn.bfloat8_b)
+        self.tt_weights_out, self.tt_bias_out = prepare_linear_params(device, weights, bias, weights_dtype)
+
+        self.program_config_in = model_config.get_matmul_config(matmul_path=f"{module_path}.proj_in")
+        self.compute_config_in = model_config.get_mm_compute_config(f"{module_path}.proj_in")
+        self.program_config_out = model_config.get_matmul_config(matmul_path=f"{module_path}.proj_out")
+        self.compute_config_out = model_config.get_mm_compute_config(f"{module_path}.proj_out")
 
     def forward(self, input_tensor, input_shape, attention_mask=None, encoder_hidden_states=None):
         B, C, H, W = input_shape
@@ -80,6 +102,8 @@ class TtTransformer2DModel(nn.Module):
             hidden_states,
             self.tt_weights_in,
             bias=self.tt_bias_in,
+            program_config=self.program_config_in,
+            compute_kernel_config=self.compute_config_in,
         )
 
         for i, transformer_block in enumerate(self.transformer_blocks):
@@ -89,6 +113,8 @@ class TtTransformer2DModel(nn.Module):
             hidden_states,
             self.tt_weights_out,
             bias=self.tt_bias_out,
+            program_config=self.program_config_out,
+            compute_kernel_config=self.compute_config_out,
         )
 
         hidden_states = ttnn.add(hidden_states, input_tensor)

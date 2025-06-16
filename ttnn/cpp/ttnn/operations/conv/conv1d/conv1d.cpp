@@ -13,14 +13,13 @@
 
 #include <tt-metalium/buffer_types.hpp>
 
-#include "tt-metalium/logger.hpp"
+#include <tt-logger/tt-logger.hpp>
 #include "ttnn/operations/conv/conv2d/conv2d.hpp"
 #include "ttnn/tensor/tensor.hpp"
 #include "ttnn/tensor/types.hpp"
 
 #include "ttnn/operations/core/compute_kernel/compute_kernel_config.hpp"
 #include "ttnn/operations/conv/conv1d/conv1d.hpp"
-#include "ttnn/operations/conv/conv.hpp"
 #include "ttnn/operations/conv/conv2d/device/conv2d_op.hpp"
 #include "ttnn/operations/matmul/matmul.hpp"
 #include "ttnn/operations/sliding_window/halo/halo.hpp"
@@ -59,7 +58,7 @@ Result conv1d(
     bool return_weights_and_bias) {
     // reshape input tensor to 4D, if it is not already
     const ttnn::Tensor& input_tensor_4d =
-        (input_tensor.get_logical_shape().rank() < 4)
+        (input_tensor.logical_shape().rank() < 4)
             ? ttnn::reshape(input_tensor, Shape({batch_size, input_length, 1, in_channels}))
             : input_tensor;
 
@@ -79,7 +78,7 @@ Result conv1d(
     };
 
     auto [output_tensor, output_dimensions, weights_and_bias] =
-        std::get<ResultType::OUTPUT_DIM_WEIGHTS_AND_BIAS>(ttnn::conv2d(
+        std::get<static_cast<int>(ResultType::OUTPUT_DIM_WEIGHTS_AND_BIAS)>(ttnn::conv2d(
             queue_id,
             input_tensor_4d,
             weight_tensor,

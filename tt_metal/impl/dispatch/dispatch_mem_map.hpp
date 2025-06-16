@@ -5,11 +5,11 @@
 #pragma once
 
 #include <stdint.h>
-#include <tt-metalium/command_queue_common.hpp>
 #include <utility>
 #include <vector>
 
 #include <umd/device/tt_core_coordinates.h>
+#include "command_queue_common.hpp"
 #include "dispatch_settings.hpp"
 
 namespace tt {
@@ -48,6 +48,8 @@ public:
 
     uint32_t scratch_db_size() const;
 
+    uint32_t ringbuffer_size() const;
+
     uint32_t dispatch_buffer_block_size_pages() const;
 
     uint32_t dispatch_buffer_base() const;
@@ -78,6 +80,8 @@ public:
 
     // Offset to be passed in the go message.
     uint8_t get_dispatch_message_update_offset(uint32_t index) const;
+
+    uint32_t get_prefetcher_l1_size() const;
 
 private:
     // Reset the instance using the settings for the core_type and num_hw_cqs.

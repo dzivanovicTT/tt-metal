@@ -8,7 +8,7 @@
 #include <tt-metalium/allocator.hpp>
 #include <tt-metalium/device.hpp>
 #include <tt-metalium/host_api.hpp>
-#include <tt-metalium/logger.hpp>
+#include <tt-logger/tt-logger.hpp>
 #include <tt-metalium/tt_metal.hpp>
 #include <algorithm>
 #include <map>
@@ -25,7 +25,6 @@
 #include <tt-metalium/kernel_types.hpp>
 #include <tt-metalium/program.hpp>
 #include <tt_stl/span.hpp>
-#include <tt-metalium/system_memory_manager.hpp>
 
 namespace tt {
 namespace tt_metal {

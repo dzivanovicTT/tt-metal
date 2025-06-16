@@ -36,7 +36,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     Tensor& v_output_tensor = output_tensors[3];
 
     auto mesh_device = input_tensor.mesh_device();
-    const bool enable_persistent_fabric_mode = true;
     // For qkv heads fuse
 
     tt::DataFormat cb_data_format = tt::tt_metal::datatype_to_dataformat_converter(dtype);
@@ -69,10 +68,9 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
 
     //  Create CBs for reader/writer for batch_offset
     uint32_t batch_offset_cb_index_reader = tt::CBIndex::c_15;
-    tt::tt_metal::CBHandle cb_batch_offset_reader = 0;
 
     tt::DataFormat cb_batch_offset_data_format =
-        tt::tt_metal::datatype_to_dataformat_converter(batch_offset_tensor.get_dtype());
+        tt::tt_metal::datatype_to_dataformat_converter(batch_offset_tensor.dtype());
     uint32_t single_batch_offset_tile_size = tt::tt_metal::detail::TileSize(cb_batch_offset_data_format);
     batch_offset_index_stick_size = batch_offset_tensor.buffer()->aligned_page_size();
 
@@ -80,8 +78,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
         tt::tt_metal::CircularBufferConfig(
             single_batch_offset_tile_size, {{batch_offset_cb_index_reader, cb_batch_offset_data_format}})
             .set_page_size(batch_offset_cb_index_reader, 1);
-    cb_batch_offset_reader = tt::tt_metal::CreateCircularBuffer(
-        program, output_tensor.memory_config().shard_spec->grid, cb_batch_offset_config_reader);
+    tt::tt_metal::CreateCircularBuffer(
+        program, output_tensor.memory_config().shard_spec()->grid, cb_batch_offset_config_reader);
 
     uint32_t q_base_addr = q_output_tensor.buffer()->address();
     uint32_t k_base_addr = k_output_tensor.buffer()->address();
@@ -157,10 +155,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     size_t num_targets_backward = 0;
     if (topology == ccl::Topology::Linear) {
         LineTopology line_topology(ring_size, ring_index);
-        num_targets_forward =
-            line_topology.get_distance_to_end_of_line(ttnn::ccl::EdmLineFabricOpInterface::Direction::FORWARD);
-        num_targets_backward =
-            line_topology.get_distance_to_end_of_line(ttnn::ccl::EdmLineFabricOpInterface::Direction::BACKWARD);
+        num_targets_forward = line_topology.get_distance_to_end_of_line(ttnn::ccl::LineDirection::FORWARD);
+        num_targets_backward = line_topology.get_distance_to_end_of_line(ttnn::ccl::LineDirection::BACKWARD);
     } else if (topology == ccl::Topology::Ring) {
         // TODO: Commonize
         num_targets_forward = tt::div_up(ring_size - 1, 2);
@@ -171,14 +167,14 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     }
     // Tensor Info
     const auto input_tensor_num_pages = input_tensor.buffer()->num_pages();
-    const auto input_tensor_cores = input_tensor.memory_config().shard_spec->grid;
-    const auto input_tensor_shard_shape = input_tensor.memory_config().shard_spec->shape;
+    const auto input_tensor_cores = input_tensor.memory_config().shard_spec()->grid;
+    const auto input_tensor_shard_shape = input_tensor.memory_config().shard_spec()->shape;
     const auto input_tensor_shard_num_pages =
         input_tensor_shard_shape[0] * input_tensor_shard_shape[1] / tt::constants::TILE_HW;
     const auto num_input_cores = input_tensor_cores.num_cores();
     const auto output_tensor_num_pages = output_tensor.buffer()->num_pages();
-    const auto output_tensor_cores = output_tensor.memory_config().shard_spec->grid;
-    const auto output_tensor_shard_shape = output_tensor.memory_config().shard_spec->shape;
+    const auto output_tensor_cores = output_tensor.memory_config().shard_spec()->grid;
+    const auto output_tensor_shard_shape = output_tensor.memory_config().shard_spec()->shape;
     const auto output_tensor_shard_num_pages =
         output_tensor_shard_shape[0] * output_tensor_shard_shape[1] / tt::constants::TILE_HW;
     const auto num_output_cores = output_tensor_cores.num_cores();
@@ -186,24 +182,24 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     // Get worker cores, assuming 1 worker per link
     std::optional<CoreRangeSet> reserved_cores = output_tensor_cores;
     uint32_t num_workers_per_link = 1;
-    const auto [sender_worker_core_range, sender_worker_cores] = choose_worker_cores_fuse(
-        num_links, num_workers_per_link, enable_persistent_fabric_mode, mesh_device, sub_device_id, reserved_cores);
+    const auto [sender_worker_core_range, sender_worker_cores] =
+        choose_worker_cores_fuse(num_links, num_workers_per_link, mesh_device, sub_device_id, reserved_cores);
 
-    tt::log_debug(tt::LogOp, "input_tensor_num_pages: {}", input_tensor_num_pages);
-    tt::log_debug(tt::LogOp, "input_tensor_cores: {}", input_tensor_cores);
-    tt::log_debug(tt::LogOp, "input_tensor_shard_shape: {}", input_tensor_shard_shape);
-    tt::log_debug(tt::LogOp, "input_tensor_shard_num_pages: {}", input_tensor_shard_num_pages);
-    tt::log_debug(tt::LogOp, "output_tensor_cores: {}", output_tensor_cores);
-    tt::log_debug(tt::LogOp, "output_tensor_shard_shape: {}", output_tensor_shard_shape);
-    tt::log_debug(tt::LogOp, "output_tensor_shard_num_pages: {}", output_tensor_shard_num_pages);
+    log_debug(tt::LogOp, "input_tensor_num_pages: {}", input_tensor_num_pages);
+    log_debug(tt::LogOp, "input_tensor_cores: {}", input_tensor_cores);
+    log_debug(tt::LogOp, "input_tensor_shard_shape: {}", input_tensor_shard_shape);
+    log_debug(tt::LogOp, "input_tensor_shard_num_pages: {}", input_tensor_shard_num_pages);
+    log_debug(tt::LogOp, "output_tensor_cores: {}", output_tensor_cores);
+    log_debug(tt::LogOp, "output_tensor_shard_shape: {}", output_tensor_shard_shape);
+    log_debug(tt::LogOp, "output_tensor_shard_num_pages: {}", output_tensor_shard_num_pages);
 
     // L1 Scratch CB Creation
-    const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
+    const size_t packet_size_bytes = tt::tt_fabric::get_tt_fabric_channel_buffer_size_bytes();
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
     uint32_t num_pages_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
     uint32_t cb_num_pages = input_tensor_num_pages;  // TODO: Reduce this to double-buffer packet-size?
     uint32_t src0_cb_index = tt::CBIndex::c_0;
-    tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
+    tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.dtype());
     tt::DataFormat output_df = tt::tt_metal::datatype_to_dataformat_converter(dtype);
 
     tt::tt_metal::CircularBufferConfig cb_src0_config =
@@ -315,7 +311,7 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     }
 
     /* reduction cb */
-    uint32_t reduction_CB_single_tile_size = output_tensor.get_tensor_spec().tile().get_tile_size(df);
+    uint32_t reduction_CB_single_tile_size = output_tensor.tensor_spec().tile().get_tile_size(df);
     uint32_t reduction_CB_tiles = output_tensor_shard_num_pages * ring_size;
     uint32_t reduction_CB_size = reduction_CB_tiles * reduction_CB_single_tile_size;
 
@@ -327,7 +323,7 @@ tt::tt_metal::operation::ProgramWithCallbacks all_reduce_create_qkv_heads_minima
     auto cb_reduction = tt::tt_metal::CreateCircularBuffer(program, all_cores, reduction_cb_config);
 
     /* out cb */
-    uint32_t out_CB_single_tile_size = output_tensor.get_tensor_spec().tile().get_tile_size(output_df);
+    uint32_t out_CB_single_tile_size = output_tensor.tensor_spec().tile().get_tile_size(output_df);
     uint32_t out_CB_tiles = output_tensor_shard_num_pages;
     uint32_t out_CB_size = out_CB_tiles * out_CB_single_tile_size;
 

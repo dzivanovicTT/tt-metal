@@ -10,11 +10,7 @@ import ttnn
 from models.demos.yolov4.common import load_torch_model
 from models.demos.yolov4.tt.model_preprocessing import create_yolov4_model_parameters
 from models.demos.yolov4.tt.yolov4 import TtYOLOv4
-from models.perf.device_perf_utils import (
-    check_device_perf,
-    prep_device_perf_report,
-    run_device_perf,
-)
+from models.perf.device_perf_utils import check_device_perf, prep_device_perf_report, run_device_perf
 from models.perf.perf_utils import prep_perf_report
 from models.utility_functions import disable_persistent_kernel_cache, profiler
 
@@ -105,7 +101,7 @@ def test_yolov4(
 @pytest.mark.parametrize(
     "batch_size, model_name, expected_perf",
     [
-        (1, "yolov4", 82),
+        (1, "yolov4", 93.5),
     ],
 )
 @pytest.mark.models_device_performance_bare_metal
