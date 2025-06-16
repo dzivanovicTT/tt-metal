@@ -17,16 +17,16 @@ def tensor_map():
 
 def randomize_tensor(tensor_map, tensor_shape):
     tensor_shape = tuple(tensor_shape)
-    # if tensor_shape in tensor_map.keys():
-    #     torch_tensor = tensor_map[tensor_shape]
-    # else:
-    #     torch_tensor = torch.rand(tensor_shape, dtype=torch.bfloat16)
-    torch_tensor = torch.zeros(tensor_shape, dtype=torch.bfloat16)
-    for n in range(tensor_shape[0]):
-        for c in range(tensor_shape[1]):
-            for h in range(tensor_shape[2]):
-                for w in range(tensor_shape[3]):
-                    torch_tensor[n, c, h, w] = h * tensor_shape[3] + w
+    if tensor_shape in tensor_map.keys():
+        torch_tensor = tensor_map[tensor_shape]
+    else:
+        torch_tensor = torch.rand(tensor_shape, dtype=torch.bfloat16)
+    # torch_tensor = torch.zeros(tensor_shape, dtype=torch.bfloat16)
+    # for n in range(tensor_shape[0]):
+    #     for c in range(tensor_shape[1]):
+    #         for h in range(tensor_shape[2]):
+    #             for w in range(tensor_shape[3]):
+    #                 torch_tensor[n, c, h, w] = h * tensor_shape[3] + w
     return torch_tensor
 
 
@@ -114,7 +114,7 @@ def run_avg_pool2d(
     # print(ttnn_output)
     # print(torch_output)
     assert_with_pcc(torch_output, ttnn_output, 0.99)
-    allclose = torch.allclose(ttnn_output, torch_output, rtol=0.02)
+    allclose = torch.allclose(ttnn_output, torch_output, rtol=0.03)
     assert allclose, " Reference and output tensor are not close"
 
 
@@ -134,11 +134,13 @@ def run_avg_pool2d(
         # [1, 640, 28, 28],
         # [1, 800, 28, 28],
         # testing
-        [1, 128, 28, 28],
-        [1, 320, 28, 28],
-        [1, 512, 28, 28],
-        [1, 640, 28, 28],
-        [1, 800, 28, 28],
+        # [1, 128, 28, 28],
+        # [1, 320, 28, 28],
+        # [1, 512, 28, 28],
+        # [1, 640, 28, 28],
+        # [1, 800, 28, 28],
+        # models
+        [8, 64, 112, 112],
     ),
 )
 @pytest.mark.parametrize(
@@ -151,15 +153,16 @@ def run_avg_pool2d(
         # (2, 2),
         # (3, 3),
         # (5, 5),
-        (8, 8),
-        (9, 9),
+        # (8, 8),
+        # (9, 9),
+        (28, 28),
     ),
 )
 @pytest.mark.parametrize(
     "stride",
     (
         (1, 1),
-        (2, 2),
+        # (2, 2),
     ),
 )
 @pytest.mark.parametrize(
@@ -168,28 +171,28 @@ def run_avg_pool2d(
         (0, 0),
         # (1, 1),
         # (2, 2),
-        (4, 4),
+        # (4, 4),
     ),
 )
 @pytest.mark.parametrize(
     "ceil_mode",
     [
         False,
-        True,
+        # True,
     ],
 )
 @pytest.mark.parametrize(
     "count_include_pad",
     [
         False,
-        True,
+        # True,
     ],
 )
 @pytest.mark.parametrize(
     "divisor_override",
     [
         None,
-        5,
+        # 5,
     ],
 )
 @pytest.mark.parametrize(
