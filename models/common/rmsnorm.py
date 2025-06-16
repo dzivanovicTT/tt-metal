@@ -172,7 +172,7 @@ class RMSNorm(LightweightModule):
             subdevice_id=self.worker_sub_device_id,
         )
 
-        ttnn.synchronize_device(self.device)
+        ttnn.synchronize_device(self.device, sub_device_ids=[self.worker_sub_device_id])
 
         # Run distributed rmsnorm part 2
         tt_out = ttnn.rms_norm_post_all_gather(

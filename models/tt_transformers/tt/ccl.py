@@ -100,6 +100,7 @@ def tt_all_reduce(
             subdevice_id=worker_sub_device_id,
         )
 
+        ttnn.synchronize_device(mesh_device, sub_device_ids=[worker_sub_device_id])
         input_tensor.deallocate(True)
         return reduced
 

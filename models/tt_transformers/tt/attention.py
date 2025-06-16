@@ -839,6 +839,8 @@ class Attention(LightweightModule):
                 subdevice_id=self.worker_sub_device_id,
             )
 
+            ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
+
         output_11SH = ttnn.linear(
             attn_output_11SH,
             self.wo,
