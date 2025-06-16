@@ -98,17 +98,6 @@ void kernel_main() {
         fill_with_val(get_write_ptr(in_one_cb_id), TILE_WIDTH, bf16_one_u16);
     }
 
-    // ensure initialization is done before proceeding
-    if constexpr (reader_id == 0) {
-        cb_push_back(sync_cb_id1, 1);
-        if constexpr (split_reader) {
-            cb_wait_front(sync_cb_id2, 2);
-        }
-    } else {
-        cb_push_back(sync_cb_id2, 1);
-        cb_wait_front(sync_cb_id1, 2);
-    }
-
     const uint32_t in_l1_read_base_addr = get_read_ptr(in_shard_cb_id);
     uint32_t reader_indices_l1_addr = get_read_ptr(in_reader_indices_cb_id);
     volatile tt_l1_ptr uint16_t* reader_indices_ptr =
