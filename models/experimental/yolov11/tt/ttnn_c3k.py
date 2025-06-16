@@ -21,6 +21,8 @@ class C3K:
 
         k1 = self.k1(device, x1)
         k2 = self.k2(device, k1)
+        x2 = ttnn.sharded_to_interleaved(x2, ttnn.L1_MEMORY_CONFIG)
+        k2 = ttnn.sharded_to_interleaved(k2, ttnn.L1_MEMORY_CONFIG)
         use_shard_concat = False
         if use_shard_concat:
             x2 = ttnn.to_layout(x2, ttnn.ROW_MAJOR_LAYOUT)

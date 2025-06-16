@@ -51,7 +51,7 @@ class Yolov11_Conv2D:
         activation="",
         activation_dtype=ttnn.bfloat8_b,
         weights_dtype=ttnn.bfloat8_b,
-        use_1d_systolic_array=True,
+        use_1d_systolic_array=False,
         shard_layout=ttnn.TensorMemoryLayout.HEIGHT_SHARDED,
         is_detect=False,
         is_dfl=False,
@@ -167,15 +167,17 @@ def sharded_concat(input_tensors, num_cores=64, dim=3):  # expected input tensor
 
 
 class Conv:
-    def __init__(self, device, parameter, conv_pt, enable_act=True, is_detect=False):
+    def __init__(self, device, parameter, conv_pt, enable_act=True, is_detect=False, reshard=False):
         self.enable_act = enable_act
-        self.conv = Yolov11_Conv2D(parameter.conv, conv_pt.conv, device=device, is_detect=is_detect)
+        self.conv = Yolov11_Conv2D(
+            parameter.conv, conv_pt.conv, device=device, is_detect=is_detect, use_1d_systolic_array=reshard
+        )
 
     def __call__(self, device, x):
         if self.enable_act:
             x = self.conv(x)
-            if x.is_sharded():
-                x = ttnn.sharded_to_interleaved(x, ttnn.L1_MEMORY_CONFIG)
+            # if x.is_sharded():
+            #     x = ttnn.sharded_to_interleaved(x, ttnn.L1_MEMORY_CONFIG)
             x = ttnn.silu(x)
 
         else:

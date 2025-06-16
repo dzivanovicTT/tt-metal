@@ -8,14 +8,25 @@ from models.experimental.yolov11.tt.ttnn_c3k import C3K
 from models.experimental.yolov11.tt.ttnn_bottleneck import Bottleneck
 
 
+def p(x, a="x"):
+    print(f"{a}'s  shape: {x.shape}")
+    print(f"{a}'s  layout: {x.layout}")
+    print(f"{a}'s  dtype: {x.dtype}")
+    print(f"{a}'s config: {x.memory_config()}")
+
+
 class C3k2:
-    def __init__(self, device, parameter, conv_pt, is_bk_enabled=False):
+    def __init__(self, device, parameter, conv_pt, is_bk_enabled=False, reshard=False):
         self.is_bk_enabled = is_bk_enabled
         self.parameter = parameter
 
         if is_bk_enabled:
-            self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1)
-            self.cv2 = Conv(device, parameter.cv2, conv_pt.cv2)
+            self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1, reshard=reshard)
+            self.cv2 = Conv(
+                device,
+                parameter.cv2,
+                conv_pt.cv2,
+            )
             self.k = Bottleneck(device, parameter[0], conv_pt.m[0])
         else:
             self.cv1 = Conv(device, parameter.cv1, conv_pt.cv1)
@@ -24,12 +35,16 @@ class C3k2:
 
     def __call__(self, device, x):
         x = self.cv1(device, x)
+        x = ttnn.sharded_to_interleaved(x, ttnn.L1_MEMORY_CONFIG)  # to support slice
+        p(x, "1st conv out")
         x = ttnn.to_layout(x, layout=ttnn.ROW_MAJOR_LAYOUT)
+        p(x, "1st conv out lchange")
         y1 = x[:, :, :, : x.shape[-1] // 2]
         y2 = x[:, :, :, x.shape[-1] // 2 : x.shape[-1]]
         if self.is_bk_enabled:
             y2 = ttnn.to_layout(y2, layout=ttnn.TILE_LAYOUT)
             y3 = self.k(device, y2)
+            y3 = ttnn.sharded_to_interleaved(y3, ttnn.L1_MEMORY_CONFIG)  # to support concat sharded
         else:
             y3 = self.c3k(device, y2)
 

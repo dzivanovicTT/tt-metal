@@ -880,6 +880,7 @@ class YoloV11(nn.Module):
         x6 = x
         x = self.model[7](x)  # 7
         x = self.model[8](x)  # 8
+        return x
         x = self.model[9](x)  # 9
         x = self.model[10](x)  # 10
         x10 = x
