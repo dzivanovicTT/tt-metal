@@ -610,7 +610,7 @@ def test_demo_text(
 
     if token_accuracy:
         token_acc = TokenAccuracy(model_name=model_args[0].model_name)
-      
+
     for m_args in model_args:
         if m_args.max_context_len < max_seq_len:
             pytest.skip(
