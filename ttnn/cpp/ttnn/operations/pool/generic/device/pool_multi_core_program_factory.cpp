@@ -306,6 +306,8 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
             : tt::constants::TILE_HEIGHT / 2;
     TT_FATAL(nblocks == 1, "Multiple blocks not yet supported");
 
+    printf("max_rows_for_reduction = %u\n", max_rows_for_reduction);
+
     if (input_shape[3] < tt::constants::TILE_WIDTH) {
         TT_FATAL(input_shape[3] == 16, "Error");
     }
@@ -330,7 +332,9 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     // CBs
     const uint32_t multi_buffering_factor = 2;
 
-    const uint32_t split_reader = 1;
+    const uint32_t split_reader = !is_large_kernel;
+
+    printf("split_reader = %u\n", split_reader);
 
     // scalar CB as coefficient of reduce
     using tt::tt_metal::CBHandle;
@@ -556,7 +560,8 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
         config_cb_id,
         multi_buffering_factor,
         sync_cb_id1,
-        sync_cb_id2};
+        sync_cb_id2,
+        out_cb_id};
     std::vector<uint32_t> reader1_ct_args = reader0_ct_args;
     reader1_ct_args[8] = 1;  // split reader id for reader1
 
