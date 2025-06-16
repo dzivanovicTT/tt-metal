@@ -99,7 +99,6 @@ inline void pack_and_push(uint32_t reg, uint32_t cb) {
     // or wait first and then commit. Logically, it makes sense to say the math procedure is finished (commit)
     // and then packing can start (wait), so commit first and then wait is preferred.
     cb_reserve_back(cb, onetile);
-    tile_regs_commit();  // this logically should be in compute functions, bc it belongs to MATH thread
     tile_regs_wait();
     // Q: is this pack_reconfig_data_format necessary? It seems like it is not, but it is better to be sure.
     pack_reconfig_data_format(cb);
@@ -120,6 +119,7 @@ inline void mask_and_pack(uint32_t cb_input, uint32_t cb_output, uint32_t cb_mas
     mask_tile_init();
     mask_tile(data_register, mask_register);
 
+    tile_regs_commit();
     pack_and_push(data_register, cb_output);
 }
 
@@ -128,6 +128,7 @@ inline void compute_and_pack_mul(uint32_t cb_a, uint32_t cb_b, uint32_t tile_a, 
     tile_regs_acquire();
     mul_tiles_init(cb_a, cb_b);
     mul_tiles(cb_a, cb_b, tile_a, tile_b, reg);
+    tile_regs_commit();
     pack_and_push(reg, out_cb);
 }
 
@@ -136,6 +137,7 @@ inline void compute_and_pack_sub(uint32_t cb_a, uint32_t cb_b, uint32_t tile_a, 
     tile_regs_acquire();
     sub_tiles_init(cb_a, cb_b);
     sub_tiles(cb_a, cb_b, tile_a, tile_b, reg);
+    tile_regs_commit();
     pack_and_push(reg, out_cb);
 }
 
@@ -150,6 +152,7 @@ inline void compute_and_pack_div(uint32_t cb_a, uint32_t cb_b, uint32_t tile_a, 
     copy_tile(cb_b, tile_b, reg_b);
     div_binary_tile_init();
     div_binary_tile(reg_a, reg_b);  // reg_a = reg_a / reg_b
+    tile_regs_commit();
     pack_and_push(reg_a, out_cb);
 }
 
@@ -214,6 +217,7 @@ inline void compute_scaled_gain_and_gained_dL_dout(uint32_t col) {
     unary_bcast_init<BroadcastType::COL>(cb_rms_a_idx, cb_rms_a_idx);
     unary_bcast<BroadcastType::COL>(cb_rms_a_idx, /* tile idx */ col, /* reg tile idx */ rms_register);
     cb_pop_front(cb_rms_a_idx, onetile);
+    tile_regs_commit();
     pack_and_push(rms_register, cb_rms_a_idx);
 
     // Mask gamma and dL_out if needed and select the right CBs for further computations along with tile indices.
@@ -296,6 +300,7 @@ inline void compute_scale(uint32_t col) {
         add_binary_tile(scale_reduction_register, scale_register);
     }
 
+    tile_regs_commit();
     pack_and_push(scale_reduction_register, cb_scale);
 }
 
@@ -317,8 +322,8 @@ inline void compute_ms_a_and_c_by_ms_a() {
     // We do not need to wait for cb_rms_a_idx and cb_scaler_idx, because they are already filled with the
     // bcasted values. We can use them directly.
     compute_and_pack_mul(cb_rms_a_idx, cb_rms_a_idx, /* tile_a */ 0, /* tile_b */ 0, cb_ms_a);
-    // NOTE: div because scale is 1/c - maybe it should be changed to c
-    compute_and_pack_div(cb_ms_a, cb_scaler_idx, /* tile_a */ 0, /* tile_b */ 0, cb_c_by_ms_a);
+    cb_wait_front(cb_ms_a, onetile);
+    compute_and_pack_mul(cb_ms_a, cb_scaler_idx, /* tile_a */ 0, /* tile_b */ 0, cb_c_by_ms_a);
     // We can pop_front cb_ms_a, since we do not need it anymore.
     cb_pop_front(cb_ms_a, onetile);
 }
@@ -364,8 +369,9 @@ inline void compute_rhs(uint32_t col) {
     tile_regs_acquire();
     cb_wait_front(cb_scale, onetile);
     unary_bcast_init<BroadcastType::COL>(cb_scale, cb_scale);
-    unary_bcast<BroadcastType::COL>(cb_scale, /* tile idx */ col, /* reg tile idx */ scale_register);
+    unary_bcast<BroadcastType::COL>(cb_scale, /* tile idx */ 0, /* reg tile idx */ scale_register);
     cb_pop_front(cb_scale, onetile);
+    tile_regs_commit();
     pack_and_push(scale_register, cb_scale);
     cb_wait_front(cb_scale, onetile);
 
@@ -392,6 +398,7 @@ inline void compute_rhs(uint32_t col) {
     div_binary_tile(rhs_register, c_by_ms_a_register);
 
     // Now we have rhs in rhs_register, we can pack it to cb_rhs.
+    tile_regs_commit();
     pack_and_push(rhs_register, cb_rhs);
 }
 

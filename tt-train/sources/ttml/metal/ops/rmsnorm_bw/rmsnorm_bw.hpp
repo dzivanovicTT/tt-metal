@@ -15,8 +15,7 @@ struct RMSNormBackwardOperation {
         const ttnn::Tensor& input_tensor,
         const ttnn::Tensor& gamma_tensor,
         const ttnn::Tensor& rms_tensor,  // intermediate from fw
-        const ttnn::Tensor& dL_dout_tensor,
-        float epsilon = 1e-6F);
+        const ttnn::Tensor& dL_dout_tensor);
 };
 
 }  // namespace ttml::metal::ops::rmsnorm_bw
