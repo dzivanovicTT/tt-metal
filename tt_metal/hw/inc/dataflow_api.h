@@ -1276,6 +1276,34 @@ inline void noc_async_write_multicast_loopback_src(
     WAYPOINT("NMLD");
 }
 
+inline void noc_async_write_multicast_loopback_src_linked(
+    std::uint32_t src_local_l1_addr,
+    std::uint64_t dst_noc_addr_multicast,
+    std::uint32_t size,
+    std::uint32_t num_dests,
+    bool linked = false,
+    uint8_t noc = noc_index) {
+    constexpr bool multicast_path_reserve = true;
+
+    NOC_TRACE_QUICK_PUSH_IF_LINKED(write_cmd_buf, linked);
+    RECORD_NOC_EVENT_WITH_ADDR(NocEventType::WRITE_MULTICAST, dst_noc_addr_multicast, size, NOC_MULTICAST_WRITE_VC);
+
+    WAYPOINT("NMLW");
+    DEBUG_SANITIZE_NOC_MULTI_WRITE_TRANSACTION(noc, dst_noc_addr_multicast, src_local_l1_addr, size);
+    ncrisc_noc_fast_write_any_len_loopback_src_linked<noc_mode>(
+        noc,
+        write_cmd_buf,
+        src_local_l1_addr,
+        dst_noc_addr_multicast,
+        size,
+        NOC_MULTICAST_WRITE_VC,
+        true,
+        linked,
+        num_dests,
+        multicast_path_reserve);
+    WAYPOINT("NMLD");
+}
+
 /**
  * This blocking call waits for all the outstanding enqueued *noc_async_read*
  * calls issued on the current Tensix core to complete. After returning from
