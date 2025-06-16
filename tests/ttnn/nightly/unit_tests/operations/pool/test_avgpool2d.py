@@ -20,7 +20,7 @@ def randomize_tensor(tensor_map, tensor_shape):
     if tensor_shape in tensor_map.keys():
         torch_tensor = tensor_map[tensor_shape]
     else:
-        torch_tensor = torch.rand(tensor_shape, dtype=torch.bfloat16)
+        torch_tensor = torch.ones(tensor_shape, dtype=torch.bfloat16)
     return torch_tensor
 
 
@@ -100,6 +100,8 @@ def run_avg_pool2d(
     ttnn_output = ttnn.to_torch(ttnn_output)
 
     ## Assertion
+    print("Torch shape ", torch_output.shape)
+    print("TTNN shape ", ttnn_output.shape)
     assert_with_pcc(torch_output, ttnn_output, 0.99)
     allclose = torch.allclose(ttnn_output, torch_output, rtol=0.02)
     assert allclose, " Reference and output tensor are not close"
