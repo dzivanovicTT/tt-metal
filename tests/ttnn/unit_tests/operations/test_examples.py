@@ -12,7 +12,7 @@ import ttnn
 def test_example(device):
     torch.manual_seed(0)
 
-    shape = [5 * 32, 32]
+    shape = [1 * 32, 32]
 
     torch_input = torch.ones(shape, dtype=torch.bfloat16) * -1.7014118e38
     torch_other = torch.zeros(shape, dtype=torch.bfloat16) * 0

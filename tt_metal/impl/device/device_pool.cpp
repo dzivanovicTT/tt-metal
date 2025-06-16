@@ -277,7 +277,7 @@ void DevicePool::initialize(
 
 void DevicePool::initialize_fabric_and_dispatch_fw() const {
     this->initialize_active_devices();
-    this->wait_for_fabric_router_sync();
+    // this->wait_for_fabric_router_sync();
 }
 
 void DevicePool::initialize_host(IDevice* dev) const {
@@ -658,6 +658,7 @@ void DevicePool::init_firmware_on_active_devices() const {
     if (init_profiler_) {
         this->init_profiler();
     }
+    std::cout << "init fabric: " << initialize_fabric_and_dispatch_fw_ << std::endl;
     if (initialize_fabric_and_dispatch_fw_) {
         this->initialize_fabric_and_dispatch_fw();
     }

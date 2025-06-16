@@ -221,6 +221,7 @@ std::shared_ptr<MeshDevice> MeshDevice::create(
     }
     // The Device Profiler must be initialized before Fabric is loaded on the Cluster
     DevicePool::instance().init_profiler();
+    std::cout << "initing fabric 1" << std::endl;
     DevicePool::instance().initialize_fabric_and_dispatch_fw();
     return mesh_device;
 }
@@ -256,6 +257,7 @@ std::map<int, std::shared_ptr<MeshDevice>> MeshDevice::create_unit_meshes(
     }
     // The Device Profiler must be initialized before Fabric is loaded on the Cluster
     DevicePool::instance().init_profiler();
+    std::cout << "initing fabric 2" << std::endl;
     DevicePool::instance().initialize_fabric_and_dispatch_fw();
     return result;
 }
