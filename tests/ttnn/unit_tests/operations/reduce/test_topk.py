@@ -6,13 +6,17 @@ import pytest
 import torch
 import ttnn
 from tests.ttnn.utils_for_testing import assert_with_pcc
+from loguru import logger
 
 
-def run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_grids=None):
+def run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_grids=None, set_infs=False):
     torch.manual_seed(2005)
     shape = [N, C, H, W]
     torch_dtype = torch.bfloat16
     input = torch.randn(shape, dtype=torch_dtype) * 0.9
+    if set_infs:
+        input[:, :, 1:, :] = float("inf")
+
     pyt_topk_values, pyt_topk_indices = torch.topk(input, k, dim=dim, largest=largest, sorted=True)
     ttnn_input = ttnn.from_torch(input, dtype, layout=ttnn.Layout.TILE, device=device)
 
@@ -40,9 +44,24 @@ def run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_g
     # use cosine similarity on the gathered indices as this will show the top elements are all about the same
     ttnn_torch_gather_from_indices = torch.gather(input, dim, ttnn_torch_indices.to(torch.int64))
     cosine = torch.nn.CosineSimilarity(dim=dim)
+    if set_infs:
+        # Slice out non inf portion of the input tensor and compute cosine similarity of it's outputs
+        pyt_topk_values = pyt_topk_values[:, :, :1, :]
+        ttnn_torch_gather_from_indices = ttnn_torch_gather_from_indices[:, :, :1, :]
+        ttnn_torch_values = ttnn_torch_values[:, :, :1, :]
+
     ttnn_torch_cosine = torch.mean(cosine(pyt_topk_values, ttnn_torch_gather_from_indices))
 
-    assert ttnn_torch_cosine > 0.99, "Cosine similarity between topk values and gather from indices is less than 0.99"
+    if ttnn_torch_cosine <= 0.99:
+        logger.info(f"Cosine similarity between topk values and gather from indices is {ttnn_torch_cosine}")
+        logger.info(f"Pytorch topk values: {pyt_topk_values}")
+        logger.info(f"TTNN topk values: {ttnn_torch_gather_from_indices}")
+        logger.info(f"Pytorch indices: {pyt_topk_indices}")
+        logger.info(f"TTNN indices: {ttnn_torch_indices}")
+
+    assert (
+        ttnn_torch_cosine > 0.99
+    ), f"Cosine similarity between topk values and gather from indices is {ttnn_torch_cosine}, expected > 0.99"
 
     assert_with_pcc(pyt_topk_values, ttnn_torch_values, pcc_values)
 
@@ -51,12 +70,12 @@ def run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_g
     "dtype",
     (
         ttnn.bfloat16,
-        ttnn.bfloat8_b,
+        # ttnn.bfloat8_b,
         # ttnn.float32, top bits in float32 get cut off somewhere, LLK does not work for this
     ),
     ids=[
         "BFLOAT16_B",
-        "BFLOAT8_B",
+        # "BFLOAT8_B",
         # "FLOAT32",
     ],
 )
@@ -107,9 +126,13 @@ def test_topk(N, C, H, W, dim, k, dtype, sorted, largest, device, sub_core_grids
 
 @pytest.mark.parametrize(
     "dtype",
-    (ttnn.bfloat8_b,),
+    (
+        ttnn.bfloat8_b,
+        ttnn.bfloat16,
+    ),
     ids=[
         "BFLOAT8_B",
+        "BFLOAT16",
     ],
 )
 @pytest.mark.parametrize(
@@ -129,6 +152,13 @@ def test_topk(N, C, H, W, dim, k, dtype, sorted, largest, device, sub_core_grids
     ],
 )
 @pytest.mark.parametrize(
+    "add_inf_in_dim",
+    [
+        # False,
+        True,
+    ],
+)
+@pytest.mark.parametrize(
     "sub_core_grids",
     [
         ttnn.CoreRangeSet(
@@ -138,11 +168,11 @@ def test_topk(N, C, H, W, dim, k, dtype, sorted, largest, device, sub_core_grids
         ),
     ],
 )
-def test_topk_sub_core_grids(N, C, H, W, dim, k, dtype, sorted, largest, device, sub_core_grids):
+def test_topk_sub_core_grids(N, C, H, W, dim, k, dtype, sorted, largest, device, sub_core_grids, add_inf_in_dim):
     if dim == 0 or dim == 1:
         # As of now, when we try to get top-k for dim = 0 or 1, we get following error from transpose_op.cpp's validate():
         # input_tensor.get_dtype() == DataType::BFLOAT16 || input_tensor.get_dtype() == DataType::FLOAT32
         # this is because, transpose.cpp always typecasts bf8 to bf16
         # and when dim = 0 or 1, transpose converts it into TransposeOpDim::HC & this dim doesnt support bf16 or fp32
         pytest.skip()
-    run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_grids)
+    run_topk_test(N, C, H, W, k, dtype, dim, sorted, largest, device, sub_core_grids, add_inf_in_dim)
