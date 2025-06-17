@@ -24,7 +24,6 @@ namespace ttnn::operations::transformer::detail {
 operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     const Tensor& input_tensor_q,
     const Tensor& input_tensor_k,
-    const Tensor& input_tensor_v,
     std::optional<const Tensor> cur_pos_tensor,
     std::optional<const Tensor> page_table_tensor,
     std::optional<const Tensor> attn_mask,
@@ -111,7 +110,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
 
     auto q_buffer = input_tensor_q.buffer();
     auto k_buffer = input_tensor_k.buffer();
-    auto v_buffer = input_tensor_v.buffer();
+    auto v_buffer = input_tensor_k.buffer();
     auto out0_buffer = output_tensor.buffer();
 
     bool use_cur_pos_tensor = cur_pos_tensor.has_value();
@@ -317,7 +316,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     // Create circular buffers
     tt::DataFormat q_df = tt_metal::datatype_to_dataformat_converter(input_tensor_q.dtype());
     tt::DataFormat k_df = tt_metal::datatype_to_dataformat_converter(input_tensor_k.dtype());
-    tt::DataFormat v_df = tt_metal::datatype_to_dataformat_converter(input_tensor_v.dtype());
+    tt::DataFormat v_df = tt_metal::datatype_to_dataformat_converter(input_tensor_k.dtype());
     tt::DataFormat mask_df = use_attention_mask ? tt_metal::datatype_to_dataformat_converter(attn_mask.value().dtype())
                                                 : tt::DataFormat::Float16_b;
     tt::DataFormat out_df = tt_metal::datatype_to_dataformat_converter(output_tensor.dtype());
@@ -863,7 +862,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
 
             auto q_buffer = input_tensors.at(0).buffer();
             auto k_buffer = input_tensors.at(1).buffer();
-            auto v_buffer = input_tensors.at(2).buffer();
+            auto v_buffer = input_tensors.at(1).buffer();
 
             auto out0_buffer = output_tensors.at(0).buffer();
             uint32_t q_addr = q_buffer->address();

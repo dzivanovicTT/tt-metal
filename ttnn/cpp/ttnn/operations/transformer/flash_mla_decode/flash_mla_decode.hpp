@@ -16,7 +16,6 @@ struct ExecuteFlashMLADecode {
         QueueId queue_id,
         const ttnn::Tensor& input_tensor_q,
         const ttnn::Tensor& input_tensor_k,
-        const ttnn::Tensor& input_tensor_v,
         const bool is_causal = true,
         const std::optional<const Tensor>& attn_mask = std::nullopt,
         const std::vector<uint32_t>& cur_pos = std::vector<uint32_t>(),
@@ -29,7 +28,6 @@ struct ExecuteFlashMLADecode {
     static ttnn::Tensor invoke(
         const ttnn::Tensor& input_tensor_q,
         const ttnn::Tensor& input_tensor_k,
-        const ttnn::Tensor& input_tensor_v,
         const bool is_causal = true,
         const std::optional<const Tensor>& attn_mask = std::nullopt,
         const std::vector<uint32_t>& cur_pos = std::vector<uint32_t>(),
@@ -45,7 +43,6 @@ struct ExecutePagedFlashMLADecode {
         QueueId queue_id,
         const ttnn::Tensor& input_tensor_q,
         const ttnn::Tensor& input_tensor_k,
-        const ttnn::Tensor& input_tensor_v,
         const ttnn::Tensor& page_table_tensor,
         const bool is_causal = true,
         const std::optional<const Tensor>& attn_mask = std::nullopt,
@@ -58,7 +55,6 @@ struct ExecutePagedFlashMLADecode {
     static ttnn::Tensor invoke(
         const ttnn::Tensor& input_tensor_q,
         const ttnn::Tensor& input_tensor_k,
-        const ttnn::Tensor& input_tensor_v,
         const ttnn::Tensor& page_table_tensor,
         const bool is_causal = true,
         const std::optional<const Tensor>& attn_mask = std::nullopt,

@@ -28,9 +28,11 @@ def nearest_pow_2(x):
     return 1 << power
 
 
-def scaled_dot_product_attention_reference(Q, K, V, start_indices, padded_layer_len, scale, is_causal=True):
+def scaled_dot_product_attention_reference(Q, K, start_indices, padded_layer_len, scale, is_causal=True):
     b, nh, _, _ = Q.shape  # b, nh, 1, d
     _, nkv, _, _ = K.shape
+
+    V = K
 
     attn_mask = None
     if is_causal:
@@ -85,9 +87,6 @@ def run_flash_mla_decode_impl(
     ######################
     q = torch.randn(batch, nh, 1, kv_lora_rank + d_rope).float()  # (B, H, S (1 for decode), D)
     k = torch.randn(batch, nkv, seq_len, kv_lora_rank + d_rope).float()  # (B, H, S, D)
-    v = torch.randn(
-        batch, nkv, seq_len, kv_lora_rank + d_rope
-    ).float()  # (B, H, S, D) # TODO: REMOVE d_rope when validation is fixed!
 
     ######################
     ### TT Setup
@@ -132,19 +131,11 @@ def run_flash_mla_decode_impl(
         layout=ttnn.TILE_LAYOUT,
         memory_config=ttnn.DRAM_MEMORY_CONFIG,
     )
-    tt_v = ttnn.from_torch(
-        v,
-        device=device,
-        dtype=dtype,
-        layout=ttnn.TILE_LAYOUT,
-        memory_config=ttnn.DRAM_MEMORY_CONFIG,
-    )
 
-    logger.info(f"TT Q shape: {tt_q.shape}, TT K shape: {tt_k.shape}, TT V shape: {tt_v.shape}")
+    logger.info(f"TT Q shape: {tt_q.shape}, TT K shape: {tt_k.shape}")
     tt_out = ttnn.transformer.flash_mla_decode(
         tt_q,
         tt_k,
-        tt_v,
         cur_pos=start_indices,
         scale=scale,
         program_config=sdpa_program_config,
@@ -159,7 +150,6 @@ def run_flash_mla_decode_impl(
     out_t = scaled_dot_product_attention_reference(
         q,
         k,
-        v,
         start_indices,
         padded_layer_len,
         scale,

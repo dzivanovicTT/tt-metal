@@ -14,7 +14,7 @@ namespace ttnn::operations::transformer {
 void FlashMLADecode::validate(
     const std::vector<Tensor>& input_tensors,
     const std::vector<std::optional<const Tensor>>& optional_input_tensors) const {
-    TT_FATAL(input_tensors.size() == 3, "Must have 3 input tensors and mask");
+    TT_FATAL(input_tensors.size() == 2, "Must have 3 input tensors and mask");
 
     for (auto& input_tensor : input_tensors) {
         TT_FATAL(input_tensor.storage_type() == StorageType::DEVICE, "Operands to SDPA need to be on device!");
@@ -33,7 +33,6 @@ void FlashMLADecode::validate(
     const auto q_shape = input_tensors.at(0).padded_shape();
     const auto q_shape_unpadded = input_tensors.at(0).logical_shape();
     const auto k_shape = input_tensors.at(1).padded_shape();
-    const auto v_shape = input_tensors.at(2).padded_shape();
 
     // Input 0 must be sharded by height or DRAM interleaved. All other inputs must be in DRAM.
     const auto Q_memcfg = input_tensors.at(0).memory_config();
@@ -129,9 +128,6 @@ void FlashMLADecode::validate(
 
         TT_FATAL(page_table_shape[0] == B, "page_table must have hidden size equal to Q");
 
-        TT_FATAL(k_shape[2] == v_shape[2], "K and V must have same block size");
-        TT_FATAL(k_shape[3] == v_shape[3] && k_shape[3] == q_shape[3], "Q, K, V must have same hidden size");
-
         // Validate chunk size for paged version
         // k_chunk_size can also be zero; if k_chunk_size = 0, figure it out in kernels
         TT_FATAL(k_chunk_size % 32 == 0, "Chunk size must be multiple of 32, got: {}", k_chunk_size);
@@ -155,18 +151,13 @@ void FlashMLADecode::validate(
         const auto B = q_shape[1];
         if (this->share_cache.value_or(false)) {
             TT_FATAL(k_shape[0] == 1, "Share cache expects K to have batch size of 1, but got {}", k_shape[0]);
-            TT_FATAL(v_shape[0] == 1, "Share cache expects V to have batch size of 1, but got {}", v_shape[0]);
         } else {
             TT_FATAL(k_shape[0] == B, "Error");
-            TT_FATAL(v_shape[0] == B, "Error");
         }
         // TT_FATAL(Q_memcfg.shard_spec.value().grid.num_cores() == B, "Q must be height sharded by batch ");
 
         // Q seqlen must be 1 if we are running decode mode
         TT_FATAL(q_shape[0] == 1, "Error");
-
-        // Check sequence lengths
-        TT_FATAL(k_shape[-2] == v_shape[-2], "Error");
 
         // Validate chunk size for unpaged version
         TT_FATAL(k_chunk_size > 0, "Must provide k_chunk_size if non-causal!");
@@ -180,7 +171,6 @@ void FlashMLADecode::validate(
         // Check hidden size
         const auto D = q_shape[-1];
         TT_FATAL(k_shape[-1] == D, "Error");
-        TT_FATAL(v_shape[-1] == D, "Error");
 
         // Check valid seqlen
         for (int i = 0; i < this->cur_pos.size(); i++) {
@@ -189,11 +179,6 @@ void FlashMLADecode::validate(
     }
 
     // Check gqa specific validation
-    TT_FATAL(
-        k_shape[1] == v_shape[1],
-        "Flash decode expects K and V to have same number of heads, but got {} and {}",
-        k_shape[1],
-        v_shape[1]);
     bool is_gqa = (k_shape[1] > 1);
     if (is_gqa) {
         TT_FATAL(!output_mem_config.is_sharded(), "Sharded output not supported for GQA");
@@ -222,7 +207,6 @@ operation::ProgramWithCallbacks FlashMLADecode::create_program(
     std::vector<Tensor>& output_tensors) const {
     auto& input_tensor_q = input_tensors.at(0);
     auto& input_tensor_k = input_tensors.at(1);
-    auto& input_tensor_v = input_tensors.at(2);
 
     auto& cur_pos_tensor = optional_input_tensors.at(0);
     auto& page_table_tensor = optional_input_tensors.at(1);
@@ -238,7 +222,6 @@ operation::ProgramWithCallbacks FlashMLADecode::create_program(
     return detail::flash_mla_decode_multi_core(
         input_tensor_q,
         input_tensor_k,
-        input_tensor_v,
         cur_pos_tensor,
         page_table_tensor,
         attn_mask,
