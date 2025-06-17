@@ -166,7 +166,7 @@ class TtUNet2DConditionModel(nn.Module):
             self.device, norm_weights_out.shape[0], self.norm_groups, self.norm_core_grid.y
         )
 
-    def forward(self, sample, input_shape, timestep, encoder_hidden_states, added_cond_kwargs):
+    def forward(self, sample, input_shape, timestep, encoder_hidden_states, added_cond_kwargs, id=-1, iter=-2):
         B, C, H, W = input_shape
 
         temb = self.time_proj.forward(timestep)
@@ -218,7 +218,7 @@ class TtUNet2DConditionModel(nn.Module):
                 sample, [C, H, W], block_residuals = down_block.forward(sample, [B, C, H, W], temb=temb)
             else:
                 sample, [C, H, W], block_residuals = down_block.forward(
-                    sample, [B, C, H, W], temb=temb, encoder_hidden_states=encoder_hidden_states
+                    sample, [B, C, H, W], temb=temb, encoder_hidden_states=encoder_hidden_states, i=id, iter=iter
                 )
 
             residuals += block_residuals

@@ -91,6 +91,7 @@ def run_tt_iteration(
     ttnn_added_cond_kwargs,
     ttnn_timestep,
     i,
+    iter,
 ):
     B, C, H, W = input_shape
 
@@ -101,6 +102,8 @@ def run_tt_iteration(
         timestep=ttnn_timestep,
         encoder_hidden_states=ttnn_prompt_embeds,
         added_cond_kwargs=ttnn_added_cond_kwargs,
+        id=i,
+        iter=iter,
     )
 
     return ttnn_noise_pred, output_shape
@@ -400,6 +403,7 @@ def run_demo_inference(
         ttnn_added_cond_kwargs[0][0],
         ttnn_timesteps[0],
         0,
+        0,
     )
     if not is_ci_env and not os.path.exists("output"):
         os.mkdir("output")
@@ -432,6 +436,7 @@ def run_demo_inference(
                     ttnn_added_cond_kwargs[iter][unet_slice],
                     t,
                     i,
+                    iter,
                 )
                 C, H, W = noise_shape
 

@@ -71,7 +71,7 @@ class TtTransformer2DModel(nn.Module):
         self.program_config_out = model_config.get_matmul_config(matmul_path=f"{module_path}.proj_out")
         self.compute_config_out = model_config.get_mm_compute_config(f"{module_path}.proj_out")
 
-    def forward(self, input_tensor, input_shape, attention_mask=None, encoder_hidden_states=None):
+    def forward(self, input_tensor, input_shape, attention_mask=None, encoder_hidden_states=None, i=1, iter=-1):
         B, C, H, W = input_shape
         hidden_states = ttnn.to_layout(input_tensor, ttnn.ROW_MAJOR_LAYOUT)
 
@@ -84,6 +84,11 @@ class TtTransformer2DModel(nn.Module):
         )
         hidden_states = ttnn.to_memory_config(hidden_states, sharded_mem_config)
 
+        if iter == 265 and i == 1:
+            print("Iteration 265, 2%, start sync")
+            ttnn.synchronize_device(self.device)
+            print("start group norm")
+
         hidden_states = ttnn.group_norm(
             hidden_states,
             num_groups=self.norm_groups,
@@ -95,9 +100,25 @@ class TtTransformer2DModel(nn.Module):
             epsilon=self.norm_eps,
         )
 
+        if iter == 265 and i == 1:
+            print("sync device after group norm")
+            ttnn.synchronize_device(self.device)
+            print("finish sync, start to_mem_config")
+
         hidden_states = ttnn.to_memory_config(hidden_states, ttnn.L1_MEMORY_CONFIG)
 
+        if iter == 265 and i == 1:
+            print("finish to_mem_config, start sync")
+            ttnn.synchronize_device(self.device)
+            print("start to_layout")
+
         hidden_states = ttnn.to_layout(hidden_states, ttnn.TILE_LAYOUT)
+
+        if iter == 265 and i == 1:
+            print("finish to_layout, start sync")
+            ttnn.synchronize_device(self.device)
+            print("start linear......")
+
         hidden_states = ttnn.linear(
             hidden_states,
             self.tt_weights_in,
