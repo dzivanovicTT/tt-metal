@@ -145,6 +145,22 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         return MeshCoordinate(coord_x, coord_y);
     };
 
+    // For each mesh in the system
+    auto user_meshes = this->get_user_physical_mesh_ids();
+    if (reliability_mode == tt_metal::FabricReliabilityMode::STRICT_SYSTEM_HEALTH_SETUP_MODE) {
+        for (auto mesh_id : user_meshes) {
+            size_t num_chips_in_mesh = intra_mesh_connectivity[mesh_id.get()].size();
+            for (std::uint32_t chip_id = 0; chip_id < num_chips_in_mesh; chip_id++) {
+                const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
+                for (const auto& [direction, eth_chans] :
+                     this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)) {
+                    this->router_port_directions_to_num_routing_planes_map_[fabric_node_id][direction] =
+                        eth_chans.size();
+                }
+            }
+        }
+    }
+
     std::unordered_map<MeshId, std::unordered_map<chip_id_t, std::unordered_map<RoutingDirection, size_t>>>
         golden_link_counts;
     TT_FATAL(
@@ -156,7 +172,6 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         this->routing_table_generator_->mesh_graph->get_inter_mesh_connectivity(), golden_link_counts);
 
     // For each mesh in the system
-    auto user_meshes = this->get_user_physical_mesh_ids();
     for (auto mesh_id : user_meshes) {
         const auto& mesh_shape = this->get_physical_mesh_shape(MeshId{mesh_id});
         TT_FATAL(mesh_shape.dims() == 2, "ControlPlane: Only 2D meshes are supported");
@@ -167,43 +182,47 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         std::vector<size_t> col_min_planes(mesh_shape[1], std::numeric_limits<size_t>::max());
 
         // First pass: Calculate minimums for each row/column
-        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id.get()].size(); chip_id++) {
-            const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
-            const auto chip_coord = get_chip_coord(fabric_node_id);
-            auto chip_coord_x = chip_coord[0];
-            auto chip_coord_y = chip_coord[1];
+        size_t num_chips_in_mesh = intra_mesh_connectivity[mesh_id.get()].size();
+        bool may_have_intra_mesh_connectivity = num_chips_in_mesh > 1;
+        if (may_have_intra_mesh_connectivity) {
+            for (std::uint32_t chip_id = 0; chip_id < num_chips_in_mesh; chip_id++) {
+                const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
+                const auto chip_coord = get_chip_coord(fabric_node_id);
+                auto chip_coord_x = chip_coord[0];
+                auto chip_coord_y = chip_coord[1];
 
-            const auto& port_directions = this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id);
+                const auto& port_directions = this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id);
 
-            const auto& golden_counts = golden_link_counts.at(MeshId{mesh_id}).at(chip_id);
-            apply_min(port_directions, RoutingDirection::E, golden_counts, row_min_planes.at(chip_coord_y));
-            apply_min(port_directions, RoutingDirection::W, golden_counts, row_min_planes.at(chip_coord_y));
-            apply_min(port_directions, RoutingDirection::N, golden_counts, col_min_planes.at(chip_coord_x));
-            apply_min(port_directions, RoutingDirection::S, golden_counts, col_min_planes.at(chip_coord_x));
-        }
+                const auto& golden_counts = golden_link_counts.at(MeshId{mesh_id}).at(chip_id);
+                apply_min(port_directions, RoutingDirection::E, golden_counts, row_min_planes.at(chip_coord_y));
+                apply_min(port_directions, RoutingDirection::W, golden_counts, row_min_planes.at(chip_coord_y));
+                apply_min(port_directions, RoutingDirection::N, golden_counts, col_min_planes.at(chip_coord_x));
+                apply_min(port_directions, RoutingDirection::S, golden_counts, col_min_planes.at(chip_coord_x));
+            }
 
-        // TODO: specialize by topology for better perf
-        if (topology == Topology::Mesh || topology == Topology::Torus) {
-            const auto rows_min = std::min_element(row_min_planes.begin(), row_min_planes.end());
-            const auto cols_min = std::min_element(col_min_planes.begin(), col_min_planes.end());
-            const auto mesh_min = std::min(*rows_min, *cols_min);
-            std::fill(row_min_planes.begin(), row_min_planes.end(), mesh_min);
-            std::fill(col_min_planes.begin(), col_min_planes.end(), mesh_min);
-        }
+            // TODO: specialize by topology for better perf
+            if (topology == Topology::Mesh || topology == Topology::Torus) {
+                const auto rows_min = std::min_element(row_min_planes.begin(), row_min_planes.end());
+                const auto cols_min = std::min_element(col_min_planes.begin(), col_min_planes.end());
+                const auto mesh_min = std::min(*rows_min, *cols_min);
+                std::fill(row_min_planes.begin(), row_min_planes.end(), mesh_min);
+                std::fill(col_min_planes.begin(), col_min_planes.end(), mesh_min);
+            }
 
-        // Second pass: Apply minimums to each device
-        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id.get()].size(); chip_id++) {
-            const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
-            const auto chip_coord = get_chip_coord(fabric_node_id);
-            auto chip_coord_x = chip_coord[0];
-            auto chip_coord_y = chip_coord[1];
+            // Second pass: Apply minimums to each device
+            for (std::uint32_t chip_id = 0; chip_id < num_chips_in_mesh; chip_id++) {
+                const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
+                const auto chip_coord = get_chip_coord(fabric_node_id);
+                auto chip_coord_x = chip_coord[0];
+                auto chip_coord_y = chip_coord[1];
 
-            this->router_port_directions_to_num_routing_planes_map_[fabric_node_id] = {
-                {RoutingDirection::E, row_min_planes.at(chip_coord_y)},
-                {RoutingDirection::W, row_min_planes.at(chip_coord_y)},
-                {RoutingDirection::N, col_min_planes.at(chip_coord_x)},
-                {RoutingDirection::S, col_min_planes.at(chip_coord_x)},
-            };
+                this->router_port_directions_to_num_routing_planes_map_[fabric_node_id] = {
+                    {RoutingDirection::E, row_min_planes.at(chip_coord_y)},
+                    {RoutingDirection::W, row_min_planes.at(chip_coord_y)},
+                    {RoutingDirection::N, col_min_planes.at(chip_coord_x)},
+                    {RoutingDirection::S, col_min_planes.at(chip_coord_x)},
+                };
+            }
         }
     }
 }
@@ -872,8 +891,13 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels(tt_meta
 
     // Trim the ethernet channels that don't map to live fabric routing planes.
     // NOTE: This MUST be called after ordering ethernet channels
+    auto user_mesh_ids = this->get_user_physical_mesh_ids();
+    std::unordered_set<MeshId> user_mesh_ids_set(user_mesh_ids.begin(), user_mesh_ids.end());
     if (tt::tt_metal::MetalContext::instance().get_fabric_config() != tt_metal::FabricConfig::CUSTOM) {
         for (auto& [fabric_node_id, directional_eth_chans] : this->router_port_directions_to_physical_eth_chan_map_) {
+            if (user_mesh_ids_set.count(fabric_node_id.mesh_id) == 0) {
+                continue;
+            }
             for (auto direction :
                  {RoutingDirection::N, RoutingDirection::S, RoutingDirection::E, RoutingDirection::W}) {
                 if (directional_eth_chans.find(direction) != directional_eth_chans.end()) {
