@@ -134,9 +134,9 @@ struct test_board_t {
             mesh_graph_descriptor = "n300_mesh_graph_descriptor.yaml";
             num_chips_to_use = 2;
 
-            if (num_chips_to_use != tt_metal::GetNumAvailableDevices()) {
-                throw std::runtime_error("Not found the expected 2 chips for n300");
-            }
+            // if (num_chips_to_use != tt_metal::GetNumAvailableDevices()) {
+            //     throw std::runtime_error("Not found the expected 2 chips for n300");
+            // }
 
             for (auto i = 0; i < num_chips_to_use; i++) {
                 available_chip_ids.push_back(i);

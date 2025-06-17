@@ -112,6 +112,9 @@ static void build_golden_link_counts(
 
 void ControlPlane::initialize_dynamic_routing_plane_counts(
     const IntraMeshConnectivity& intra_mesh_connectivity, tt_metal::FabricConfig fabric_config, tt_metal::FabricReliabilityMode reliability_mode) {
+    if (fabric_config == tt_metal::FabricConfig::CUSTOM) {
+        return;
+    }
     auto topology = FabricContext::get_topology_from_config(fabric_config);
     size_t min_routing_planes = std::numeric_limits<size_t>::max();
 
@@ -880,7 +883,7 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels(tt_meta
     }
 
     this->initialize_dynamic_routing_plane_counts(
-        intra_mesh_connectivity, this->fabric_context_.get()->get_fabric_config(), reliability_mode);
+        intra_mesh_connectivity, tt::tt_metal::MetalContext::instance().get_fabric_config(), reliability_mode);
 
     // Order the ethernet channels so that when we use them for deciding connections, indexing into ports per direction
     // is consistent for each each neighbouring chip.
@@ -888,38 +891,42 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels(tt_meta
 
     // Trim the ethernet channels that don't map to live fabric routing planes.
     // NOTE: This MUST be called after ordering ethernet channels
-    for (auto& [fabric_node_id, directional_eth_chans] : this->router_port_directions_to_physical_eth_chan_map_) {
-        for (auto direction : {RoutingDirection::N, RoutingDirection::S, RoutingDirection::E, RoutingDirection::W}) {
-            if (directional_eth_chans.find(direction) != directional_eth_chans.end()) {
-                size_t num_available_routing_planes = this->get_num_live_routing_planes(fabric_node_id, direction);
-                TT_FATAL(
-                    directional_eth_chans.at(direction).size() >= num_available_routing_planes,
-                    "Expected {} eth channels on M{}D{} in direction {}, but got {}",
-                    num_available_routing_planes,
-                    fabric_node_id.mesh_id,
-                    fabric_node_id.chip_id,
-                    direction,
-                    directional_eth_chans.at(direction).size());
-                TT_FATAL(
-                    num_available_routing_planes <= 4,
-                    "Expected at most 4 routing planes for M{}D{} in direction {}",
-                    fabric_node_id.mesh_id,
-                    fabric_node_id.chip_id,
-                    direction);
-                bool trim = directional_eth_chans.at(direction).size() > num_available_routing_planes;
-                auto physical_chip_id = this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
-                if (trim) {
-                    log_warning(
-                        tt::LogFabric,
-                        "phys {} M{}D{} in direction {} has {} eth channels, but only {} routing planes are available",
-                        physical_chip_id,
+    if (tt::tt_metal::MetalContext::instance().get_fabric_config() != tt_metal::FabricConfig::CUSTOM) {
+        for (auto& [fabric_node_id, directional_eth_chans] : this->router_port_directions_to_physical_eth_chan_map_) {
+            for (auto direction :
+                 {RoutingDirection::N, RoutingDirection::S, RoutingDirection::E, RoutingDirection::W}) {
+                if (directional_eth_chans.find(direction) != directional_eth_chans.end()) {
+                    size_t num_available_routing_planes = this->get_num_live_routing_planes(fabric_node_id, direction);
+                    TT_FATAL(
+                        directional_eth_chans.at(direction).size() >= num_available_routing_planes,
+                        "Expected {} eth channels on M{}D{} in direction {}, but got {}",
+                        num_available_routing_planes,
                         fabric_node_id.mesh_id,
                         fabric_node_id.chip_id,
                         direction,
-                        directional_eth_chans.at(direction).size(),
-                        num_available_routing_planes);
+                        directional_eth_chans.at(direction).size());
+                    TT_FATAL(
+                        num_available_routing_planes <= 4,
+                        "Expected at most 4 routing planes for M{}D{} in direction {}",
+                        fabric_node_id.mesh_id,
+                        fabric_node_id.chip_id,
+                        direction);
+                    bool trim = directional_eth_chans.at(direction).size() > num_available_routing_planes;
+                    auto physical_chip_id = this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(fabric_node_id);
+                    if (trim) {
+                        log_warning(
+                            tt::LogFabric,
+                            "phys {} M{}D{} in direction {} has {} eth channels, but only {} routing planes are "
+                            "available",
+                            physical_chip_id,
+                            fabric_node_id.mesh_id,
+                            fabric_node_id.chip_id,
+                            direction,
+                            directional_eth_chans.at(direction).size(),
+                            num_available_routing_planes);
+                    }
+                    directional_eth_chans.at(direction).resize(num_available_routing_planes);
                 }
-                directional_eth_chans.at(direction).resize(num_available_routing_planes);
             }
         }
     }
