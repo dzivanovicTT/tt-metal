@@ -295,15 +295,14 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     // CB sizes can be restricted to this in case input channels are more than 256 to perform reduction iteratively.
     const bool is_large_kernel =
         is_partial_tile ? kernel_size_hw > tt::constants::TILE_HEIGHT / 2 : kernel_size_hw > tt::constants::TILE_HEIGHT;
+    printf("is_large_kernel = %d\n", is_large_kernel);
 
     // TODO: enable 32 sticks per tile for reduction for all cases, we can only support 16 row reductions for
     // partial tiles, and there is currently a bug forcing us to use 16 row reductions for avg pool when there
     // is 1 remainder C tile
     const uint32_t max_rows_for_reduction =
-        !is_partial_tile && !(is_wide_reduction && pool_type == Pool2DType::AVG_POOL2D &&
-                              in_ntiles_c % MAX_TILES_PER_REDUCTION == 1)
-            ? tt::constants::TILE_HEIGHT
-            : tt::constants::TILE_HEIGHT / 2;
+        !is_partial_tile ? tt::constants::TILE_HEIGHT : tt::constants::TILE_HEIGHT / 2;
+    printf("max_rows_for_reduction = %d\n", max_rows_for_reduction);
     TT_FATAL(nblocks == 1, "Multiple blocks not yet supported");
 
     if (input_shape[3] < tt::constants::TILE_WIDTH) {
