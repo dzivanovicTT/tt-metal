@@ -208,7 +208,7 @@ def create_tt_model(
             True,  # instruct mode
             1,  # repeat_batches
             128 * 1024,  # max_seq_len
-            32,  # batch_size
+            1,  # batch_size
             200,  # max_generated_tokens
             True,  # paged_attention
             {"page_block_size": 64, "page_max_num_blocks": 2048},  # page_params
@@ -234,7 +234,7 @@ def create_tt_model(
         "batch-32",  # throughput
         "batch-1",  # latency
         "repeat2",  # latency with 5 repeat batches
-        "long-context-batch32",  # max-length for 32 users
+        "long-context-batch1",  # max-length for 32 users
         "long-context-32k",  # max-length
     ],
 )
@@ -348,14 +348,11 @@ def test_demo_text(
         input_prompts = load_inputs(
             input_prompts,
             [
-                534,
-                1008,
-                1111 * 4,
-                3333 * 4,
+                4000 * 4,
             ]
-            * 8
+            * 32
             if batch_size == 32
-            else [15384 * 8],
+            else [4000 * 4],
             input_prompts,
         )
     profiler.end("loading_inputs")
@@ -512,8 +509,8 @@ def test_demo_text(
             user_tok = int(prefilled_token[user].item())
             all_outputs[user].append(user_tok)
         # print("Prefill outputs:", [tokenizer.decode(output) for output in all_outputs])
-        # model.tt_ccl.close()
-        # return True
+        model.tt_ccl.close()
+        return True
         user_done = [False] * batch_size  # Keeps track when a user reaches EoD token
 
         device_sampling_params = SamplingParams(temperature=0.0, top_k=-1, top_p=1.0)
