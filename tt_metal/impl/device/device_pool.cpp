@@ -294,7 +294,7 @@ void DevicePool::initialize_host(IDevice* dev) const {
     }
 
     ClearNocData(dev->id());
-    DprintServerAttach(dev->id());
+    // DprintServerAttach(dev->id());
     watcher_init(dev->id());
 
     // TODO: as optimization, investigate removing all this call for already initialized devivces
@@ -304,6 +304,7 @@ void DevicePool::initialize_host(IDevice* dev) const {
     dev->initialize_and_launch_firmware();
 
     watcher_attach(dev->id());
+    DprintServerAttach(dev->id());
 }
 
 void DevicePool::initialize_active_devices() const {

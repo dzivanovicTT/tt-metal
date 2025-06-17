@@ -730,6 +730,8 @@ void DebugPrintServerContext::AttachDevice(chip_id_t device_id) {
         }
     }
 
+    sleep(20);
+
     device_intermediate_streams_force_flush_lock_.lock();
     TT_ASSERT(
         device_intermediate_streams_force_flush_.count(device_id) == 0,
@@ -1333,6 +1335,7 @@ void DprintServerAttach(chip_id_t device_id) {
     if (!DprintServerIsRunning()) {
         DebugPrintServerContext* ctx = new DebugPrintServerContext();
     }
+    sleep(20);
 
     // Add this device to the server
     DebugPrintServerContext::inst->AttachDevice(device_id);
