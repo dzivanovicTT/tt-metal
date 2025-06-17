@@ -453,7 +453,7 @@ class Attention(LightweightModule):
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
             )
         else:
-            attn_output_1G4D = ttnn.transformer.scaled_dot_product_attention_decode(
+            attn_output_1G4D = ttnn.transformer.scaled_dot_product_attention_decode_mla(
                 q_heads_1BQD,
                 keys,
                 values,

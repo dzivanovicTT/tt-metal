@@ -13,14 +13,17 @@ target_sources(
         sdpa/device/sdpa_op.cpp
         sdpa/device/sdpa_program_factory.cpp
         sdpa/sdpa.cpp
-        sdpa_mla/device/joint_sdpa_op.cpp
-        sdpa_mla/device/joint_sdpa_program_factory.cpp
-        sdpa_mla/device/sdpa_op.cpp
-        sdpa_mla/device/sdpa_program_factory.cpp
-        sdpa_mla/sdpa.cpp
+        sdpa/device/joint_sdpa_op.cpp
+        sdpa/device/joint_sdpa_program_factory.cpp
+        sdpa/device/sdpa_op.cpp
+        sdpa/device/sdpa_program_factory.cpp
+        sdpa/sdpa.cpp
         sdpa_decode/device/sdpa_decode_op.cpp
         sdpa_decode/device/sdpa_decode_program_factory.cpp
         sdpa_decode/sdpa_decode.cpp
+        sdpa_decode_mla/device/sdpa_decode_op.cpp
+        sdpa_decode_mla/device/sdpa_decode_program_factory.cpp
+        sdpa_decode_mla/sdpa_decode.cpp
         split_query_key_value_and_split_heads/split_query_key_value_and_split_heads.cpp
 )
 
