@@ -136,6 +136,7 @@ def run_flash_mla_decode_impl(
     tt_out = ttnn.transformer.flash_mla_decode(
         tt_q,
         tt_k,
+        kv_lora_rank,
         cur_pos=start_indices,
         scale=scale,
         program_config=sdpa_program_config,

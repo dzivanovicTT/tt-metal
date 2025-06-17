@@ -34,6 +34,12 @@ void FlashMLADecode::validate(
     const auto q_shape_unpadded = input_tensors.at(0).logical_shape();
     const auto k_shape = input_tensors.at(1).padded_shape();
 
+    TT_FATAL(
+        head_dim_v <= q_shape[3],
+        "Head dimension of V must be less than or equal to head dim of Q, got {} and {}",
+        head_dim_v,
+        q_shape[3]);
+
     // Input 0 must be sharded by height or DRAM interleaved. All other inputs must be in DRAM.
     const auto Q_memcfg = input_tensors.at(0).memory_config();
     if (input_tensors.at(0).is_sharded()) {
@@ -222,6 +228,7 @@ operation::ProgramWithCallbacks FlashMLADecode::create_program(
     return detail::flash_mla_decode_multi_core(
         input_tensor_q,
         input_tensor_k,
+        this->head_dim_v,
         cur_pos_tensor,
         page_table_tensor,
         attn_mask,
@@ -241,6 +248,7 @@ operation::Hash FlashMLADecode::compute_program_hash(
     bool has_cur_pos = optional_input_tensors.at(0).has_value();
     bool has_attn_mask = optional_input_tensors.at(2).has_value();
     return operation::hash_operation<FlashMLADecode>(
+        this->head_dim_v,
         this->scale,
         this->output_mem_config,
         this->program_config,
