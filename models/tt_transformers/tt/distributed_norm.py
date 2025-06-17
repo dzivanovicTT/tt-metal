@@ -15,15 +15,13 @@ class DistributedNorm(LightweightModule):
         norm,
         args,
         TG=False,
-        from_remote_semaphore_handles=None,
-        to_remote_semaphore_handles=None,
+        ccl_sub_device_crs=None,
         worker_sub_device_id=None,
     ):
         self.norm = norm
         self.args = args
 
-        self.from_remote_semaphore_handles = from_remote_semaphore_handles
-        self.to_remote_semaphore_handles = to_remote_semaphore_handles
+        self.ccl_sub_device_crs = ccl_sub_device_crs
         self.worker_sub_device_id = worker_sub_device_id
 
         if TG:
@@ -92,11 +90,6 @@ class DistributedNorm(LightweightModule):
 
         # Distributed norm requires a gather
         if self.args.is_distributed_norm(mode):
-            compute_grid_size = self.args.mesh_device.compute_with_storage_grid_size()
-            ccl_sub_device_crs = ttnn.CoreRangeSet(
-                {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
-            )
-
             use_all_gather_async_minimal_interleaved_any = (
                 x.shape[0] == 1 and x.shape[1] == 1 and x.shape[2] != 32 and not x.is_sharded()
             )
@@ -125,7 +118,7 @@ class DistributedNorm(LightweightModule):
                 )
 
                 multi_device_global_semaphore = [
-                    ttnn.create_global_semaphore(self.args.mesh_device, ccl_sub_device_crs, 0) for _ in range(2)
+                    ttnn.create_global_semaphore(self.args.mesh_device, self.ccl_sub_device_crs, 0) for _ in range(2)
                 ]
 
                 x = ttnn.experimental.all_gather_async(
@@ -141,7 +134,7 @@ class DistributedNorm(LightweightModule):
                 )
             else:
                 multi_device_global_semaphore = ttnn.create_global_semaphore(
-                    self.args.mesh_device, ccl_sub_device_crs, 0
+                    self.args.mesh_device, self.ccl_sub_device_crs, 0
                 )
 
                 x = ttnn.experimental.all_gather_async(

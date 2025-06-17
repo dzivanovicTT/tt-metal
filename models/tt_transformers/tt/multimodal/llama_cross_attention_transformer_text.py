@@ -63,7 +63,6 @@ class TtLlamaCrossAttentionTransformerText(LightweightModule):
             {k[len(tok_embedding_prefix) :]: v for k, v in state_dict.items() if k.startswith(tok_embedding_prefix)}
         )
 
-        assert False, "Catch 0"
         self.norm = DistributedNorm(
             RMSNorm(
                 device=mesh_device,

@@ -24,10 +24,6 @@ class TtTransformerBlock(LightweightModule):
         use_paged_kv_cache=False,
         prefetcher_setup=None,
         tt_ccl=None,
-        from_remote_semaphore_handles=None,
-        to_remote_semaphore_handles=None,
-        worker_sub_device_id=None,
-        # TODO: (GR) Possibly need, if so then work way up
     ):
         super().__init__()
 
@@ -51,13 +47,6 @@ class TtTransformerBlock(LightweightModule):
 
         self.prefetcher_setup = prefetcher_setup
         self.tt_ccl = tt_ccl
-
-        # TODO: (GR) Possibly need, if so then work way up
-        # self.from_remote_semaphore_handles = from_remote_semaphore_handles
-        # self.to_remote_semaphore_handles = to_remote_semaphore_handles
-        # self.worker_sub_device_id = worker_sub_device_id
-
-        assert False, "Catch llama_decoder arguments"
 
         self.attention = TtLlamaAttention(
             mesh_device=mesh_device,
@@ -96,13 +85,7 @@ class TtTransformerBlock(LightweightModule):
                 sharded_program_config=self.model_config["SHARDED_NORM_ATTN_PRGM_CFG"],
                 sharded_output_config=self.model_config["SHARDED_ATTN_INPUT_MEMCFG"],
                 output_mem_config=self.model_config["SHARDED_ATTN_INPUT_RING_MEMCFG"],
-                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
-                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
-                worker_sub_device_id=self.worker_sub_device_id,
             ),
-            from_remote_semaphore_handles=self.from_remote_semaphore_handles,
-            to_remote_semaphore_handles=self.to_remote_semaphore_handles,
-            worker_sub_device_id=self.worker_sub_device_id,
             args,
             TG=args.is_galaxy,
             tt_ccl=tt_ccl,
@@ -120,13 +103,7 @@ class TtTransformerBlock(LightweightModule):
                 sharded_program_config=self.model_config["SHARDED_NORM_MLP_PRGM_CFG"],
                 sharded_output_config=self.model_config["SHARDED_MLP_INPUT_MEMCFG"],
                 output_mem_config=self.model_config["SHARDED_FF12_RING_MEMCFG"],
-                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
-                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
-                worker_sub_device_id=self.worker_sub_device_id,
             ),
-            from_remote_semaphore_handles=self.from_remote_semaphore_handles,
-            to_remote_semaphore_handles=self.to_remote_semaphore_handles,
-            worker_sub_device_id=self.worker_sub_device_id,
             args,
             TG=args.is_galaxy,
             tt_ccl=tt_ccl,

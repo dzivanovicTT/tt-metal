@@ -52,8 +52,7 @@ class RMSNorm(LightweightModule):
         sharded_output_config=None,
         output_mem_config=None,
         ccl_topology=ttnn.Topology.Ring,
-        from_remote_semaphore_handles=None,
-        to_remote_semaphore_handles=None,
+        ccl_sub_device_crs=None,
         worker_sub_device_id=None,
     ):
         super().__init__()
@@ -61,8 +60,7 @@ class RMSNorm(LightweightModule):
         self.is_distributed = is_distributed
         self.ccl_topology = ccl_topology
 
-        self.from_remote_semaphore_handles = from_remote_semaphore_handles
-        self.to_remote_semaphore_handles = to_remote_semaphore_handles
+        self.ccl_sub_device_crs = ccl_sub_device_crs
         self.worker_sub_device_id = worker_sub_device_id
 
         self.device = device
@@ -155,11 +153,6 @@ class RMSNorm(LightweightModule):
         tt_stats = ttnn.rms_norm_pre_all_gather(inp, compute_kernel_config=compute_kernel_config, dtype=ttnn.bfloat16)
 
         # AllGather stats
-        compute_grid_size = self.device.compute_with_storage_grid_size()
-        ccl_sub_device_crs = ttnn.CoreRangeSet(
-            {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
-        )
-
         use_all_gather_async_minimal_interleaved_any = (
             tt_stats.shape[0] == 1 and tt_stats.shape[1] == 1 and tt_stats.shape[2] != 32 and not tt_stats.is_sharded()
         )
@@ -188,7 +181,7 @@ class RMSNorm(LightweightModule):
             )
 
             multi_device_global_sem = [
-                ttnn.create_global_semaphore(self.device, ccl_sub_device_crs, 0) for _ in range(2)
+                ttnn.create_global_semaphore(self.device, self.ccl_sub_device_crs, 0) for _ in range(2)
             ]
 
             tt_stats = ttnn.experimental.all_gather_async(
@@ -203,7 +196,7 @@ class RMSNorm(LightweightModule):
                 subdevice_id=self.worker_sub_device_id,
             )
         else:
-            multi_device_global_semaphore = ttnn.create_global_semaphore(self.device, ccl_sub_device_crs, 0)
+            multi_device_global_semaphore = ttnn.create_global_semaphore(self.device, self.ccl_sub_device_crs, 0)
 
             tt_stats = ttnn.experimental.all_gather_async(
                 tt_stats,

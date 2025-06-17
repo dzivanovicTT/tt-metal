@@ -25,8 +25,7 @@ class Attention(LightweightModule):
         configuration,
         paged_attention_config=None,
         use_paged_kv_cache=False,
-        from_remote_semaphore_handles=None,
-        to_remote_semaphore_handles=None,
+        ccl_sub_device_crs=None,
         worker_sub_device_id=None,
     ):
         super().__init__()
@@ -54,8 +53,7 @@ class Attention(LightweightModule):
             max(self.max_batch_size // self.num_device_groups, 1) if self.TG else self.max_batch_size
         )
 
-        self.from_remote_semaphore_handles = from_remote_semaphore_handles
-        self.to_remote_semaphore_handles = to_remote_semaphore_handles
+        self.ccl_sub_device_crs = ccl_sub_device_crs
         self.worker_sub_device_id = worker_sub_device_id
 
         self.n_local_heads = self.n_heads // self.num_devices_per_group
@@ -385,6 +383,7 @@ class Attention(LightweightModule):
         kv_cache=None,
     ) -> ttnn.Tensor:
         """
+
         x: (seq_len, 1, batch, dim)
         current_pos: (batch_size), current token position in the sequence for each user
         """
@@ -536,7 +535,6 @@ class Attention(LightweightModule):
         ttnn.deallocate(attn_output_1G4D)
 
         if self.use_fused_all_gather_matmul:
-            # TODO: (GR) Not for prefill
             attn_output_cat = ttnn.to_memory_config(
                 attn_output_cat, self.model_config["ATTN_ALL_GATHER_MATMUL_OUTPUT_MEMCFG"]
             )
@@ -819,11 +817,7 @@ class Attention(LightweightModule):
 
         # Non fused All Gather Matmul
         if self.use_fused_all_gather_matmul:  # is true for Ring topology
-            compute_grid_size = self.mesh_device.compute_with_storage_grid_size()
-            ccl_sub_device_crs = ttnn.CoreRangeSet(
-                {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
-            )
-            multi_device_global_semaphore = ttnn.create_global_semaphore(self.mesh_device, ccl_sub_device_crs, 0)
+            multi_device_global_semaphore = ttnn.create_global_semaphore(self.mesh_device, self.ccl_sub_device_crs, 0)
 
             attn_output_11SH = ttnn.experimental.all_gather_async(
                 attn_output_11SH,
@@ -872,8 +866,7 @@ class Attention(LightweightModule):
                 topology=self.ccl_topology,
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
                 dtype=self.ccl_dtype,
-                from_remote_semaphore_handles=self.from_remote_semaphore_handles,
-                to_remote_semaphore_handles=self.to_remote_semaphore_handles,
+                ccl_sub_device_crs=self.ccl_sub_device_crs,
                 worker_sub_device_id=self.worker_sub_device_id,
             )
 

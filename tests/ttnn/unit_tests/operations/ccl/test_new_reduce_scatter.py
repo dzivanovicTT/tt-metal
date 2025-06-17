@@ -125,14 +125,14 @@ def run_reduce_scatter_impl(
     def run_op(i):
         tt_reduce_scatter_output_tensor = ttnn.experimental.reduce_scatter_minimal_async(
             tt_input_tensor_mesh_list[i],
-            persistent_intermediate_buffer=persistent_intermediate_buffers[i],  # Hit
-            persistent_output_buffer=persistent_output_buffers[i],  # Hit
+            persistent_intermediate_buffer=persistent_intermediate_buffers[i],
+            persistent_output_buffer=persistent_output_buffers[i],
             dim=dim,
-            multi_device_global_semaphore=ccl_semaphore_handles[i],  # Hit
+            multi_device_global_semaphore=ccl_semaphore_handles[i],
             num_links=num_links,
             memory_config=mem_config_rs,
             topology=rs_topology,
-            subdevice_id=worker_sub_device_id,  # Hit
+            subdevice_id=worker_sub_device_id,
         )
 
         return tt_reduce_scatter_output_tensor
