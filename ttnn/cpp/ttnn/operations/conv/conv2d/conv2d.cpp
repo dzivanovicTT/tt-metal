@@ -607,6 +607,22 @@ Result conv2d_L1(
                 "in activation matrix height.");
         }
         // call conv micro op
+        auto op_trace_metadata = sliding_window::generate_op_trace_metadata(sliding_window_config);
+        auto shard_boundaries = sliding_window::generate_shard_boundaries(sliding_window_config, op_trace_metadata);
+
+        uint32_t input_num_cores = sliding_window_config.num_cores_nhw * sliding_window_config.num_cores_c;
+        uint32_t output_num_output_cores = 0;
+
+        for (const auto& item : shard_boundaries) {
+            const auto& [output_shard_start, output_shard_end] = item.output_range;
+            if (output_shard_start < op_trace_metadata.size()) {
+                output_num_output_cores++;
+            }
+        }
+
+        log_info(tt::LogOp, "input cores: {} output cores: {}", input_num_cores, output_num_output_cores);
+        assert(input_num_cores == output_num_output_cores);
+
         auto conv_output = optimized_conv_new(
             input_tensor_post_tm,
             weight_tensor_on_device,
