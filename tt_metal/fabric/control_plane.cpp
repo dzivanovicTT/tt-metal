@@ -156,7 +156,8 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         this->routing_table_generator_->mesh_graph->get_inter_mesh_connectivity(), golden_link_counts);
 
     // For each mesh in the system
-    for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
+    auto user_meshes = this->get_user_physical_mesh_ids();
+    for (auto mesh_id : user_meshes) {
         const auto& mesh_shape = this->get_physical_mesh_shape(MeshId{mesh_id});
         TT_FATAL(mesh_shape.dims() == 2, "ControlPlane: Only 2D meshes are supported");
         TT_FATAL(mesh_shape[0] > 0, "ControlPlane: Mesh width must be greater than 0");
@@ -166,7 +167,7 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         std::vector<size_t> col_min_planes(mesh_shape[1], std::numeric_limits<size_t>::max());
 
         // First pass: Calculate minimums for each row/column
-        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
+        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id.get()].size(); chip_id++) {
             const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
             const auto chip_coord = get_chip_coord(fabric_node_id);
             auto chip_coord_x = chip_coord[0];
@@ -191,7 +192,7 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
         }
 
         // Second pass: Apply minimums to each device
-        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
+        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id.get()].size(); chip_id++) {
             const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
             const auto chip_coord = get_chip_coord(fabric_node_id);
             auto chip_coord_x = chip_coord[0];
@@ -205,26 +206,6 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
             };
         }
     }
-
-    // Validation only - no functional impact
-    // for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
-    //     for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
-    //         const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
-    //         for (auto dir : {RoutingDirection::E, RoutingDirection::W, RoutingDirection::N, RoutingDirection::S}) {
-    //             auto actual_count = this->router_port_directions_to_num_routing_planes_map_[fabric_node_id].at(dir);
-    //             if (golden_link_counts[MeshId{mesh_id}][chip_id].find(dir) !=
-    //                 golden_link_counts[MeshId{mesh_id}][chip_id].end()) {
-    //                 auto max_count = golden_link_counts[MeshId{mesh_id}][chip_id][dir];
-    //                 TT_FATAL(
-    //                     actual_count <= max_count,
-    //                     "Routing plane count for chip {} in mesh {} direction {} is greater than golden link count",
-    //                     chip_id,
-    //                     mesh_id,
-    //                     dir);
-    //             }
-    //         }
-    //     }
-    // }
 }
 
 ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
