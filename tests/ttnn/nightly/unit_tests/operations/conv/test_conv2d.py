@@ -3656,3 +3656,136 @@ def test_conv2d_with_fold(
         enable_kernel_stride_folding=True,
         preprocess_weights_on_device=preprocess_weights_on_device,
     )
+
+@pytest.mark.parametrize("device_params", [{"l1_small_size": 16384}], indirect=True)
+def test_conv2d_and_add(
+    device,
+    torch_tensor_map,):
+    config_override = {}
+    config_override["act_block_h"] = 0
+    config_override["act_block_w_div"] = 1
+
+    in_height = 160
+    in_width = 160
+    out_height = 80
+    out_width = 80
+
+    in_channels = 32
+    out_channels = 32
+
+    torch.manual_seed(0)
+    conv_input_shape = (1, in_channels, in_height, in_width)
+    conv_weight_shape = (out_channels, in_channels, 3, 3)
+    tensor_b_shape = (1, out_channels, out_height, out_width)
+
+    torch_input_tensor_nchw = randomize_torch_tensor(torch_tensor_map, conv_input_shape)
+    torch_input_tensor = torch.permute(torch_input_tensor_nchw, (0, 2, 3, 1))
+    torch_weight_tensor = randomize_torch_tensor(torch_tensor_map, conv_weight_shape)
+
+    torch_tensor_b = torch.randn(tensor_b_shape, dtype=torch.bfloat16).float() * 50
+
+
+    ref = torch.nn.functional.conv2d(
+        torch_input_tensor_nchw,
+        torch_weight_tensor,
+        stride=(2, 2),
+        padding=(1, 1),
+        dilation=(1, 1),
+        groups=1,
+    )
+
+    ref = ref + torch_tensor_b
+
+    tt_weight_tensor = ttnn.from_torch(
+        torch_weight_tensor,
+        ttnn.bfloat16,
+    )
+
+    shard_grid = ttnn.CoreRangeSet(
+        {
+            ttnn.CoreRange(
+                ttnn.CoreCoord(0, 0),
+                ttnn.CoreCoord(7, 7),
+            ),
+        }
+    )
+    shard_spec = ttnn.ShardSpec(shard_grid, (400, in_channels), ttnn.ShardOrientation.ROW_MAJOR)
+    in_sharded_mem_config = ttnn.MemoryConfig(
+        ttnn.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.BufferType.L1, shard_spec
+    )
+
+    input_tensor_a = ttnn.from_torch(
+        torch_input_tensor, layout=ttnn.ROW_MAJOR_LAYOUT, device=device, memory_config=in_sharded_mem_config
+    )
+
+    input_tensor_b = ttnn.from_torch(
+        torch_tensor_b.reshape(1, 1, out_height * out_width, out_channels), layout=ttnn.TILE_LAYOUT, device=device, memory_config=ttnn.DRAM_MEMORY_CONFIG
+    )
+
+    conv_config = ttnn.Conv2dConfig(
+        dtype=ttnn.bfloat16,
+        weights_dtype=ttnn.bfloat8_b,
+        shard_layout=ttnn.TensorMemoryLayout.HEIGHT_SHARDED,
+        deallocate_activation=True,
+        enable_act_double_buffer=True,
+        enable_weights_double_buffer=False,
+        enable_split_reader=True,
+        enable_subblock_padding=False,
+        output_layout=ttnn.TILE_LAYOUT,
+        activation="",
+        transpose_shards=False,
+        preprocess_weights_on_device=False,
+        always_preprocess_weights=False,
+        in_place=False,
+        enable_kernel_stride_folding=False,
+        reshard_if_not_optimal=False,
+        reallocate_halo_output=True,
+    )
+    compute_config = ttnn.init_device_compute_kernel_config(
+        device.arch(),
+        math_fidelity=ttnn.MathFidelity.LoFi,
+        fp32_dest_acc_en=False,
+        packer_l1_acc=False,
+    )
+    conv_config.act_block_h_override = config_override["act_block_h"]
+
+    conv_config.act_block_w_div = config_override["act_block_w_div"]
+
+    out_conv = ttnn.conv2d(
+        input_tensor=input_tensor_a,
+        weight_tensor=tt_weight_tensor,
+        in_channels=in_channels,
+        out_channels=out_channels,
+        device=device,
+        kernel_size=(3, 3),
+        stride=(2, 2),
+        padding=(1, 1, 1, 1),
+        dilation=(1, 1),
+        batch_size=1,
+        input_height=in_height,
+        input_width=in_width,
+        conv_config=conv_config,
+        compute_config=compute_config,
+        groups=1,
+        memory_config=None,
+        slice_config=None,
+        return_output_dim=False,
+        return_weights_and_bias=False,
+    )
+
+    out = out_conv
+    out = out_conv + input_tensor_b
+
+
+    tt_output_tensor = ttnn.from_device(out)
+    torch_output_tensor = ttnn.to_torch(tt_output_tensor)
+
+    torch_output_tensor = torch_output_tensor.reshape(1, out_height, out_width, out_channels)
+    torch_output_tensor = torch.permute(torch_output_tensor, (0, 3, 1, 2))
+
+    pcc, pcc_msg = assert_with_pcc(torch_output_tensor, ref, pcc=0.999)
+
+    print(torch_output_tensor)
+    print(ref)
+
+    logger.info(f"PCC = {pcc_msg}. Threshold = {pcc}")
