@@ -113,7 +113,7 @@ ttnn::Tensor ExecuteScaledDotProductAttentionDecodeMLA::invoke(
         compute_kernel_config);
 }
 
-ttnn::Tensor ExecutePagedScaledDotProductAttentionDecode::invoke(
+ttnn::Tensor ExecutePagedScaledDotProductAttentionDecodeMLA::invoke(
     QueueId queue_id,
     const ttnn::Tensor& input_tensor_q,
     const ttnn::Tensor& input_tensor_k,

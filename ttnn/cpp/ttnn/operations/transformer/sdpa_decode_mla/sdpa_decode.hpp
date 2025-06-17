@@ -40,7 +40,7 @@ struct ExecuteScaledDotProductAttentionDecodeMLA {
         std::optional<DeviceComputeKernelConfig> compute_kernel_config = std::nullopt);
 };
 
-struct ExecutePagedScaledDotProductAttentionDecode {
+struct ExecutePagedScaledDotProductAttentionDecodeMLA {
     static ttnn::Tensor invoke(
         QueueId queue_id,
         const ttnn::Tensor& input_tensor_q,
@@ -77,8 +77,8 @@ constexpr auto scaled_dot_product_attention_decode_mla = ttnn::register_operatio
     "ttnn::transformer::scaled_dot_product_attention_decode_mla",
     ttnn::operations::transformer::ExecuteScaledDotProductAttentionDecodeMLA>();
 
-constexpr auto paged_scaled_dot_product_attention_decode = ttnn::register_operation<
-    "ttnn::transformer::paged_scaled_dot_product_attention_decode",
+constexpr auto paged_scaled_dot_product_attention_decode_mla = ttnn::register_operation<
+    "ttnn::transformer::paged_scaled_dot_product_attention_decode_mla",
     ttnn::operations::transformer::ExecutePagedScaledDotProductAttentionDecode>();
 
 }  // namespace transformer

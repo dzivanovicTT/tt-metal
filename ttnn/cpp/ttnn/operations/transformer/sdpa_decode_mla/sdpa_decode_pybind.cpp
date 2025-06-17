@@ -12,7 +12,7 @@
 
 namespace ttnn::operations::transformer {
 
-void py_bind_sdpa_decode(py::module& module) {
+void py_bind_sdpa_decode_mla(py::module& module) {
     auto doc =
         R"doc(
         A version of scaled dot product attention specifically for decode.
