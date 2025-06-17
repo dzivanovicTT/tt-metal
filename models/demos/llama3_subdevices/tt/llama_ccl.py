@@ -652,6 +652,7 @@ class TT_CCL:
                 if seqlen not in self.persistent_buffers.keys()
                 else self.persistent_buffers[seqlen].get(buffer_key, None)
             )
+            print(f"+ RS {input_tensor_mesh.shape}")
             ttnn_tensor_out = ttnn.experimental.reduce_scatter_async(
                 input_tensor_mesh,
                 dim,
@@ -670,6 +671,7 @@ class TT_CCL:
                 subdevice_id=self.worker_sub_device_id,
                 persistent_output_tensors=persistent_buffers,
             )
+            print(f"- RS {input_tensor_mesh.shape}")
             # reshape input back
             ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))
             self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
@@ -720,6 +722,7 @@ class TT_CCL:
             assert buffer_key is not None, "buffer_key is None"
             persistent_buffer = self.all_gather_buffers.get(buffer_key, None)
         # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
+        print(f"+ AG {input_tensor_mesh.shape}")
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor_mesh,
             dim,
@@ -732,6 +735,7 @@ class TT_CCL:
             memory_config=memory_config,
             subdevice_id=self.worker_sub_device_id,
         )
+        print(f"- AG {input_tensor_mesh.shape}")
         if self.mode == "prefill" and buffer_key is not None:
             # reshape input back
             ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))

@@ -518,6 +518,7 @@ class TtTransformer(LightweightModule):
         h = None
         # x needs to be in bfloat16_b as it gets reused as the residual tensor
         for i, layer in enumerate(self.layers):
+            print(f"Layer {i}")
             x, h = layer(
                 x,
                 h,
