@@ -248,6 +248,7 @@ void kernel_main() {
                 }
 
                 // Read V chunk in row major order, write in row-major order
+                // TODO: Add support to reuse_k for paged FlashMLA
                 cb_reserve_back(cb_v_in, v_chunk_tiles);
                 uint32_t v_write_ptr = get_write_ptr(cb_v_in);
                 barrier_count = 0;
@@ -284,6 +285,8 @@ void kernel_main() {
             uint32_t k_start_tile_id = k_batch_offset + k_head_offset + k_chunk_offset;
             uint32_t v_start_tile_id = v_batch_offset + v_head_offset + v_chunk_offset;
 
+            const bool reuse_k = false;  // Reuse K for V, as they are the same in FlashMLA
+
             read_kv_mask_chunks<
                 DHt,
                 vDHt,
@@ -293,7 +296,8 @@ void kernel_main() {
                 use_attention_mask,
                 cb_k_in,
                 cb_v_in,
-                cb_mask_in>(
+                cb_mask_in,
+                reuse_k>(
                 k_chunk_start,
                 k_chunk_end,
                 k_start_tile_id,
