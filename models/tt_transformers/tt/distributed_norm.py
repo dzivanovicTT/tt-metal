@@ -95,11 +95,11 @@ class DistributedNorm(LightweightModule):
             )
             if use_all_gather_async_minimal_interleaved_any:
                 ag_input_dtype = x.dtype
-                as_output_shape = list(x.shape)
-                as_output_shape[3] *= self.args.mesh_device.get_num_devices()
+                ag_output_shape = list(x.shape)
+                ag_output_shape[3] *= self.args.mesh_device.get_num_devices()
 
                 persistent_intermediate_buffer = ttnn.from_torch(
-                    torch.zeros(as_output_shape),
+                    torch.zeros(ag_output_shape),
                     device=self.args.mesh_device,
                     layout=ttnn.TILE_LAYOUT,
                     dtype=ag_input_dtype,
@@ -108,7 +108,7 @@ class DistributedNorm(LightweightModule):
                 )
 
                 persistent_output_buffer = ttnn.from_torch(
-                    torch.zeros(as_output_shape),
+                    torch.zeros(ag_output_shape),
                     device=self.args.mesh_device,
                     layout=ttnn.TILE_LAYOUT,
                     dtype=ag_input_dtype,
