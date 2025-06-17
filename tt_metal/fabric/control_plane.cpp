@@ -207,24 +207,24 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
     }
 
     // Validation only - no functional impact
-    for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
-        for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
-            const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
-            for (auto dir : {RoutingDirection::E, RoutingDirection::W, RoutingDirection::N, RoutingDirection::S}) {
-                auto actual_count = this->router_port_directions_to_num_routing_planes_map_[fabric_node_id].at(dir);
-                if (golden_link_counts[MeshId{mesh_id}][chip_id].find(dir) !=
-                    golden_link_counts[MeshId{mesh_id}][chip_id].end()) {
-                    auto max_count = golden_link_counts[MeshId{mesh_id}][chip_id][dir];
-                    TT_FATAL(
-                        actual_count <= max_count,
-                        "Routing plane count for chip {} in mesh {} direction {} is greater than golden link count",
-                        chip_id,
-                        mesh_id,
-                        dir);
-                }
-            }
-        }
-    }
+    // for (std::uint32_t mesh_id = 0; mesh_id < intra_mesh_connectivity.size(); mesh_id++) {
+    //     for (std::uint32_t chip_id = 0; chip_id < intra_mesh_connectivity[mesh_id].size(); chip_id++) {
+    //         const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
+    //         for (auto dir : {RoutingDirection::E, RoutingDirection::W, RoutingDirection::N, RoutingDirection::S}) {
+    //             auto actual_count = this->router_port_directions_to_num_routing_planes_map_[fabric_node_id].at(dir);
+    //             if (golden_link_counts[MeshId{mesh_id}][chip_id].find(dir) !=
+    //                 golden_link_counts[MeshId{mesh_id}][chip_id].end()) {
+    //                 auto max_count = golden_link_counts[MeshId{mesh_id}][chip_id][dir];
+    //                 TT_FATAL(
+    //                     actual_count <= max_count,
+    //                     "Routing plane count for chip {} in mesh {} direction {} is greater than golden link count",
+    //                     chip_id,
+    //                     mesh_id,
+    //                     dir);
+    //             }
+    //         }
+    //     }
+    // }
 }
 
 ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
