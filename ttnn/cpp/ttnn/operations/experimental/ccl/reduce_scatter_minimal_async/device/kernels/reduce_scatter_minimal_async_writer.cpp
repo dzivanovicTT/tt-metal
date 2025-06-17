@@ -67,15 +67,6 @@ void kernel_main() {
     size_t arg_for_fab = arg_idx;
     auto fabric_connection = FabricConnectionManager::build_from_args(arg_for_fab);
 
-    DPRINT << "my_chip_id: " << my_chip_id << "\n";
-    DPRINT << "tile_granularity: " << tile_granularity << "\n";
-    DPRINT << "input_tensor_Wt: " << input_tensor_Wt << "\n";
-    DPRINT << "batch_slice_num_pages: " << batch_slice_num_pages << "\n";
-    DPRINT << "ring_size: " << ring_size << "\n";
-    DPRINT << "num_batches: " << num_batches << "\n";
-    DPRINT << "link: " << link << "\n";
-    DPRINT << "num_links: " << num_links << "\n";
-
     // packet header cb
     cb_reserve_back(reserved_packet_header_cb_id, 1);
     auto packet_header_buffer_addr_forward = get_write_ptr(reserved_packet_header_cb_id);
@@ -115,9 +106,6 @@ void kernel_main() {
     }
 
     for (uint32_t b = 0; b < num_batches; b++) {
-        int fwd_slice_idx = my_chip_id - 1;
-        int bwd_slice_idx = my_chip_id + 1;
-
         uint32_t batch_offset = batch_slice_num_pages * b;
         uint32_t actual_fwd_slice_id_x = my_chip_id_x;
         uint32_t actual_fwd_slice_id_y = my_chip_id_y;
@@ -148,12 +136,6 @@ void kernel_main() {
                 uint32_t row_offset = row_offset_0;
                 uint32_t tiles_read = tiles_read_0;
                 uint32_t tiles_to_read = tiles_to_read_0;
-                DPRINT << "WRITER: for link " << link << ", tiles_read: " << tiles_read
-                       << ", tiles_to_read: " << tiles_to_read << ", "
-                       << "pages_read_in_row: " << pages_read_in_row << ", row_offset: " << row_offset << ", "
-                       << "slice_Wt: " << slice_Wt << ", stride_Wt: " << stride_Wt << ", batch_offset: " << batch_offset
-                       << "\n";
-
                 bool write_forward = true;
 
                 while (tiles_read < tiles_to_read) {
@@ -297,10 +279,6 @@ void kernel_main() {
                 }
                 noc_async_writes_flushed();
             }
-
-            // Next slice idx
-            fwd_slice_idx--;
-            bwd_slice_idx++;
         }
         // Reset the global semaphore before the next batch
         while (*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(batch_ready_sem) < ring_size - 1);

@@ -17,13 +17,9 @@ void MAIN {
     constexpr uint32_t num_links = get_compile_time_arg_val(7);
 
     // const uint32_t num_packets = batch_slice_num_pages / tile_granularity / num_links;
-    uint32_t total_tiles = (batch_slice_num_pages + tile_granularity - 1) / tile_granularity;
-    const uint32_t num_packets = (total_tiles + num_links - 1) / num_links;
-    uint32_t tiles_per_slice = batch_slice_num_pages / num_links;
-
-    DPRINT << "num_packets: " << num_packets << ", batch_slice_num_pages: " << batch_slice_num_pages
-           << ", tile_granularity: " << tile_granularity << ", num_links: " << num_links << "\t" << num_packets
-           << ", tiles_per_slice: " << tiles_per_slice << "\n";
+    constexpr uint32_t total_tiles = (batch_slice_num_pages + tile_granularity - 1) / tile_granularity;
+    constexpr uint32_t num_packets = (total_tiles + num_links - 1) / num_links;
+    constexpr uint32_t tiles_per_slice = batch_slice_num_pages / num_links;
 
     for (uint32_t b = 0; b < num_batches; b++) {
         for (uint32_t i = 0; i < ring_size - 1; i++) {  // Don't reduce on the first slice
@@ -34,8 +30,6 @@ void MAIN {
             // Wait for input data once before beginning processing
             for (uint32_t packet_id = 0; packet_id < num_packets; packet_id++) {
                 uint32_t to_process = std::min(tile_granularity, tiles_per_slice - packet_id * tile_granularity);
-                DPRINT << "to_process: " << to_process << ", packet_id: " << packet_id
-                       << ", total_tiles: " << total_tiles << ", tiles_per_slice: " << tiles_per_slice << "\n";
                 cb_wait_front(input_cb_id, to_process);
                 // Reserve output space once before processing
                 cb_wait_front(intermediate_cb, to_process);
