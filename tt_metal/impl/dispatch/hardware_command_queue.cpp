@@ -237,6 +237,8 @@ void HWCommandQueue::enqueue_read_buffer(
     TT_FATAL(!this->manager_.get_bypass_mode(), "Enqueue Read Buffer cannot be used with tracing");
     Buffer& buffer_obj = get_buffer_object(buffer);
 
+    // TODO DIEGO: I need to change this as well?
+
     // This is to make sure we block on the same sub_device_ids at the end
     // TODO: enqueue_read_from_core will call select_sub_device_ids every loop which will have minor overhead
     sub_device_ids = buffer_dispatch::select_sub_device_ids(this->device_, sub_device_ids);

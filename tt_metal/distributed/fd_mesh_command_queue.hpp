@@ -153,6 +153,13 @@ private:
     // This is temporary - will not be needed when we MeshCommandQueue is the only dispatch interface.
     std::atomic<bool> in_use_ = false;
 
+#if TTNN_OPERATION_TIMEOUT_SECONDS > 0
+    // Error callback type
+    using ErrorCallback = std::function<void(const std::exception&)>;
+    ErrorCallback error_callback_ = nullptr;
+
+    std::atomic<bool> thread_timeout_ = false;
+#endif
 protected:
     void write_shard_to_device(
         const MeshBuffer& buffer,
