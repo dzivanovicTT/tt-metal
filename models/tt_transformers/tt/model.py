@@ -49,14 +49,12 @@ class Transformer(LightweightModule):
         )
 
         self.worker_sub_device_id = ttnn.SubDeviceId(0)
-        self.from_remote_semaphore_handles = ttnn.create_global_semaphore(mesh_device, self.ccl_sub_device_crs, 0)
-        self.to_remote_semaphore_handles = ttnn.create_global_semaphore(mesh_device, self.ccl_sub_device_crs, 0)
 
         self.worker_sub_device = ttnn.SubDevice([self.ccl_sub_device_crs])
         self.sub_device_stall_group = [self.worker_sub_device_id]
         self.sub_device_manager = mesh_device.create_sub_device_manager([self.worker_sub_device], 0)
         self.mesh_device.load_sub_device_manager(self.sub_device_manager)
-        self.mesh_device.set_sub_device_stall_group([self.worker_sub_device_id])
+        self.mesh_device.set_sub_device_stall_group(self.sub_device_stall_group)
 
         self.embd = Embedding(
             mesh_device=mesh_device,
