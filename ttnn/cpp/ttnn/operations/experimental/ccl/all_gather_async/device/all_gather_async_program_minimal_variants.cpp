@@ -371,7 +371,7 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
     const size_t packet_size_bytes = tt::tt_fabric::get_1d_fabric_config().channel_buffer_size_bytes;
     uint32_t l1_scratch_cb_page_size_bytes = op_config.get_page_size();
     uint32_t tiles_to_write_per_packet = packet_size_bytes / l1_scratch_cb_page_size_bytes;
-    uint32_t num_pages_per_packet = 4 * tiles_to_write_per_packet;
+    uint32_t num_pages_per_packet = 2 * tiles_to_write_per_packet;
     uint32_t cb_num_pages = 3 * num_pages_per_packet;  // triple buffering
     tt::DataFormat df = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.get_dtype());
 
