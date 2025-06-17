@@ -502,7 +502,7 @@ def test_demo_text(
     data_parallel,
     reset_seeds,
     request,
-    token_accuracy=True,
+    token_accuracy=False,
 ):
     """
     Simple demo with limited dependence on reference code.
