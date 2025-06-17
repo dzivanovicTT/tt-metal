@@ -183,7 +183,8 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
 
         // First pass: Calculate minimums for each row/column
         size_t num_chips_in_mesh = intra_mesh_connectivity[mesh_id.get()].size();
-        bool may_have_intra_mesh_connectivity = true;  // num_chips_in_mesh > 1;
+        bool is_single_chip = num_chips_in_mesh == 1 && user_meshes.size() == 1;
+        bool may_have_intra_mesh_connectivity = !is_single_chip;
         if (may_have_intra_mesh_connectivity) {
             for (std::uint32_t chip_id = 0; chip_id < num_chips_in_mesh; chip_id++) {
                 const auto fabric_node_id = FabricNodeId(MeshId{mesh_id}, chip_id);
