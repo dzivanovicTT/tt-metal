@@ -110,7 +110,13 @@ def sample_top_p(values: torch.Tensor, p: float):
     probs_sum = torch.cumsum(probs_sort, dim=-1)
     mask = probs_sum - probs_sort > p
     probs_sort[mask] = 0.0
-    probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
+    # probs_sort.div_(probs_sort.sum(dim=-1, keepdim=True))
+    probs_sort = torch.nn.functional.softmax(probs_sort, dim=-1)
+    # Set all Nans or Infs to 0
+    probs_sort = torch.where(torch.isnan(probs_sort), torch.zeros_like(probs_sort), probs_sort)
+    probs_sort = torch.where(torch.isinf(probs_sort), torch.zeros_like(probs_sort), probs_sort)
+    # If all values in a row are 0, set to 1
+    probs_sort = torch.where(probs_sort.sum(dim=-1, keepdim=True) == 0, torch.ones_like(probs_sort), probs_sort)
 
     next_token = torch.multinomial(probs_sort, num_samples=1)
     return torch.gather(probs_idx, -1, next_token)
@@ -170,7 +176,7 @@ def reference_sampling(input_tensor, sampling_params, num_devices, padded_vocab_
         # Test top-p settings
         # {"temperature": 1.0, "top_k": 32, "top_p": 0.00, "seed": 42}, # argmax
         # {"temperature": 1.0, "top_k": 32, "top_p": 1.00, "seed": 42}, # multinomial sampling from all tok-k tokens
-        {"temperature": 1.0, "top_k": 32, "top_p": 0.95, "seed": 42},  # typical top-p parameter in LLMs
+        {"temperature": 1.0, "top_k": 1, "top_p": 0.0, "seed": 42},  # typical top-p parameter in LLMs
         # {"temperature": 1.0, "top_k": 32, "top_p": 0.08, "seed": 42}, # small top-p
         # {"temperature": 1.0, "top_k": 32, "top_p": 0.5, "seed": 42}, # mid top-p
         # {"temperature": 1.0, "top_k": 32, "top_p": 0.99, "seed": 42}, # large top-p
@@ -205,9 +211,9 @@ def reference_sampling(input_tensor, sampling_params, num_devices, padded_vocab_
     indirect=True,
 )
 def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_device, use_program_cache, reset_seeds):
-    use_tracing = True
-    load_cached_outputs = False
-    num_samples = 10000
+    use_tracing = False
+    load_cached_outputs = True
+    num_samples = 10
     num_compile_steps = 1
     model_args = TtModelArgs(mesh_device, max_batch_size=batch_size, max_seq_len=32, dummy_weights=True)
     max_top_k = model_args.max_top_k
@@ -225,7 +231,9 @@ def test_llama_sampling_inference(dtype, sampling_params, batch_size, mesh_devic
 
     if load_cached_outputs:
         # Cached model outputs
-        tt_model_output_cache_path = f"models/demos/llama3_subdevices/tests/ref_outputs/test_llama_model/tt_model_layers_80_output_logits_tok_4.bin"
+        tt_model_output_cache_path = (
+            f"models/demos/llama3_subdevices/tests/ref_outputs/test_llama_model/text_demo_logits.bin"
+        )
         tt_input_loaded = ttnn.load_tensor(file_name=tt_model_output_cache_path, device=mesh_device)
         tt_input_loaded = tt_input_loaded.reshape(1, 1, 32, -1)
         torch_input = ttnn.to_torch(

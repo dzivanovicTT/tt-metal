@@ -90,8 +90,12 @@ class TTSampling(LightweightModule):
         assert type(k) == list and len(k) == x.shape[2]
         assert type(p) == list and len(p) == x.shape[2]
 
+        x_bf16 = ttnn.typecast(x, dtype=ttnn.bfloat16, sub_core_grids=self.args.sub_core_grids)
+
         # Local top k
-        topk_values, topk_indices = ttnn.topk(x, k=self.max_top_k, dim=-1, sub_core_grids=self.args.sub_core_grid_topk)
+        topk_values, topk_indices = ttnn.topk(
+            x_bf16, k=self.max_top_k, dim=-1, sub_core_grids=self.args.sub_core_grid_topk
+        )
 
         # Gather values
         # Note: Persistent output buffer used, do not deallocate output!

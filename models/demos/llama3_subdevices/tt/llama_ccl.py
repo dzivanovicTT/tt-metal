@@ -177,7 +177,8 @@ class TT_CCL:
             torch.zeros((1, 1, self.max_batch_size, self.max_top_k * self.cluster_shape[0])),
             device=self.mesh_device,
             layout=ttnn.TILE_LAYOUT,
-            dtype=ttnn.bfloat8_b,
+            # dtype=ttnn.bfloat8_b,  # TODO: use bfp8_b when issue #23644 is fixed
+            dtype=ttnn.bfloat16,
             memory_config=ttnn.DRAM_MEMORY_CONFIG,
             mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
         )
