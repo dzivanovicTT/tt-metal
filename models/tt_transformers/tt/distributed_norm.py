@@ -94,10 +94,9 @@ class DistributedNorm(LightweightModule):
                 x.shape[0] == 1 and x.shape[1] == 1 and x.shape[2] != 32 and not x.is_sharded()
             )
             if use_all_gather_async_minimal_interleaved_any:
-                num_devices = 8
                 ag_input_dtype = x.dtype
-                as_output_shape = [x.shape[0], x.shape[1], x.shape[2], x.shape[3]]
-                as_output_shape[3] *= num_devices
+                as_output_shape = list(x.shape)
+                as_output_shape[3] *= self.args.mesh_device.get_num_devices()
 
                 persistent_intermediate_buffer = ttnn.from_torch(
                     torch.zeros(as_output_shape),

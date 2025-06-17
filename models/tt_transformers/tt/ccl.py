@@ -46,9 +46,8 @@ def tt_all_reduce(
             {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
         )
 
-        num_devices = 8
         rs_input_dtype = input_tensor.dtype
-        rs_input_shape = [input_tensor.shape[0], input_tensor.shape[1], input_tensor.shape[2], input_tensor.shape[3]]
+        rs_input_shape = list(input_tensor.shape)
 
         rs_num_batches = rs_input_shape[0]
         single_batch_input_shape = rs_input_shape[:]
@@ -63,7 +62,7 @@ def tt_all_reduce(
         )
 
         rs_output_shape = rs_input_shape[:]
-        rs_output_shape[3] //= num_devices
+        rs_output_shape[3] //= mesh_device.get_num_devices()
         persistent_output_buffer = ttnn.from_torch(
             torch.zeros(rs_output_shape),
             device=mesh_device,

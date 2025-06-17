@@ -157,10 +157,9 @@ class RMSNorm(LightweightModule):
             tt_stats.shape[0] == 1 and tt_stats.shape[1] == 1 and tt_stats.shape[2] != 32 and not tt_stats.is_sharded()
         )
         if use_all_gather_async_minimal_interleaved_any:
-            num_devices = 8
             ag_input_dtype = tt_stats.dtype
-            ag_output_shape = [tt_stats.shape[0], tt_stats.shape[1], tt_stats.shape[2], tt_stats.shape[3]]
-            ag_output_shape[3] *= num_devices
+            ag_output_shape = list(tt_stats.shape)
+            ag_output_shape[3] *= self.device.get_num_devices()
 
             persistent_intermediate_buffer = ttnn.from_torch(
                 torch.zeros(ag_output_shape),
