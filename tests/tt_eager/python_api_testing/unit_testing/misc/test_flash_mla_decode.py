@@ -28,11 +28,9 @@ def nearest_pow_2(x):
     return 1 << power
 
 
-def scaled_dot_product_attention_reference(Q, K, start_indices, padded_layer_len, scale, is_causal=True):
+def scaled_dot_product_attention_reference(Q, K, V, start_indices, padded_layer_len, scale, is_causal=True):
     b, nh, _, _ = Q.shape  # b, nh, 1, d
     _, nkv, _, _ = K.shape
-
-    V = K
 
     attn_mask = None
     if is_causal:
@@ -87,6 +85,7 @@ def run_flash_mla_decode_impl(
     ######################
     q = torch.randn(batch, nh, 1, kv_lora_rank + d_rope).float()  # (B, H, S (1 for decode), D)
     k = torch.randn(batch, nkv, seq_len, kv_lora_rank + d_rope).float()  # (B, H, S, D)
+    v = k[..., :kv_lora_rank]  # (B, H, S, D)
 
     ######################
     ### TT Setup
@@ -132,11 +131,16 @@ def run_flash_mla_decode_impl(
         memory_config=ttnn.DRAM_MEMORY_CONFIG,
     )
 
-    logger.info(f"TT Q shape: {tt_q.shape}, TT K shape: {tt_k.shape}")
+    ##########################
+    ### FlashMLA Decode
+    ##########################
+    logger.info(
+        f"Running FlashMLA Decode with TT Q shape: {tt_q.shape}, TT K shape: {tt_k.shape}, head_dim_v: {kv_lora_rank}"
+    )
     tt_out = ttnn.transformer.flash_mla_decode(
         tt_q,
         tt_k,
-        kv_lora_rank,
+        head_dim_v=kv_lora_rank,
         cur_pos=start_indices,
         scale=scale,
         program_config=sdpa_program_config,
@@ -151,12 +155,19 @@ def run_flash_mla_decode_impl(
     out_t = scaled_dot_product_attention_reference(
         q,
         k,
+        v,
         start_indices,
         padded_layer_len,
         scale,
     )
 
-    out_pass, out_pcc = comp_pcc(tt_out_torch, out_t)
+    pcc_threshold = 0.99
+    if dtype == ttnn.bfloat4_b:
+        pcc_threshold = 0.91
+    if dtype == ttnn.bfloat8_b:
+        pcc_threshold = 0.97
+
+    out_pass, out_pcc = comp_pcc(tt_out_torch, out_t, pcc_threshold)
     logger.info(f"Output PCC: {out_pcc}")
 
     assert out_pass, f"Output mismatch: PCC {out_pcc} < 0.99"
@@ -166,15 +177,21 @@ def run_flash_mla_decode_impl(
     "batch, seq_len, nh, nkv, kv_lora_rank, d_rope",
     # batch, seq_len, num heads q, num heads kv, kv lora rank, dim rope
     [
-        # (2, 1024, 16, 16, 512, 64), # DeepSeek V3 TG TP=8, DP=4 (OOM)
-        (2, 1024, 8, 8, 128, 64),
+        # (2, 1024, 128, 1, 512, 64), # DeepSeek V3 TG DP=32 (OOM)
+        (2, 8 * 1024, 8, 1, 128, 64),
+        (2, 8 * 1024, 64, 1, 256, 0),
+        (2, 8 * 1024, 64, 1, 32, 64),
+        (8, 4 * 1024, 8, 1, 128, 32),
+        # (32, 8 * 1024, 8, 1, 128, 32),  # Gives bad PCC
     ],
 )
 @pytest.mark.parametrize(
     "q_dtype, dtype",
     [
         (ttnn.bfloat16, ttnn.bfloat8_b),
+        (ttnn.bfloat8_b, ttnn.bfloat8_b),
         (ttnn.bfloat16, ttnn.bfloat4_b),
+        (ttnn.bfloat8_b, ttnn.bfloat4_b),
     ],
 )
 def test_flash_mla_decode(

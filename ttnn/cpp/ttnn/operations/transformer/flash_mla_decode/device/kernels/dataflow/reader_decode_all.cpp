@@ -19,23 +19,25 @@ void kernel_main() {
     constexpr uint32_t PNHt = get_compile_time_arg_val(1);        // padded number of heads in tiles
     constexpr uint32_t St = get_compile_time_arg_val(2);          // full sequence length of kv cache in tiles
     constexpr uint32_t DHt = get_compile_time_arg_val(3);         // head dim
-    constexpr uint32_t Sk_chunk_t = get_compile_time_arg_val(4);  // number of tiles in seqlen of a k/v/mask chunk
-    constexpr uint32_t num_cores = get_compile_time_arg_val(5);
-    constexpr bool is_q_sharded = get_compile_time_arg_val(6);
-    constexpr uint32_t num_cores_per_batch = get_compile_time_arg_val(7);
-    constexpr uint32_t k_chunk_size = get_compile_time_arg_val(8);
-    constexpr uint32_t index_stick_size_B = get_compile_time_arg_val(9);
-    constexpr bool is_paged_attention = get_compile_time_arg_val(10) == 1;
-    constexpr uint32_t num_kv_heads = get_compile_time_arg_val(11);
-    constexpr uint32_t block_size_t = get_compile_time_arg_val(12);
-    constexpr uint32_t Bkv = get_compile_time_arg_val(13);
-    constexpr uint32_t num_cores_per_head = get_compile_time_arg_val(14);
-    constexpr uint32_t num_heads_per_core = get_compile_time_arg_val(15);
-    constexpr uint32_t num_output_cores = get_compile_time_arg_val(16);
-    constexpr bool is_causal = get_compile_time_arg_val(17) == 1;
-    constexpr bool use_attention_mask = get_compile_time_arg_val(18) == 1;
-    constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(19);
-    constexpr bool tilize_q = get_compile_time_arg_val(20) == 1;
+    constexpr uint32_t vDHt = get_compile_time_arg_val(4);        // head dim for V
+    constexpr uint32_t Sk_chunk_t = get_compile_time_arg_val(5);  // number of tiles in seqlen of a k/v/mask chunk
+    constexpr uint32_t num_cores = get_compile_time_arg_val(6);
+    constexpr bool is_q_sharded = get_compile_time_arg_val(7);
+    constexpr uint32_t num_cores_per_batch = get_compile_time_arg_val(8);
+    constexpr uint32_t k_chunk_size = get_compile_time_arg_val(9);
+    constexpr uint32_t index_stick_size_B = get_compile_time_arg_val(10);
+    constexpr bool is_paged_attention = get_compile_time_arg_val(11) == 1;
+    constexpr uint32_t num_kv_heads = get_compile_time_arg_val(12);
+    constexpr uint32_t block_size_t = get_compile_time_arg_val(13);
+    constexpr uint32_t Bkv = get_compile_time_arg_val(14);
+    constexpr uint32_t num_cores_per_head = get_compile_time_arg_val(15);
+    constexpr uint32_t num_heads_per_core = get_compile_time_arg_val(16);
+    constexpr uint32_t num_output_cores = get_compile_time_arg_val(17);
+    constexpr bool is_causal = get_compile_time_arg_val(18) == 1;
+    constexpr bool use_attention_mask = get_compile_time_arg_val(19) == 1;
+    constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(20);
+    constexpr bool tilize_q = get_compile_time_arg_val(21) == 1;
+
     uint32_t arg_idx = 0;
     const uint32_t q_addr = get_arg_val<uint32_t>(arg_idx++);
     const uint32_t k_addr = get_arg_val<uint32_t>(arg_idx++);
@@ -105,6 +107,7 @@ void kernel_main() {
 
     constexpr uint32_t q_chunk_tiles = PNHt * DHt;
     uint32_t k_chunk_tiles = Sk_chunk_t_dynamic * DHt;
+    uint32_t v_chunk_tiles = Sk_chunk_t_dynamic * vDHt;
     uint32_t mask_chunk_tiles = PNHt * Sk_chunk_t_dynamic;
 
     constexpr bool is_dram = true;
@@ -245,16 +248,16 @@ void kernel_main() {
                 }
 
                 // Read V chunk in row major order, write in row-major order
-                cb_reserve_back(cb_v_in, k_chunk_tiles);
+                cb_reserve_back(cb_v_in, v_chunk_tiles);
                 uint32_t v_write_ptr = get_write_ptr(cb_v_in);
                 barrier_count = 0;
 
                 for (uint32_t row = 0; row < Sk_chunk_t_dynamic; ++row) {
                     uint32_t virtual_v_tile_row_num = k_chunk_start_row_num + row;
                     uint32_t physical_v_tile_id =
-                        virtual_seq_tile_id_to_physical_tile_id<num_kv_heads, block_size_t, DHt>(
+                        virtual_seq_tile_id_to_physical_tile_id<num_kv_heads, block_size_t, DHt /* Use K's head dim */>(
                             virtual_v_tile_row_num, cur_head, page_table_ptr);
-                    for (uint32_t col = 0; col < DHt; ++col) {
+                    for (uint32_t col = 0; col < vDHt; ++col) {
                         noc_async_read_tile(physical_v_tile_id, v_reader, v_write_ptr);
                         physical_v_tile_id += 1;
                         v_write_ptr += v_tile_bytes;
@@ -266,14 +269,14 @@ void kernel_main() {
                     }
                 }
                 noc_async_read_barrier();
-                cb_push_back(cb_v_in, k_chunk_tiles);
+                cb_push_back(cb_v_in, v_chunk_tiles);
             }
         } else {
             // Offset for current batch
             const uint32_t k_batch_offset = (cur_batch % Bkv) * num_kv_heads * St * DHt;
-            const uint32_t v_batch_offset = (cur_batch % Bkv) * num_kv_heads * St * DHt;
+            const uint32_t v_batch_offset = (cur_batch % Bkv) * num_kv_heads * St * DHt;  // Use K's head dim
             const uint32_t k_head_offset = cur_head * St * DHt;
-            const uint32_t v_head_offset = cur_head * St * DHt;
+            const uint32_t v_head_offset = cur_head * St * DHt;  // Use K's head dim
 
             // Then, read K, V, Mask k_chunk_tiles at a time
             const uint32_t k_chunk_offset = k_chunk_start * Sk_chunk_t_dynamic * DHt;
@@ -283,6 +286,7 @@ void kernel_main() {
 
             read_kv_mask_chunks<
                 DHt,
+                vDHt,
                 barrier_threshold,
                 mask_tile_bytes,
                 PNHt,
@@ -297,6 +301,7 @@ void kernel_main() {
                 mask_start_tile_id,
                 Sk_chunk_t_dynamic,
                 k_chunk_tiles,
+                v_chunk_tiles,
                 mask_chunk_tiles,
                 k_reader,
                 v_reader,

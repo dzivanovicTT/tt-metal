@@ -34,10 +34,16 @@ void FlashMLADecode::validate(
     const auto q_shape_unpadded = input_tensors.at(0).logical_shape();
     const auto k_shape = input_tensors.at(1).padded_shape();
 
+    // Head dim v validation
     TT_FATAL(
-        head_dim_v <= q_shape[3],
+        this->head_dim_v <= q_shape[3],
         "Head dimension of V must be less than or equal to head dim of Q, got {} and {}",
         head_dim_v,
+        q_shape[3]);
+    TT_FATAL(
+        this->head_dim_v <= k_shape[3],
+        "Head dimension of V must be less than or equal to head dim of K, got {} and {}",
+        this->head_dim_v,
         q_shape[3]);
 
     // Input 0 must be sharded by height or DRAM interleaved. All other inputs must be in DRAM.
@@ -203,8 +209,10 @@ void FlashMLADecode::validate(
 
 std::vector<TensorSpec> FlashMLADecode::compute_output_specs(const std::vector<Tensor>& input_tensors) const {
     auto& input = input_tensors.at(0);
-    return {
-        TensorSpec(input.logical_shape(), TensorLayout(input.dtype(), PageConfig(Layout::TILE), output_mem_config))};
+    auto shape = input.logical_shape();
+    shape[3] = this->head_dim_v;
+
+    return {TensorSpec(shape, TensorLayout(input.dtype(), PageConfig(Layout::TILE), output_mem_config))};
 }
 
 operation::ProgramWithCallbacks FlashMLADecode::create_program(

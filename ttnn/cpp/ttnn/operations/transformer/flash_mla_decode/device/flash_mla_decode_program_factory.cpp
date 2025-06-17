@@ -71,6 +71,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     uint32_t Bkv = k_shape[0];
     uint32_t St = S / TILE_HEIGHT;
     uint32_t DHt = DH / TILE_WIDTH;
+    uint32_t vDHt = head_dim_v / TILE_WIDTH;
     uint32_t PNHt = PNH / TILE_HEIGHT;
 
     const uint32_t Sk_chunk_t = k_chunk_size / TILE_HEIGHT;
@@ -94,6 +95,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     log_debug(tt::LogOp, "Bkv: {}", Bkv);
     log_debug(tt::LogOp, "St: {}", St);
     log_debug(tt::LogOp, "DHt: {}", DHt);
+    log_debug(tt::LogOp, "vDHt: {}", vDHt);
     log_debug(tt::LogOp, "PNHt: {}", PNHt);
     log_debug(tt::LogOp, "Sk_chunk_t: {}", Sk_chunk_t);
     log_debug(tt::LogOp, "k_chunk_size: {}", k_chunk_size);
@@ -249,10 +251,10 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
 
     uint32_t q_tiles = PNHt * DHt;
     uint32_t k_tiles = Sk_chunk_t_cb_size * DHt * 2;  // double buffer
-    uint32_t v_tiles = Sk_chunk_t_cb_size * DHt * 2;  // double buffer
+    uint32_t v_tiles = Sk_chunk_t_cb_size * vDHt * 2;  // double buffer
     uint32_t qk_tiles = PNHt * Sk_chunk_t_cb_size;
-    uint32_t out_im_tiles = PNHt * DHt;
-    uint32_t out0_t = PNHt * DHt;
+    uint32_t out_im_tiles = PNHt * vDHt;
+    uint32_t out0_t = PNHt * vDHt;
     uint32_t scale_tiles = 1;
     uint32_t statistics_tiles = PNHt;  // Single column of values in each iteration
 
@@ -292,12 +294,12 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         out_num_blocks = Sk_chunk_t / out_in0_block_w;
     }
 
-    const uint32_t out_out_subblock_w = std::min(DHt, dst_size);
+    const uint32_t out_out_subblock_w = std::min(vDHt, dst_size);
     const uint32_t out_out_subblock_h =
-        (out_out_subblock_w == DHt) ? (std::min(PNHt, dst_size / out_out_subblock_w)) : 1;
+        (out_out_subblock_w == vDHt) ? (std::min(PNHt, dst_size / out_out_subblock_w)) : 1;
 
     const uint32_t out_in0_num_subblocks = PNHt / out_out_subblock_h;
-    const uint32_t out_in1_num_subblocks = DHt / out_out_subblock_w;
+    const uint32_t out_in1_num_subblocks = vDHt / out_out_subblock_w;
 
     // log all values
     log_debug(tt::LogOp, "dst_size: {}", dst_size);
@@ -618,6 +620,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         PNHt,
         St,
         DHt,
+        vDHt,
         Sk_chunk_t,
         num_active_cores,
         is_q_sharded,
@@ -642,6 +645,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         PNHt,
         St,
         DHt,
+        vDHt,
         Sk_chunk_t,
         packed_identity_scalar,
         scale_union.u,
@@ -665,6 +669,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     std::vector<uint32_t> compute_compile_time_args_common = {
         St,
         DHt,
+        vDHt,
         PNHt,
         Sk_chunk_t,
         qk_in0_block_w,

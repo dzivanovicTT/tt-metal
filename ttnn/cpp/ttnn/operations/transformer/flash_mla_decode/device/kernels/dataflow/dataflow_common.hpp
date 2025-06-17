@@ -368,6 +368,7 @@ uint32_t write_partial_tiles_to_memory(
 
 template <
     uint32_t DHt,
+    uint32_t vDHt,
     uint32_t barrier_threshold,
     uint32_t mask_tile_bytes,
     uint32_t PNHt,
@@ -383,6 +384,7 @@ void read_kv_mask_chunks(
     uint32_t mask_start_tile_id,
     uint32_t Sk_chunk_t,
     uint32_t k_chunk_tiles,
+    uint32_t v_chunk_tiles,
     uint32_t mask_chunk_tiles,
     const InterleavedAddrGenFast<true>& k_reader,
     const InterleavedAddrGenFast<true>& v_reader,
@@ -418,12 +420,12 @@ void read_kv_mask_chunks(
         }
 
         // Read V chunk
-        cb_reserve_back(cb_v_in, k_chunk_tiles);
+        cb_reserve_back(cb_v_in, v_chunk_tiles);
         uint32_t v_write_ptr = get_write_ptr(cb_v_in);
         barrier_count = 0;
         uint32_t v_tile_id = v_start_tile_id;
         for (uint32_t row = 0; row < Sk_chunk_t; ++row) {
-            for (uint32_t col = 0; col < DHt; ++col) {
+            for (uint32_t col = 0; col < vDHt; ++col) {
                 noc_async_read_tile(v_tile_id, v_reader, v_write_ptr);
                 if (++barrier_count == barrier_threshold) {
                     noc_async_read_barrier();
@@ -434,7 +436,7 @@ void read_kv_mask_chunks(
             }
         }
         noc_async_read_barrier();
-        cb_push_back(cb_v_in, k_chunk_tiles);
-        v_start_tile_id += k_chunk_tiles;
+        cb_push_back(cb_v_in, v_chunk_tiles);
+        v_start_tile_id += v_chunk_tiles;
     }
 }
