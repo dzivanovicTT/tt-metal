@@ -819,20 +819,16 @@ class Attention(LightweightModule):
 
         # Non fused All Gather Matmul
         if self.use_fused_all_gather_matmul:  # is true for Ring topology
-            # assert False, "attention ccl"
-            # TODO: (GR) For Prefill
-            # attn_output_11SH = ttnn.all_gather(
-            #     attn_output_11SH,
-            #     dim=3,
-            #     num_links=1,
-            #     topology=self.ccl_topology,
-            #     memory_config=ttnn.DRAM_MEMORY_CONFIG,
-            # )
+            compute_grid_size = self.mesh_device.compute_with_storage_grid_size()
+            ccl_sub_device_crs = ttnn.CoreRangeSet(
+                {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
+            )
+            multi_device_global_semaphore = ttnn.create_global_semaphore(self.mesh_device, ccl_sub_device_crs, 0)
 
             attn_output_11SH = ttnn.experimental.all_gather_async(
                 attn_output_11SH,
                 dim=3,
-                multi_device_global_semaphore=self.from_remote_semaphore_handles,
+                multi_device_global_semaphore=multi_device_global_semaphore,
                 num_links=1,
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
                 topology=self.ccl_topology,
@@ -840,6 +836,16 @@ class Attention(LightweightModule):
             )
 
             ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
+
+            print("33333333")
+            print("33333333")
+            print("33333333")
+            print(attn_output_11SH.shape[0])
+            print(attn_output_11SH.shape[1])
+            print(attn_output_11SH.shape[2])
+            print(attn_output_11SH.shape[3])
+            print(attn_output_11SH.dtype)
+            print("---------")
 
         output_11SH = ttnn.linear(
             attn_output_11SH,

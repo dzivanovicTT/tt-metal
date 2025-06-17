@@ -350,8 +350,8 @@ def run_all_gather_impl(
 @pytest.mark.parametrize(
     "use_non_fused",
     [
-        # True,
-        False,
+        True,
+        # False,
     ],
 )
 @pytest.mark.parametrize(

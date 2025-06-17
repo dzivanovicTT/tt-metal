@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: © 2023 Tenstorrent Inc.
 
 # SPDX-License-Identifier: Apache-2.0
+import torch
+
 import ttnn
 from models.common.lightweightmodule import LightweightModule
 
@@ -151,28 +153,79 @@ class RMSNorm(LightweightModule):
 
         # Run distributed rmsnorm part 1
         tt_stats = ttnn.rms_norm_pre_all_gather(inp, compute_kernel_config=compute_kernel_config, dtype=ttnn.bfloat16)
-        # AllGather stats
-        # TODO: (GR) For Prefill
-        # assert False, "rmsnorm ccl"
-        # tt_stats = ttnn.all_gather(
-        #     tt_stats,
-        #     dim=3,
-        #     num_links=1,
-        #     topology=self.ccl_topology,
-        #     memory_config=ttnn.DRAM_MEMORY_CONFIG,
-        # )
 
-        tt_stats = ttnn.experimental.all_gather_async(
-            tt_stats,
-            dim=3,
-            multi_device_global_semaphore=self.from_remote_semaphore_handles,
-            num_links=1,
-            topology=self.ccl_topology,
-            memory_config=ttnn.DRAM_MEMORY_CONFIG,
-            subdevice_id=self.worker_sub_device_id,
+        # AllGather stats
+        compute_grid_size = self.device.compute_with_storage_grid_size()
+        ccl_sub_device_crs = ttnn.CoreRangeSet(
+            {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
         )
 
+        use_all_gather_async_minimal_interleaved_any = (
+            tt_stats.shape[0] == 1 and tt_stats.shape[1] == 1 and tt_stats.shape[2] != 32 and not tt_stats.is_sharded()
+        )
+        if use_all_gather_async_minimal_interleaved_any:
+            num_devices = 8
+            ag_input_dtype = tt_stats.dtype
+            ag_output_shape = [tt_stats.shape[0], tt_stats.shape[1], tt_stats.shape[2], tt_stats.shape[3]]
+            ag_output_shape[3] *= num_devices
+
+            persistent_intermediate_buffer = ttnn.from_torch(
+                torch.zeros(ag_output_shape),
+                device=self.device,
+                layout=ttnn.TILE_LAYOUT,
+                dtype=ag_input_dtype,
+                memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                mesh_mapper=ttnn.ReplicateTensorToMesh(self.device),
+            )
+
+            persistent_output_buffer = ttnn.from_torch(
+                torch.zeros(ag_output_shape),
+                device=self.device,
+                layout=ttnn.TILE_LAYOUT,
+                dtype=ag_input_dtype,
+                memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                mesh_mapper=ttnn.ReplicateTensorToMesh(self.device),
+            )
+
+            multi_device_global_sem = [
+                ttnn.create_global_semaphore(self.device, ccl_sub_device_crs, 0) for _ in range(2)
+            ]
+
+            tt_stats = ttnn.experimental.all_gather_async(
+                tt_stats,
+                persistent_intermediate_buffer=persistent_intermediate_buffer,
+                persistent_output_buffer=persistent_output_buffer,
+                dim=3,
+                multi_device_global_semaphore=multi_device_global_sem,
+                num_links=1,
+                topology=self.ccl_topology,
+                memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                subdevice_id=self.worker_sub_device_id,
+            )
+        else:
+            multi_device_global_semaphore = ttnn.create_global_semaphore(self.device, ccl_sub_device_crs, 0)
+
+            tt_stats = ttnn.experimental.all_gather_async(
+                tt_stats,
+                dim=3,
+                multi_device_global_semaphore=multi_device_global_semaphore,
+                num_links=1,
+                topology=self.ccl_topology,
+                memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                subdevice_id=self.worker_sub_device_id,
+            )
+
         ttnn.synchronize_device(self.device, sub_device_ids=[self.worker_sub_device_id])
+
+        print("11111111")
+        print("11111111")
+        print("11111111")
+        print(tt_stats.shape[0])
+        print(tt_stats.shape[1])
+        print(tt_stats.shape[2])
+        print(tt_stats.shape[3])
+        print(tt_stats.dtype)
+        print("---------")
 
         # Run distributed rmsnorm part 2
         tt_out = ttnn.rms_norm_post_all_gather(

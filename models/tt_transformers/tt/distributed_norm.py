@@ -2,6 +2,8 @@
 
 # SPDX-License-Identifier: Apache-2.0
 
+import torch
+
 import ttnn
 from models.common.lightweightmodule import LightweightModule
 from models.tt_transformers.tt.ccl import tt_distributed_rmsnorm, tt_sharded_distributed_rmsnorm
@@ -90,18 +92,78 @@ class DistributedNorm(LightweightModule):
 
         # Distributed norm requires a gather
         if self.args.is_distributed_norm(mode):
-            # TODO: (GR) For Prefill
-            # assert False, "distributed_norm ccl"
-            # x = ttnn.all_gather(x, dim=3, num_links=1, topology=self.args.ccl_topology())
-            x = ttnn.experimental.all_gather_async(
-                x,
-                dim=3,
-                multi_device_global_semaphore=self.from_remote_semaphore_handles,
-                num_links=1,
-                memory_config=input_mem_cfg,
-                topology=self.args.ccl_topology(),
-                subdevice_id=self.worker_sub_device_id,
+            compute_grid_size = self.args.mesh_device.compute_with_storage_grid_size()
+            ccl_sub_device_crs = ttnn.CoreRangeSet(
+                {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(compute_grid_size.x - 1, compute_grid_size.y - 1))}
             )
+
+            use_all_gather_async_minimal_interleaved_any = (
+                x.shape[0] == 1 and x.shape[1] == 1 and x.shape[2] != 32 and not x.is_sharded()
+            )
+            if use_all_gather_async_minimal_interleaved_any:
+                num_devices = 8
+                ag_input_dtype = x.dtype
+                as_output_shape = [x.shape[0], x.shape[1], x.shape[2], x.shape[3]]
+                as_output_shape[3] *= num_devices
+
+                persistent_intermediate_buffer = ttnn.from_torch(
+                    torch.zeros(as_output_shape),
+                    device=self.args.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ag_input_dtype,
+                    memory_config=input_mem_cfg,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.args.mesh_device),
+                )
+
+                persistent_output_buffer = ttnn.from_torch(
+                    torch.zeros(as_output_shape),
+                    device=self.args.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ag_input_dtype,
+                    memory_config=input_mem_cfg,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.args.mesh_device),
+                )
+
+                multi_device_global_semaphore = [
+                    ttnn.create_global_semaphore(self.args.mesh_device, ccl_sub_device_crs, 0) for _ in range(2)
+                ]
+
+                x = ttnn.experimental.all_gather_async(
+                    x,
+                    persistent_intermediate_buffer=persistent_intermediate_buffer,
+                    persistent_output_buffer=persistent_output_buffer,
+                    dim=3,
+                    multi_device_global_semaphore=multi_device_global_semaphore,
+                    num_links=1,
+                    memory_config=input_mem_cfg,
+                    topology=self.args.ccl_topology(),
+                    subdevice_id=self.worker_sub_device_id,
+                )
+            else:
+                multi_device_global_semaphore = ttnn.create_global_semaphore(
+                    self.args.mesh_device, ccl_sub_device_crs, 0
+                )
+
+                x = ttnn.experimental.all_gather_async(
+                    x,
+                    dim=3,
+                    multi_device_global_semaphore=multi_device_global_semaphore,
+                    num_links=1,
+                    memory_config=input_mem_cfg,
+                    topology=self.args.ccl_topology(),
+                    subdevice_id=self.worker_sub_device_id,
+                )
+
             ttnn.synchronize_device(self.args.mesh_device, sub_device_ids=[self.worker_sub_device_id])
+
+            print("22222222")
+            print("22222222")
+            print("22222222")
+            print(x.shape[0])
+            print(x.shape[1])
+            print(x.shape[2])
+            print(x.shape[3])
+            print(x.dtype)
+            print("---------")
 
         return x
