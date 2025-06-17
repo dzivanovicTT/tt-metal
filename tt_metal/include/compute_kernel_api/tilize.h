@@ -248,8 +248,9 @@ ALWI void fast_tilize_init(uint32_t icb, uint32_t full_dim, uint32_t ocb) {
 }
 
 ALWI void fast_tilize_uninit(uint32_t icb, uint32_t ocb) {
-    UNPACK((llk_unpack_fast_tilize_uninit()));
-    PACK((llk_pack_fast_tilize_uninit(ocb)));
+    UNPACK((llk_unpack_fast_tilize_uninit<DST_ACCUM_MODE>()));
+    MATH((llk_math_fast_eltwise_unary_datacopy_uninit<DST_ACCUM_MODE>()));
+    PACK((llk_pack_fast_tilize_uninit<DST_ACCUM_MODE>(ocb)));
 }
 
 ALWI void fast_tilize_block(

@@ -231,7 +231,7 @@ inline void llk_unpack_tilizeA_B_block(
  * LLK UNPACK FAST TILIZE SRC A
  *************************************************************************/
 
-template <bool is_fp32_dest_acc_en = false>
+template <bool is_fp32_dest_acc_en>
 inline void llk_unpack_fast_tilize_hw_configure(const llk_unpack_A_params_t* unpack_tilize_params) {
     const uint32_t unpA_operand_id = get_operand_id(unpack_tilize_params->unpA_operand);
 
@@ -239,7 +239,7 @@ inline void llk_unpack_fast_tilize_hw_configure(const llk_unpack_A_params_t* unp
         unpack_src_format[unpA_operand_id], unpack_dst_format[unpA_operand_id]);
 }
 
-template <bool is_fp32_dest_acc_en = false>
+template <bool is_fp32_dest_acc_en>
 inline void llk_unpack_fast_tilize_hw_configure_disaggregated(const std::uint32_t unpA_operand) {
     const llk_unpack_A_params_t unpack_tilize_params = {.unpA_operand = unpA_operand};
 
@@ -253,7 +253,10 @@ inline void llk_unpack_fast_tilize_init(
     _llk_unpack_fast_tilize_init_(unit_dim, full_dim);
 }
 
-inline void llk_unpack_fast_tilize_uninit() { _llk_unpack_fast_tilize_uninit_(); }
+template <bool is_fp32_dest_acc_en>
+inline void llk_unpack_fast_tilize_uninit() {
+    _llk_unpack_fast_tilize_uninit_<is_fp32_dest_acc_en>();
+}
 
 inline void llk_unpack_fast_tilize_block(
     const std::uint32_t operand,

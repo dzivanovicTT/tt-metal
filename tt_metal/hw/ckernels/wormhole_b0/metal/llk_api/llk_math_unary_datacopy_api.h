@@ -70,6 +70,11 @@ inline void llk_math_fast_eltwise_unary_datacopy_init(const std::uint32_t unit_d
     _llk_math_fast_eltwise_unary_datacopy_init_(unit_dim);
 }
 
+template <bool is_fp32_dest_acc_en>
+inline void llk_math_fast_eltwise_unary_datacopy_uninit() {
+    _llk_math_fast_eltwise_unary_datacopy_uninit_<is_fp32_dest_acc_en>();
+}
+
 inline void llk_math_fast_eltwise_unary_datacopy_block(
     const std::uint32_t dst_index, const std::uint32_t unit_dim, const std::uint32_t num_units) {
     _llk_math_fast_eltwise_unary_datacopy_block_(dst_index, unit_dim, num_units);
