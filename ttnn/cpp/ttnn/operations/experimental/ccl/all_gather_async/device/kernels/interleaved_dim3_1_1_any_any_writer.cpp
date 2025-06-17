@@ -136,7 +136,7 @@ void kernel_main() {
     DPRINT << "WRITER: Reading tiles...\n";
     while (tiles_read < tiles_to_read) {
         uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-        cb_wait_front(cb_forward_id, num_pages_to_read);
+        cb_wait_front(cb_forward_id, packet_size_in_pages);
         size_t l1_read_addr = get_read_ptr(cb_forward_id);
 
         for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
@@ -178,7 +178,7 @@ void kernel_main() {
                 intermediate_packet_id_y++;
             }
         }
-        cb_pop_front(cb_forward_id, num_pages_to_read);
+        cb_pop_front(cb_forward_id, packet_size_in_pages);
     }
 
     DPRINT << "WRITER: Done first\n";
@@ -258,7 +258,7 @@ void kernel_main() {
 
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-                cb_wait_front(cb_forward_id, num_pages_to_read);
+                cb_wait_front(cb_forward_id, packet_size_in_pages);
                 size_t l1_read_addr = get_read_ptr(cb_forward_id);
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     const uint32_t payload_size_bytes =
@@ -284,7 +284,7 @@ void kernel_main() {
                         intermediate_packet_id_y++;
                     }
                 }
-                cb_pop_front(cb_forward_id, num_pages_to_read);
+                cb_pop_front(cb_forward_id, packet_size_in_pages);
             }
             // 2. unicast output ready semaphore forward
             fabric_connection.get_forward_connection().wait_for_empty_write_slot();
@@ -316,7 +316,7 @@ void kernel_main() {
 
             while (tiles_read < tiles_to_read) {
                 uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-                cb_wait_front(cb_backward_id, num_pages_to_read);
+                cb_wait_front(cb_backward_id, packet_size_in_pages);
                 size_t l1_read_addr = get_read_ptr(cb_backward_id);
                 for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                     const uint32_t payload_size_bytes =
@@ -341,7 +341,7 @@ void kernel_main() {
                         intermediate_packet_id_y++;
                     }
                 }
-                cb_pop_front(cb_backward_id, num_pages_to_read);
+                cb_pop_front(cb_backward_id, packet_size_in_pages);
             }
 
             // 2. unicast output ready semaphore backward

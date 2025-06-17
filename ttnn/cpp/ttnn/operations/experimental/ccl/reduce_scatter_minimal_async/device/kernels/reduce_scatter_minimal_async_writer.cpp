@@ -143,7 +143,7 @@ void kernel_main() {
 
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
 
-                    cb_wait_front(cb_output_id, num_pages_to_read);
+                    cb_wait_front(cb_output_id, tile_granularity);
                     size_t l1_read_addr = get_read_ptr(cb_output_id);
 
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
@@ -201,7 +201,7 @@ void kernel_main() {
                         }
                     }
 
-                    cb_pop_front(cb_output_id, num_pages_to_read);
+                    cb_pop_front(cb_output_id, tile_granularity);
                     write_forward = !write_forward;
                 }
 
@@ -244,7 +244,7 @@ void kernel_main() {
                 uint32_t tile_id_start = batch_offset;
                 while (tiles_read < tiles_to_read) {
                     uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, tile_granularity);
-                    cb_wait_front(cb_output_id, num_pages_to_read);
+                    cb_wait_front(cb_output_id, tile_granularity);
                     size_t l1_read_addr = get_read_ptr(cb_output_id);
 
                     for (uint32_t j = 0; j < num_pages_to_read; j++) {
@@ -254,7 +254,7 @@ void kernel_main() {
                     }
 
                     noc_async_writes_flushed();
-                    cb_pop_front(cb_output_id, num_pages_to_read);
+                    cb_pop_front(cb_output_id, tile_granularity);
                 }
                 noc_async_write_barrier();
 

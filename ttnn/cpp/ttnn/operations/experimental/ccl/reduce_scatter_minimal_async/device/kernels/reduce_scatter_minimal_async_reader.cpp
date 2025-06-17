@@ -140,7 +140,7 @@ void kernel_main() {
                 uint32_t intermediate_pages_read_in_row = pages_read_in_row;
                 uint32_t intermediate_row_offset = row_offset;
 
-                cb_reserve_back(cb_in0, num_pages_to_read);
+                cb_reserve_back(cb_in0, tile_granularity);
                 const uint32_t l1_write_addr_base = get_write_ptr(cb_in0);
                 uint32_t l1_write_addr = l1_write_addr_base;
 
@@ -162,7 +162,7 @@ void kernel_main() {
 
                 if (do_reduce) {
                     // read the next intermediate slice out of the intermediate buffer, and put it in intermediate CB
-                    cb_reserve_back(cb_intermediate_id, num_pages_to_read);
+                    cb_reserve_back(cb_intermediate_id, tile_granularity);
                     size_t intermediate_l1_write_addr = get_write_ptr(cb_intermediate_id);
                     for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                         uint32_t payload_size_bytes =
@@ -193,11 +193,11 @@ void kernel_main() {
                     }
 
                     noc_async_read_barrier();
-                    cb_push_back(cb_intermediate_id, num_pages_to_read);
+                    cb_push_back(cb_intermediate_id, tile_granularity);
                 }
                 read_forward = !read_forward;
                 noc_async_read_barrier();
-                cb_push_back(cb_in0, num_pages_to_read);
+                cb_push_back(cb_in0, tile_granularity);
             }
         }
     }

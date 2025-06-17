@@ -104,7 +104,7 @@ void kernel_main() {
 
         while (tiles_read < tiles_to_read) {
             uint32_t num_pages_to_read = std::min(tiles_to_read - tiles_read, packet_size_in_pages);
-            cb_reserve_back(cb_intermediate_id, num_pages_to_read);
+            cb_reserve_back(cb_intermediate_id, packet_size_in_pages);
             size_t l1_write_addr = get_write_ptr(cb_intermediate_id);
             for (uint32_t j = 0; j < num_pages_to_read; j += contig_pages_advanced) {
                 const uint32_t payload_size_bytes =
@@ -125,7 +125,7 @@ void kernel_main() {
                 }
             }
             noc_async_read_barrier();
-            cb_push_back(cb_intermediate_id, num_pages_to_read);
+            cb_push_back(cb_intermediate_id, packet_size_in_pages);
         }
     }
 

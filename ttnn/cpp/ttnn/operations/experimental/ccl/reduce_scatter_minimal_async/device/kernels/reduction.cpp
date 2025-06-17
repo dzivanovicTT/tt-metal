@@ -30,19 +30,19 @@ void MAIN {
             // Wait for input data once before beginning processing
             for (uint32_t packet_id = 0; packet_id < num_packets; packet_id++) {
                 uint32_t to_process = std::min(tile_granularity, tiles_per_slice - packet_id * tile_granularity);
-                cb_wait_front(input_cb_id, to_process);
+                cb_wait_front(input_cb_id, tile_granularity);
                 // Reserve output space once before processing
-                cb_wait_front(intermediate_cb, to_process);
-                cb_reserve_back(output_cb, to_process);
+                cb_wait_front(intermediate_cb, tile_granularity);
+                cb_reserve_back(output_cb, tile_granularity);
                 acquire_dst();
                 for (uint32_t tile_id = 0; tile_id < to_process; tile_id++) {
                     add_tiles(input_cb_id, intermediate_cb, tile_id, tile_id, tile_id);
                     pack_tile(tile_id, output_cb);
                 }
                 release_dst();
-                cb_pop_front(input_cb_id, to_process);
-                cb_pop_front(intermediate_cb, to_process);
-                cb_push_back(output_cb, to_process);
+                cb_pop_front(input_cb_id, tile_granularity);
+                cb_pop_front(intermediate_cb, tile_granularity);
+                cb_push_back(output_cb, tile_granularity);
             }
         }
     }
