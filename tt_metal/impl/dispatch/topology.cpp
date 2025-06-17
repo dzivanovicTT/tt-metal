@@ -1236,7 +1236,7 @@ void configure_dispatch_cores(IDevice* device) {
     }
 }
 
-tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
+std::pair<tt::tt_fabric::FabricEriscDatamoverType, tt::tt_fabric::FabricEriscDatamoverAxis> get_fabric_edm_type(
     const tt::tt_fabric::ControlPlane& control_plane,
     tt_fabric::Topology topology,
     tt::tt_fabric::MeshId mesh_id,
@@ -1244,7 +1244,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
     chip_id_t chip1,
     bool wrap_around_mesh) {
     if (topology != tt_fabric::Topology::Ring) {
-        return tt::tt_fabric::FabricEriscDatamoverType::Default;
+        return {tt::tt_fabric::FabricEriscDatamoverType::Default, tt::tt_fabric::FabricEriscDatamoverAxis::Row};
     }
 
     auto physical_mesh_shape = control_plane.get_physical_mesh_shape(mesh_id);
@@ -1253,6 +1253,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
     auto mesh_num_rows = physical_mesh_shape[0];
     auto mesh_num_columns = physical_mesh_shape[1];
     auto fabric_edm_type = tt::tt_fabric::FabricEriscDatamoverType::Default;
+    auto fabric_edm_axis = tt::tt_fabric::FabricEriscDatamoverAxis::Row;
 
     auto smaller_chip_id = std::min(chip0, chip1);
     auto larger_chip_id = std::max(chip0, chip1);
@@ -1295,10 +1296,11 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
         bool is_dateline_upstream_adjacent_upstream_edm_along_row =
             (chip0 >= mesh_num_columns && chip0 < (2 * mesh_num_columns) && chip1 == chip0 + mesh_num_columns) ||
             (chip0 >= (mesh_num_columns * (mesh_num_rows - 2)) && chip0 < (mesh_num_columns * (mesh_num_rows - 1)) &&
-             chip1 == chip0 + mesh_num_columns);
+             chip1 == chip0 - mesh_num_columns);
         // Column dateline
         if (is_dateline_edm_along_column) {
             fabric_edm_type = tt::tt_fabric::FabricEriscDatamoverType::Dateline;
+            fabric_edm_axis = tt::tt_fabric::FabricEriscDatamoverAxis::Col;
         }
         // Row dateline
         else if (is_dateline_edm_along_row) {
@@ -1307,6 +1309,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
         // Column dateline upstream
         else if (is_dateline_upstream_edm_along_column) {
             fabric_edm_type = tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstream;
+            fabric_edm_axis = tt::tt_fabric::FabricEriscDatamoverAxis::Col;
         }
         // Row dateline upstream
         else if (is_dateline_upstream_edm_along_row) {
@@ -1315,6 +1318,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
         // Column dateline upstream adjacent
         else if (is_dateline_upstream_adjacent_edm_along_column) {
             fabric_edm_type = tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDevice;
+            fabric_edm_axis = tt::tt_fabric::FabricEriscDatamoverAxis::Col;
         }
         // Row dateline upstream adjacent
         else if (is_dateline_upstream_adjacent_edm_along_row) {
@@ -1323,6 +1327,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
         // Column dateline upstream adjacent device upstream
         else if (is_dateline_upstream_adjacent_upstream_edm_along_column) {
             fabric_edm_type = tt::tt_fabric::FabricEriscDatamoverType::DatelineUpstreamAdjacentDeviceUpstream;
+            fabric_edm_axis = tt::tt_fabric::FabricEriscDatamoverAxis::Col;
         }
         // Row dateline upstream adjacent device upstream
         else if (is_dateline_upstream_adjacent_upstream_edm_along_row) {
@@ -1330,7 +1335,7 @@ tt::tt_fabric::FabricEriscDatamoverType get_fabric_edm_type(
         }
     }
 
-    return fabric_edm_type;
+    return {fabric_edm_type, fabric_edm_axis};
 }
 
 void build_tt_fabric_program(
@@ -1420,7 +1425,7 @@ void build_tt_fabric_program(
 
     for (const auto& [direction, remote_physical_chip_id] : chip_neighbors) {
         auto remote_fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(remote_physical_chip_id);
-        const auto& fabric_edm_type = get_fabric_edm_type(
+        const auto& [fabric_edm_type, fabric_edm_axis] = get_fabric_edm_type(
             control_plane,
             topology,
             fabric_node_id.mesh_id,
@@ -1431,7 +1436,7 @@ void build_tt_fabric_program(
         bool is_dateline = remote_fabric_node_id.mesh_id == fabric_node_id.mesh_id &&
                            fabric_edm_type == tt::tt_fabric::FabricEriscDatamoverType::Dateline;
 
-        const auto& curr_edm_config = fabric_context.get_fabric_router_config(fabric_edm_type);
+        const auto& curr_edm_config = fabric_context.get_fabric_router_config(fabric_edm_type, fabric_edm_axis);
 
         for (const auto& eth_chan : active_fabric_eth_channels[direction]) {
             auto eth_logical_core = soc_desc.get_eth_core_for_channel(eth_chan, CoordSystem::LOGICAL);

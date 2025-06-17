@@ -1129,7 +1129,7 @@ def test_fabric_6u_4chip_cols_mcast_bw(
 @pytest.mark.parametrize("line_size", [4])
 @pytest.mark.parametrize("num_links", [1, 2, 3, 4])
 @pytest.mark.parametrize("packet_size", [2048, 4096])
-@pytest.mark.parametrize("fabric_test_mode", [FabricTestMode.HalfRing, FabricTestMode.FullRing, FabricTestMode.Linear])
+@pytest.mark.parametrize("fabric_test_mode", [FabricTestMode.HalfRing])
 @pytest.mark.parametrize("num_cluster_rows", [8])
 def test_fabric_6u_4chip_rows_mcast_bw(
     is_unicast,

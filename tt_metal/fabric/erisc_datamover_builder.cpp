@@ -156,11 +156,18 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
     std::array<size_t, num_receiver_channels>& num_receiver_buffer_slots,
     std::array<size_t, num_receiver_channels>& num_remote_receiver_buffer_slots,
     std::array<size_t, num_downstream_sender_channels>& num_downstream_sender_buffer_slots) {
-    constexpr std::array<std::pair<size_t, size_t>, 1> linear_buffer_slot_options = {{{8, 16}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options = {{{8, 8}, {4, 8}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options_dateline = {{{8, 16}, {8, 8}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options_dateline_upstream = {{{8, 16}, {8, 8}}};
-    constexpr std::array<std::pair<size_t, size_t>, 2> ring_buffer_slot_options_dateline_upstream_adjcent = {
+    const std::vector<std::pair<size_t, size_t>> linear_buffer_slot_options = {{{8, 16}}};
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options = {{{8, 8}, {4, 8}}};
+
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_col = {{{8, 16}, {8, 8}}};
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_upstream_col = {{{8, 16}, {8, 8}}};
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_upstream_adjcent_col = {
+        {{16, 8}, {8, 8}}};
+
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_row = {{{16, 16}, {8, 16}, {8, 8}}};
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_upstream_row = {
+        {{16, 16}, {8, 16}, {8, 8}}};
+    const std::vector<std::pair<size_t, size_t>> ring_buffer_slot_options_dateline_upstream_adjcent_row = {
         {{16, 8}, {8, 8}}};
 
     auto get_optimal_num_slots = [this](
@@ -168,17 +175,34 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
                                      size_t num_sender_channels,
                                      size_t num_receiver_channels,
                                      size_t& num_sender_buffer_slots,
-                                     size_t& num_receiver_buffer_slots) {
+                                     size_t& num_receiver_buffer_slots,
+                                     std::optional<size_t> worker_num_sender_buffer_slots = std::nullopt) {
         for (auto& option : buffer_slot_options) {
             num_sender_buffer_slots = option.first;
             num_receiver_buffer_slots = option.second;
-            if (num_sender_channels * num_sender_buffer_slots * this->channel_buffer_size_bytes +
-                    num_receiver_channels * num_receiver_buffer_slots * this->channel_buffer_size_bytes <=
-                this->available_channel_buffering_space) {
+            auto num_total_sender_slots = num_sender_channels * num_sender_buffer_slots;
+            auto num_total_receiver_slots = num_receiver_channels * num_receiver_buffer_slots;
+            if (worker_num_sender_buffer_slots.has_value()) {
+                num_total_sender_slots =
+                    worker_num_sender_buffer_slots.value() + (num_sender_channels - 1) * num_sender_buffer_slots;
+            }
+            auto total_num_bytes =
+                (num_total_sender_slots + num_total_receiver_slots) * this->channel_buffer_size_bytes;
+            if (total_num_bytes <= this->available_channel_buffering_space) {
                 break;
             }
         }
     };
+
+    bool is_edm_on_row_axis = options.edm_axis == FabricEriscDatamoverAxis::Row;
+    const auto& ring_buffer_slot_options_dateline =
+        is_edm_on_row_axis ? ring_buffer_slot_options_dateline_row : ring_buffer_slot_options_dateline_col;
+    const auto& ring_buffer_slot_options_dateline_upstream = is_edm_on_row_axis
+                                                                 ? ring_buffer_slot_options_dateline_upstream_row
+                                                                 : ring_buffer_slot_options_dateline_upstream_col;
+    const auto& ring_buffer_slot_options_dateline_upstream_adjcent =
+        is_edm_on_row_axis ? ring_buffer_slot_options_dateline_upstream_adjcent_row
+                           : ring_buffer_slot_options_dateline_upstream_adjcent_col;
 
     if (topology == Topology::Ring) {
         size_t default_num_sender_buffer_slots;
@@ -198,7 +222,8 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
             this->num_used_sender_channels - 1,
             this->num_used_receiver_channels - 1,
             dateline_num_sender_buffer_slots,
-            dateline_num_receiver_buffer_slots);
+            dateline_num_receiver_buffer_slots,
+            default_num_sender_buffer_slots);
         // get the dateline upstream buffer slots
         size_t dateline_upstream_num_sender_buffer_slots;
         size_t dateline_upstream_num_receiver_buffer_slots;
@@ -207,7 +232,8 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
             this->num_used_sender_channels - 1,
             this->num_used_receiver_channels - 1,
             dateline_upstream_num_sender_buffer_slots,
-            dateline_upstream_num_receiver_buffer_slots);
+            dateline_upstream_num_receiver_buffer_slots,
+            default_num_sender_buffer_slots);
         // get the dateline upstream adjacent device buffer slots
         size_t dateline_upstream_adjcent_num_sender_buffer_slots;
         size_t dateline_upstream_adjcent_num_receiver_buffer_slots;
@@ -216,7 +242,8 @@ void FabricEriscDatamoverConfig::configure_buffer_slots_helper(
             this->num_used_sender_channels - 1,
             this->num_used_receiver_channels,
             dateline_upstream_adjcent_num_sender_buffer_slots,
-            dateline_upstream_adjcent_num_receiver_buffer_slots);
+            dateline_upstream_adjcent_num_receiver_buffer_slots,
+            default_num_sender_buffer_slots);
         // set default buffer slots.
         num_sender_buffer_slots.fill(default_num_sender_buffer_slots);
         num_remote_sender_buffer_slots.fill(default_num_sender_buffer_slots);

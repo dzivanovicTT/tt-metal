@@ -65,9 +65,16 @@ enum class FabricEriscDatamoverType {
     Invalid = 5,
 };
 
+enum class FabricEriscDatamoverAxis {
+    Row = 0,
+    Col = 1,
+    Invalid = 2,
+};
+
 // enable extra buffer slots configuration based on sender/receiver channel and EDM type.
 struct FabricEriscDatamoverOptions {
     FabricEriscDatamoverType edm_type = FabricEriscDatamoverType::Default;
+    FabricEriscDatamoverAxis edm_axis = FabricEriscDatamoverAxis::Row;
     bool enable_dateline_sender_extra_buffer_slots = false;
     bool enable_dateline_receiver_extra_buffer_slots = false;
     bool enable_dateline_upstream_sender_extra_buffer_slots = false;
