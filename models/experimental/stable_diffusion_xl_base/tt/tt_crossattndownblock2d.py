@@ -74,10 +74,8 @@ class TtCrossAttnDownBlock2D(nn.Module):
         hidden_states = input_tensor
         tt_blocks = list(zip(self.resnets, self.attentions))
         for resnet, attn in tt_blocks:
-            hidden_states, [C, H, W] = resnet.forward(hidden_states, temb, [B, C, H, W])
-            hidden_states = attn.forward(
-                hidden_states, [B, C, H, W], encoder_hidden_states=encoder_hidden_states, i=i, iter=iter
-            )
+            hidden_states, [C, H, W] = resnet.forward(hidden_states, temb, [B, C, H, W], i=i, iter=iter)
+            hidden_states = attn.forward(hidden_states, [B, C, H, W], encoder_hidden_states=encoder_hidden_states)
             residual = ttnn.to_memory_config(hidden_states, ttnn.DRAM_MEMORY_CONFIG)
             output_states = output_states + (residual,)
 

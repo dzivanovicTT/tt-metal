@@ -170,7 +170,7 @@ class TtResnetBlock2D(nn.Module):
         assert self.linear_program_config is not None, "linear_program_config should not be None"
         self.default_compute_config = model_config.get_mm_compute_config(mm_path)
 
-    def forward(self, input_tensor, temb, input_shape):
+    def forward(self, input_tensor, temb, input_shape, i=-1, iter=-2):
         B, C, H, W = input_shape
         hidden_states = input_tensor
 
@@ -268,9 +268,24 @@ class TtResnetBlock2D(nn.Module):
         )
 
         temb = ttnn.unsqueeze_to_4D(temb)
+
+        if iter == 265 and i == 1:
+            print("Iteration 265, 2%, start sync_device")
+            ttnn.synchronize_device(self.device)
+            print("start repeat")
         temb = ttnn.repeat(temb, (1, 1, H * W, 1))
 
+        if iter == 265 and i == 1:
+            print("start sync_device after repeat")
+            ttnn.synchronize_device(self.device)
+            print("start sharded_to_interleaved")
+
         hidden_states = ttnn.sharded_to_interleaved(hidden_states, ttnn.L1_MEMORY_CONFIG)
+        if iter == 265 and i == 1:
+            print("start sync_device after sharded_to_interleaved")
+            ttnn.synchronize_device(self.device)
+            print("start add")
+
         hidden_states = ttnn.add(hidden_states, temb)
 
         hidden_states = ttnn.to_layout(hidden_states, ttnn.ROW_MAJOR_LAYOUT)
