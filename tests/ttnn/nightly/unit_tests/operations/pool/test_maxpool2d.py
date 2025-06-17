@@ -336,7 +336,7 @@ def run_max_pool(
             # partial grid tests
             # [1, 32, 10, 10],  # BH
             # [1, 32, 6, 6],  # WH
-            [1, 64, 112, 112],
+            [1, 128, 20, 20],
         )
     ),
 )
@@ -347,18 +347,18 @@ def run_max_pool(
         # (3, 3),
         # (5, 5),
         # (9, 9),
-        # (13, 13),
-        (64, 64),
+        (13, 13),
+        # (28, 28),
     ),
 )
 @pytest.mark.parametrize(
     "padding",
     (
-        (0, 0),
+        # (0, 0),
         # (1, 1),
         # (2, 2),
         # (4, 4),
-        # (6, 6),
+        (6, 6),
     ),
 )
 @pytest.mark.parametrize(
@@ -395,7 +395,7 @@ def test_run_max_pool(
         device,
         torch_tensor_map,
         dtype,
-        shard_scheme=ttnn.TensorMemoryLayout.HEIGHT_SHARDED,
+        shard_scheme=ttnn.TensorMemoryLayout.BLOCK_SHARDED,
         ceil_mode=ceil_mode,
     )
 
