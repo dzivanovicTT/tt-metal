@@ -274,9 +274,9 @@ int GraphProcessor::add_tensor(const Tensor& t) {
         storage);
     std::int64_t tensor_id;
     if (not t.tensor_id.has_value()) {
-        tt::log_warning(
-            "Tensor doesn't have tensor_id, generating new one. Ideally this should not happen. Please set tensor_id "
-            "for this tensor ahead of time.");
+        // tt::log_warning(
+        //"Tensor doesn't have tensor_id, generating new one. Ideally this should not happen. Please set tensor_id "
+        //"for this tensor ahead of time.");
         tensor_id = ttnn::CoreIDs::instance().fetch_and_increment_tensor_id();
     } else {
         tensor_id = t.tensor_id.value();
