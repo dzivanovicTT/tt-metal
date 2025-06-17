@@ -18,6 +18,14 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
     // and we will use the NoC to write to the former source/new destination cores
     // Addresses calculated should be the same in both cases
 
+    std::map<int, int> batch_mapping = {
+        {0, 0},   {1, 1},   {2, 8},   {3, 9},   {4, 2},   {5, 3},   {6, 10},  {7, 11},  {8, 16},  {9, 17},  {10, 24},
+        {11, 25}, {12, 18}, {13, 19}, {14, 26}, {15, 27}, {16, 4},  {17, 5},  {18, 12}, {19, 13}, {20, 6},  {21, 7},
+        {22, 14}, {23, 15}, {24, 20}, {25, 21}, {26, 28}, {27, 29}, {28, 22}, {29, 23}, {30, 30}, {31, 31}, {32, 32},
+        {33, 33}, {34, 40}, {35, 41}, {36, 34}, {37, 35}, {38, 42}, {39, 43}, {40, 48}, {41, 49}, {42, 56}, {43, 57},
+        {44, 50}, {45, 51}, {46, 58}, {47, 59}, {48, 36}, {49, 37}, {50, 44}, {51, 45}, {52, 38}, {53, 39}, {54, 46},
+        {55, 47}, {56, 52}, {57, 53}, {58, 60}, {59, 61}, {60, 54}, {61, 55}, {62, 62}, {63, 63}};
+
     using namespace tt::constants;
     using namespace tt::tt_metal::detail;
     using namespace tt::tt_metal;
@@ -173,6 +181,8 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
         uint32_t cores_in_batch = num_of_shards / in_batches;
         // batch this core is processing [0-3]
         uint32_t src_batch = this_core / cores_in_batch;
+        // chainted deinterleave messes up order, use mapping
+        src_batch = batch_mapping[src_batch];
 
         // id of this core in batch
         uint32_t id_in_batch = this_core % cores_in_batch;
