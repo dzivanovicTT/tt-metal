@@ -150,8 +150,6 @@ class DistributedNorm(LightweightModule):
             ttnn.synchronize_device(self.args.mesh_device, sub_device_ids=[self.worker_sub_device_id])
 
             print("22222222")
-            print("22222222")
-            print("22222222")
             print(x.shape[0])
             print(x.shape[1])
             print(x.shape[2])

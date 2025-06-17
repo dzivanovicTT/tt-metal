@@ -211,8 +211,6 @@ class RMSNorm(LightweightModule):
         ttnn.synchronize_device(self.device, sub_device_ids=[self.worker_sub_device_id])
 
         print("11111111")
-        print("11111111")
-        print("11111111")
         print(tt_stats.shape[0])
         print(tt_stats.shape[1])
         print(tt_stats.shape[2])

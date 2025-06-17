@@ -832,8 +832,6 @@ class Attention(LightweightModule):
             ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
 
             print("33333333")
-            print("33333333")
-            print("33333333")
             print(attn_output_11SH.shape[0])
             print(attn_output_11SH.shape[1])
             print(attn_output_11SH.shape[2])
