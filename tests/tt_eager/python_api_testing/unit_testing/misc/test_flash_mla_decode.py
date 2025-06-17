@@ -15,42 +15,55 @@ from loguru import logger
 import pytest
 
 
-def scaled_dot_product_attention(query, key, value, h_q, h_kv, is_causal=True):
-    """
-    Reference implementation of scaled dot-product attention.
-    Args:
-        query: (batch, seq_len_q, h_q, d_qk)
-        key: (batch, seq_len_kv, h_kv, d_qk)
-        value: (batch, seq_len_kv, h_kv, d_v)
-        is_causal: whether to apply causal masking
-    Returns:
-        output: (batch, seq_len_q, h_q, d_v)
-    """
+def nearest_n(x, n):
+    return ((x + n - 1) // n) * n
 
-    query = query.float()
-    key = key.float()
-    value = value.float()
-    key = key.repeat_interleave(h_q // h_kv, dim=0)  # Repeat heads
-    value = value.repeat_interleave(h_q // h_kv, dim=0)  # Repeat heads
-    attn_weight = query @ key.transpose(-2, -1) / math.sqrt(query.size(-1))
+
+def nearest_pow_2(x):
+    if x < 1:
+        raise ValueError("x must be >= 1")
+    import math
+
+    power = math.ceil(math.log2(x))
+    return 1 << power
+
+
+def scaled_dot_product_attention_reference(Q, K, V, start_indices, padded_layer_len, scale, is_causal=True):
+    b, nh, _, _ = Q.shape  # b, nh, 1, d
+    _, nkv, _, _ = K.shape
+
+    attn_mask = None
     if is_causal:
-        s_q = query.shape[-2]
-        s_k = key.shape[-2]
-        attn_bias = torch.zeros(s_q, s_k, dtype=query.dtype)
-        temp_mask = torch.ones(s_q, s_k, dtype=torch.bool).tril(diagonal=s_k - s_q)
-        attn_bias.masked_fill_(temp_mask.logical_not(), float("-inf"))
-        attn_bias.to(query.dtype)
-        attn_weight += attn_bias
-    attn_weight = torch.softmax(attn_weight, dim=-1, dtype=torch.float32)
-    return attn_weight @ value
+        attn_mask = torch.zeros((b, nh, 1, padded_layer_len))
+        for i in range(b):
+            start_idx = start_indices[i]
+            attn_mask[i, :, :, start_idx + 1 :] = torch.finfo(torch.float32).min
+    else:
+        assert False, "Non-causal attention is not supported in this function."
+
+    Q_slice = Q[:, :nh, :, :]  # b, nh, 1, d
+    K_slice = K[:, :nkv, :padded_layer_len, :]  # b, nkv, S, d
+    K_slice = torch.cat(
+        [K_slice[:, i : i + 1, :, :].repeat(1, nh // nkv, 1, 1) for i in range(nkv)], dim=1
+    )  # b, nh, d, S
+    V_slice = V[:, :, :padded_layer_len, :]  # b, nkv, S, d
+    V_slice = torch.cat(
+        [V_slice[:, i : i + 1, :, :].repeat(1, nh // nkv, 1, 1) for i in range(nkv)], dim=1
+    )  # b, nh, d, S
+    attn_mask_slice = attn_mask[:, :nh, :, :]  # b, nh, 1, S
+    out = torch.nn.functional.scaled_dot_product_attention(
+        Q_slice, K_slice, V_slice, attn_mask_slice, scale=scale, is_causal=False
+    )  # b, nh, 1, d
+
+    return out
 
 
 def flash_mla_decode_tt(
     query,
     key,
     value,
-    h_q,
-    h_kv,
+    nh,
+    nkv,
     is_causal=True,
 ):
     pass
@@ -60,10 +73,9 @@ def run_flash_mla_decode_impl(
     device,
     batch,
     seq_len,
-    h_q,
-    h_kv,
-    d_qk_nope,
-    d_v,
+    nh,
+    nkv,
+    kv_lora_rank,
     d_rope,
     q_dtype,
     dtype,
@@ -71,23 +83,26 @@ def run_flash_mla_decode_impl(
     ######################
     ### Torch Setup
     ######################
-    q = torch.randn(batch, h_q, 1, d_qk_nope + d_rope).float()  # (B, H, S (1 for decode), D)
-    k = torch.randn(batch, h_kv, seq_len, d_qk_nope + d_rope).float()  # (B, H, S, D)
+    q = torch.randn(batch, nh, 1, kv_lora_rank + d_rope).float()  # (B, H, S (1 for decode), D)
+    k = torch.randn(batch, nkv, seq_len, kv_lora_rank + d_rope).float()  # (B, H, S, D)
     v = torch.randn(
-        batch, h_kv, seq_len, d_v + d_rope
+        batch, nkv, seq_len, kv_lora_rank + d_rope
     ).float()  # (B, H, S, D) # TODO: REMOVE d_rope when validation is fixed!
-
-    out_t = scaled_dot_product_attention(q, k, v, h_q, h_kv)
 
     ######################
     ### TT Setup
     #######################
-    q_chunk_size = 32
-    k_chunk_size = 32
-    scale = (d_qk_nope + d_rope) ** -0.5
+
+    padded_num_heads = nearest_pow_2(nearest_n(nh, n=32))
+    q_chunk_size = padded_num_heads
+    k_chunk_size = 128
+
+    scale = (kv_lora_rank + d_rope) ** -0.5
 
     max_start_idx = seq_len // 2
     start_indices = np.linspace(0, max_start_idx, batch, dtype=np.int32).tolist() if batch > 1 else [max_start_idx]
+
+    padded_layer_len = nearest_n(max_start_idx + 1, n=k_chunk_size)
 
     sdpa_program_config = ttnn.SDPAProgramConfig(
         compute_with_storage_grid_size=device.compute_with_storage_grid_size(),
@@ -99,7 +114,7 @@ def run_flash_mla_decode_impl(
     compute_kernel_config = ttnn.WormholeComputeKernelConfig(
         math_fidelity=ttnn.MathFidelity.HiFi4,
         math_approx_mode=False,
-        fp32_dest_acc_en=True,
+        fp32_dest_acc_en=False,
         packer_l1_acc=False,
     )
 
@@ -125,6 +140,7 @@ def run_flash_mla_decode_impl(
         memory_config=ttnn.DRAM_MEMORY_CONFIG,
     )
 
+    logger.info(f"TT Q shape: {tt_q.shape}, TT K shape: {tt_k.shape}, TT V shape: {tt_v.shape}")
     tt_out = ttnn.transformer.scaled_dot_product_attention_decode(
         tt_q,
         tt_k,
@@ -135,45 +151,62 @@ def run_flash_mla_decode_impl(
         compute_kernel_config=compute_kernel_config,
         memory_config=ttnn.DRAM_MEMORY_CONFIG,
     )
+    tt_out_torch = ttnn.to_torch(tt_out)[..., :nh, :].permute(1, 2, 0, 3)  # (S, B, H, D) -> (B, H, S, D)
 
-    breakpoint()
+    ########################
+    ### Validation
+    ########################
+    out_t = scaled_dot_product_attention_reference(
+        q,
+        k,
+        v,
+        start_indices,
+        padded_layer_len,
+        scale,
+    )
+
+    out_pass, out_pcc = comp_pcc(tt_out_torch, out_t)
+    logger.info(f"Output PCC: {out_pcc}")
+
+    assert out_pass, f"Output mismatch: PCC {out_pcc} < 0.99"
 
 
 @pytest.mark.parametrize(
-    "batch, seq_len, h_q, h_kv, d_qk_nope, d_v, d_rope",
-    # batch, seq_len, num heads q, num heads kv, dim q/k (nope), dim v, dim rope
+    "batch, seq_len, nh, nkv, kv_lora_rank, d_rope",
+    # batch, seq_len, num heads q, num heads kv, kv lora rank, dim rope
     [
-        (32, 1024, 16, 16, 64, 64, 64),
+        # (2, 1024, 16, 16, 512, 64), # DeepSeek V3 TG TP=8, DP=4 (OOM)
+        (2, 1024, 8, 8, 128, 64),
     ],
 )
 @pytest.mark.parametrize(
     "q_dtype, dtype",
     [
         (ttnn.bfloat16, ttnn.bfloat8_b),
+        (ttnn.bfloat16, ttnn.bfloat4_b),
     ],
 )
 def test_flash_mla_decode(
     device,
     batch,
     seq_len,
-    h_q,
-    h_kv,
-    d_qk_nope,
-    d_v,
+    nh,
+    nkv,
+    kv_lora_rank,
     d_rope,
     q_dtype,
     dtype,
     use_program_cache,
     function_level_defaults,
+    reset_seeds,
 ):
     run_flash_mla_decode_impl(
         device,
         batch,
         seq_len,
-        h_q,
-        h_kv,
-        d_qk_nope,
-        d_v,
+        nh,
+        nkv,
+        kv_lora_rank,
         d_rope,
         q_dtype,
         dtype,
