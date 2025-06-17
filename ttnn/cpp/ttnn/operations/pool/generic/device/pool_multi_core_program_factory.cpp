@@ -286,20 +286,19 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     const uint32_t kernel_size_hw_padded = tt::round_up(kernel_size_hw, tt::constants::TILE_HEIGHT);
     const uint32_t in_ntiles_hw = (uint32_t)std::ceil((float)kernel_size_hw_padded / tt::constants::TILE_HEIGHT);
     const uint32_t in_ntiles_c = (uint32_t)std::ceil((float)input_shape[3] / num_shards_c / tt::constants::TILE_WIDTH);
-    const uint32_t out_ntiles_c =
-        (uint32_t)std::ceil((float)output_shape[3] / num_shards_c / tt::constants::TILE_WIDTH);
-    const bool is_partial_tile = (input_shape[3] / num_shards_c) == 16;
+    const uint32_t out_ntiles_c = (uint32_t)std::ceil((float)in_c / num_shards_c / tt::constants::TILE_WIDTH);
+    const bool last_tile_is_partial = (in_c / num_shards_c) % 32 != 0;
 
     constexpr uint32_t MAX_TILES_PER_REDUCTION = 8;
     const bool is_wide_reduction = in_ntiles_c > MAX_TILES_PER_REDUCTION;
     // Hardware can do reduction of 8 tiles at a time.
     // CB sizes can be restricted to this in case input channels are more than 256 to perform reduction iteratively.
-    const bool is_large_kernel =
-        is_partial_tile ? kernel_size_hw > tt::constants::TILE_HEIGHT / 2 : kernel_size_hw > tt::constants::TILE_HEIGHT;
+    const bool is_large_kernel = last_tile_is_partial ? kernel_size_hw > tt::constants::TILE_HEIGHT / 2
+                                                      : kernel_size_hw > tt::constants::TILE_HEIGHT;
 
     // ToDo: enable 32 sticks per tile for reduction for all cases.
     const uint32_t max_rows_for_reduction =
-        (!is_partial_tile && !is_large_kernel) ? tt::constants::TILE_HEIGHT : tt::constants::TILE_HEIGHT / 2;
+        (!last_tile_is_partial && !is_large_kernel) ? tt::constants::TILE_HEIGHT : tt::constants::TILE_HEIGHT / 2;
     TT_FATAL(nblocks == 1, "Multiple blocks not yet supported");
 
     const uint32_t out_w_loop_count = std::ceil((float)out_w / nblocks);
@@ -429,7 +428,7 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     const uint32_t out_cb_pagesize = std::min(tt::constants::TILE_WIDTH, output.shard_spec().value().shape[1]) *
                                      out_nbytes;  // there is just one row of channels after each reduction (or 1 block
                                                   // of c if its greater than 8 tiles)
-    const uint32_t out_cb_npages = output.shard_spec().value().shape[0] * in_ntiles_c;
+    const uint32_t out_cb_npages = output.shard_spec().value().shape[0] * out_ntiles_c;
 
     auto [out_cb_id, cb_out] = tt::tt_metal::create_cb(
         next_cb_index++, program, all_cores, out_cb_pagesize, out_cb_npages, out_df, output.buffer());
