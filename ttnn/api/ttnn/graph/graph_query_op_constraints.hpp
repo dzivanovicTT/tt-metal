@@ -92,12 +92,6 @@ auto query_op_constraints(Op op, IDevice* device, Args&&... args) {
             auto capture_inner = ScopedGraphCapture(GraphProcessor::RunMode::NO_DISPATCH);
             output = detail::extract_output_tensor(std::apply(op, transformed_args));
             op_trace = capture_inner.end_graph_capture();
-            for (const auto& arg : extract_arguments(op_trace)) {
-                std::cerr << "Op " << arg.operation_name << "\n";
-                for (const auto& a : arg.arguments) {
-                    std::cerr << "  - arg " << a << "\n";
-                }
-            }
         }  // end of inner graph capture
         catch (const std::exception& e) {
             tt::log_debug(tt::LogOp, "Error during graph capture: {}", e.what());
