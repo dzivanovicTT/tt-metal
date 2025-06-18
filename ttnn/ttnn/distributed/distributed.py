@@ -159,12 +159,21 @@ def open_mesh_device(
         ttnn._ttnn.multi_device.MeshDevice: The opened mesh device.
 
     """
+    from loguru import logger
+
+    logger.info(f"Opening mesh device with shape {mesh_shape} and offset {offset}")
+    logger.info(
+        f"l1_small_size: {l1_small_size}, trace_region_size: {trace_region_size}, num_command_queues: {num_command_queues}"
+    )
+    logger.info(
+        f"dispatch_core_config: {dispatch_core_config}, physical_device_ids: {physical_device_ids}, worker_l1_size: {worker_l1_size}"
+    )
     return ttnn._ttnn.multi_device.MeshDevice(
         mesh_shape=mesh_shape,
         l1_small_size=l1_small_size,
         trace_region_size=trace_region_size,
         num_command_queues=num_command_queues,
-        dispatch_core_config=dispatch_core_config,
+        dispatch_core_config=ttnn.DispatchCoreConfig(),
         offset=offset,
         physical_device_ids=physical_device_ids,
         worker_l1_size=worker_l1_size,
