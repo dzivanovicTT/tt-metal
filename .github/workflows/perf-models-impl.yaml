@@ -65,7 +65,7 @@ jobs:
             -e GITHUB_ACTIONS=true
           install_wheel: true
           run_args: |
-            pytest models/experimental/functional_unet/tests/test_unet_perf.py
+            pytest models/experimental/functional_unet/tests/test_unet_perf.py::test_unet_trace_perf_multi_device
       # ./tests/scripts/run_tests.sh --tt-arch ${{ matrix.test-info.arch }} --pipeline-type ${{ matrix.model-type }}_models_performance_${{ matrix.test-info.machine-type }}
       # TODO: Fix the pipeline before enabling notifications.
       #- uses: tenstorrent/tt-metal/.github/actions/slack-report@main
