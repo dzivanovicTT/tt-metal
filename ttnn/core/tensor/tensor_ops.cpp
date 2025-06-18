@@ -165,6 +165,10 @@ Tensor tensor_unpad_from_tile(const Tensor& input_tensor, const ttnn::Shape& out
     ZoneScoped;
     GraphTracker::instance().track_function_start("Tensor::unpad_from_tile", input_tensor, output_tensor_shape);
 
+    std::cout << "*************** TensorUnpadFromTile function ***************" << std::endl;
+    std::cout << "Input tensor padded shape: " << input_tensor.padded_shape()[-2] << ", " << input_tensor.padded_shape()[-1] << std::endl;
+    std::cout << "Output tensor logical shape:" << output_tensor_shape << std::endl;
+
     for (auto index = -3; index >= -static_cast<int>(input_tensor.padded_shape().rank()); index--) {
         TT_ASSERT(
             input_tensor.logical_shape()[index] == output_tensor_shape[index],
