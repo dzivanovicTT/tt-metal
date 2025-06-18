@@ -3814,35 +3814,19 @@ void RunRingDeadlockStabilityTestWithPersistentFabric(
     size_t dest_buffer_size = packet_payload_size_bytes * 4;
     static constexpr tt::DataFormat cb_df = tt::DataFormat::Bfp8;
 
-    log_debug(tt::LogTest, "Opening devices");
     DeviceInitFixture test_fixture;
     auto view = test_fixture.mesh_device_->get_view();
-    log_debug(tt::LogTest, "Getting devices");
 
-    log_info(
-        tt::LogTest,
-        "Running test case. num_devices: {}, num_links_opt: {}, row_or_col: {}",
-        num_devices,
-        num_links_opt.value_or(0),
-        row_or_col.value_or(0));
     std::vector<IDevice*> devices_ =
         get_devices_for_ring_deadlock_stability_test(view, cluster_type, num_devices, row_or_col);
     size_t num_links = get_number_of_links_for_ring_deadlock_stability_test(
         *test_fixture.mesh_device_.get(), cluster_type, num_links_opt, num_devices, row_or_col);
-
-    log_info(
-        tt::LogTest,
-        "Running test; num_links: {}, num_devices: {}, row_or_col offset: {}",
-        num_links,
-        num_devices,
-        row_or_col.value_or(0));
 
     std::vector<IDevice*> devices;
     devices.reserve(line_size);
     for (size_t i = 0; i < line_size; i++) {
         devices.push_back(devices_[i]);
     }
-    // build the mesh device
 
     // Other boiler plate setup
     CoreRangeSet worker_cores = CoreRangeSet(CoreRange(CoreCoord(0, 0), CoreCoord(num_links - 1, 0)));
