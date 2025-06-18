@@ -176,7 +176,7 @@ def run_inference(generator, model_args, page_table, tt_kv_cache, tokenizer, pro
     iteration = 0
     users_decoding = True
     out_tok = prefilled_token
-    enable_trace = True  # Disable tracing for simplicity
+    enable_trace = True
 
     logger.info("Starting decode loop...")
     start_time = time.time()
