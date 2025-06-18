@@ -185,12 +185,12 @@ def check_ARC(dev):
         # Heartbeat must be between 10 and 50
         if heartbeats_per_second < 10:
             print(
-                f"ARC heartbeat is too low: {RED}{heartbeats_per_second}{RST}hb/s. Expected at least {BLUE}500{RST}hb/s"
+                f"ARC heartbeat is too low: {RED}{heartbeats_per_second}{RST}hb/s. Expected at least {BLUE}10{RST}hb/s"
             )
             raiseTTTriageError(check_ARC.__doc__)
         if heartbeats_per_second > 50:
             print(
-                f"ARC heartbeat is too high: {RED}{heartbeats_per_second}{RST}hb/s. Expected at most {BLUE}20000{RST}hb/s"
+                f"ARC heartbeat is too high: {RED}{heartbeats_per_second}{RST}hb/s. Expected at most {BLUE}50{RST}hb/s"
             )
             raiseTTTriageError(check_ARC.__doc__)
 
