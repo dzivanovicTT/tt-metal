@@ -1,0 +1,11 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.0.0
+loguru>=0.7.0
+pytest>=7.0.0
+torch>=2.0.0
+
+# Note: ttnn is a Tenstorrent-specific package that should be installed
+# separately according to Tenstorrent's installation instructions
+# The models.tt_transformers modules are part of the TT-Metal codebase
+# and don't need to be installed via pip
