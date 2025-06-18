@@ -320,7 +320,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
     const auto output_tensor_page_layout = output_tensor.layout();
     const auto input_tensor_shape = input_tensor.get_padded_shape();
     const auto output_tensor_shape = output_tensor.get_padded_shape();
-    const auto intermediate_tensor_buffer_type = intermediate_tensor.buffer()->buffer_type();
 
     auto mesh_device = input_tensor.mesh_device();
     const bool enable_async_output_tensor = false;
@@ -360,8 +359,8 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
     // Get worker cores
     // 2 sender (forward/backward, each with a reader/writer)
     uint32_t num_senders_per_link = 2;
-    const auto [sender_worker_core_range, sender_worker_cores] = choose_worker_cores(
-        num_links, num_senders_per_link, enable_persistent_fabric_mode, mesh_device, sub_device_id, core_grid_offset);
+    const auto [sender_worker_core_range, sender_worker_cores] =
+        choose_worker_cores(num_links, num_senders_per_link, mesh_device, sub_device_id, core_grid_offset);
 
     std::set<CoreRange> sender_forward_core_ranges;
     std::set<CoreRange> sender_backward_core_ranges;
@@ -421,17 +420,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
             .set_page_size(reserved_packet_header_backward_CB_index, packet_header_size_bytes);
     auto reserved_packet_header_backward_CB_handle =
         CreateCircularBuffer(program, sender_backward_core_ranges, cb_reserved_packet_header_backward_config);
-
-    // Tensor Info
-    const auto input_tensor_layout = input_tensor.buffer()->buffer_layout();
-    const auto input_tensor_buffer_type = input_tensor.buffer()->buffer_type();
-    const auto input_tensor_page_layout = input_tensor.layout();
-    const auto input_tensor_num_pages = input_tensor.buffer()->num_pages();
-    const auto output_tensor_layout = output_tensor.buffer()->buffer_layout();
-    const auto output_tensor_buffer_type = output_tensor.buffer()->buffer_type();
-    const auto output_tensor_page_layout = output_tensor.layout();
-    const auto input_tensor_shape = input_tensor.get_padded_shape();
-    const auto output_tensor_shape = output_tensor.get_padded_shape();
 
     // KERNEL CREATION
     // Forward Direction
@@ -556,9 +544,6 @@ tt::tt_metal::operation::ProgramWithCallbacks all_gather_async_minimal_interleav
         uint32_t input_tile_id_end = (link + 1) * base_pages_per_worker + std::min(link + 1, remainder);
         uint32_t packet_id = ((input_tile_id_end - input_tile_id_start) + tiles_to_write_per_packet - 1) /
                              tiles_to_write_per_packet * link;
-        uint32_t intermediate_packet_offset = packet_id * ring_size;
-        uint32_t intermediate_packet_offset_x = intermediate_packet_offset % N_DRAM_BANKS;
-        uint32_t intermediate_packet_offset_y = intermediate_packet_offset / N_DRAM_BANKS;
 
         TT_FATAL(!(input_tensor_shape[3] % TILE_WIDTH), "Input tensor width must be a multiple of TILE_WIDTH");
         TT_FATAL(!(output_tensor_shape[3] % TILE_WIDTH), "Output tensor width must be a multiple of TILE_WIDTH");
