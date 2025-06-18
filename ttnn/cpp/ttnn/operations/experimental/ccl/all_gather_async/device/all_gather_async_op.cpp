@@ -139,12 +139,7 @@ AllGatherAsyncVersion AllGatherAsync::select_version(const Tensor& input_tensor)
     log_trace(tt::LogOp, "[select_version] output_shard_num_cores: {}", output_shard_num_cores);
 
     // Check for minimal interleaved case
-    if (input_tensor_shape[0] == 1 && input_tensor_shape[1] == 1 && input_tensor_shape[2] == 32 &&
-        input_tensor_buffer_layout == tt::tt_metal::TensorMemoryLayout::INTERLEAVED &&
-        input_tensor_page_layout == tt::tt_metal::Layout::TILE) {
-        return AllGatherAsyncVersion::MINIMAL_INTERLEAVED_32;
-    } else if (
-        input_tensor_shape[0] == 1 && input_tensor_shape[1] == 1 &&
+    if (input_tensor_shape[0] == 1 && input_tensor_shape[1] == 1 &&
         input_tensor_buffer_layout == tt::tt_metal::TensorMemoryLayout::INTERLEAVED &&
         input_tensor_page_layout == tt::tt_metal::Layout::TILE && semaphore.size() == 2) {
         return AllGatherAsyncVersion::MINIMAL_INTERLEAVED_ANY;
@@ -220,28 +215,29 @@ tt::tt_metal::operation::ProgramWithCallbacks AllGatherAsync::create_program_at(
     AllGatherAsyncVersion version = select_version(input_tensors[0]);
     IDevice* target_device = mesh_device ? mesh_device->get_device(coord) : input_tensors[0].device();
     std::vector<IDevice*> devices_to_use = {};
+    const auto& mesh_view = input_tensors[0].mesh_device()->get_view();
     if (this->cluster_axis.has_value()) {
         // User specified the cluster-axis. Derive devices based on the current coordinate
         // and the cluster-axis.
-        const auto& mesh_view = input_tensors[0].mesh_device()->get_view();
         devices_to_use = (this->cluster_axis.value() == 0) ? mesh_view.get_devices_on_column(coord[1])
                                                            : mesh_view.get_devices_on_row(coord[0]);
     } else {
         devices_to_use = devices;
     }
+    uint32_t target_ring_size = devices_to_use.size();
 
     std::optional<IDevice*> forward_device = std::nullopt;
     std::optional<IDevice*> backward_device = std::nullopt;
     uint32_t device_index = 0;  // Initialize device index
-    for (uint32_t i = 0; i < this->ring_size; ++i) {
+    for (uint32_t i = 0; i < target_ring_size; ++i) {
         if (devices_to_use.at(i) == target_device) {
             device_index = i;
             if (i != 0) {
                 backward_device = devices_to_use.at(i - 1);
             } else if (topology == ttnn::ccl::Topology::Ring) {
-                backward_device = devices_to_use.at(this->ring_size - 1);
+                backward_device = devices_to_use.at(target_ring_size - 1);
             }
-            if (i != this->ring_size - 1) {
+            if (i != target_ring_size - 1) {
                 forward_device = devices_to_use.at(i + 1);
             } else if (topology == ttnn::ccl::Topology::Ring) {
                 forward_device = devices_to_use.at(0);
@@ -264,7 +260,7 @@ tt::tt_metal::operation::ProgramWithCallbacks AllGatherAsync::create_program_at(
                 output_tensors[0],
                 this->dim,
                 this->num_links,
-                this->ring_size,
+                target_ring_size,
                 device_index,
                 this->topology,
                 this->semaphore.at(0),
@@ -284,7 +280,7 @@ tt::tt_metal::operation::ProgramWithCallbacks AllGatherAsync::create_program_at(
                 output_tensors[1],
                 this->dim,
                 this->num_links,
-                this->ring_size,
+                target_ring_size,
                 device_index,
                 this->topology,
                 this->semaphore,
@@ -358,7 +354,8 @@ tt::tt_metal::operation::Hash AllGatherAsync::compute_program_hash(const std::ve
         input_shape,
         input_memory_layout,
         input_dtype,
-        input_memory_config);
+        input_memory_config,
+        semaphore_address);
 }
 
 namespace operations {
@@ -417,7 +414,8 @@ Tensor all_gather_async_impl(
     const std::optional<MemoryConfig>& memory_config,
     const ttnn::ccl::Topology topology,
     std::optional<tt::tt_metal::SubDeviceId> sub_device_id,
-    const std::vector<IDevice*>& devices) {
+    const std::vector<IDevice*>& devices,
+    const std::optional<uint32_t>& cluster_axis) {
     TT_FATAL(
         std::getenv("TT_METAL_SLOW_DISPATCH_MODE") == nullptr,
         "all_gather_async op is only supported for Fast Dispatch");
@@ -448,7 +446,7 @@ Tensor all_gather_async_impl(
                    ccl_topology,
                    multi_device_global_semaphore,
                    sub_device_id,
-                   /*cluster_axis=*/std::nullopt),
+                   cluster_axis),
                {input_tensor},
                {},
                optional_output_tensors)
@@ -534,7 +532,8 @@ Tensor all_gather_async(
     const uint32_t num_links,
     const std::optional<MemoryConfig>& memory_config,
     const ttnn::ccl::Topology topology,
-    std::optional<tt::tt_metal::SubDeviceId> sub_device_id) {
+    std::optional<tt::tt_metal::SubDeviceId> sub_device_id,
+    std::optional<uint32_t> cluster_axis) {
     std::vector<IDevice*> devices = ttnn::ccl::get_active_physical_devices(input_tensor);
 
     return all_gather_async_impl(
@@ -547,7 +546,8 @@ Tensor all_gather_async(
         memory_config,
         topology,
         sub_device_id,
-        devices);
+        devices,
+        cluster_axis);
 }
 
 std::vector<Tensor> all_gather_async(
