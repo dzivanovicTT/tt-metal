@@ -125,7 +125,6 @@ std::pair<std::vector<tt::tt_metal::IDevice*>, std::array<bool, 4>> get_neighbor
     } else {
         directions = {false, false, false, false};
     }
-    const auto& control_plane = tt::tt_fabric::get_control_plane();
     auto src_device = mesh_view.get_device(mesh_coordinate);
     if (axis.has_value()) {
         if (axis.value() == 1) {
