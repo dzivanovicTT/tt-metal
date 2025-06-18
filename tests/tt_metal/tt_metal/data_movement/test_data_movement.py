@@ -45,6 +45,10 @@ test_id_to_name = {
     21: "Conv Act with halo 3x3",
     22: "Conv Act with halo 3x3 Small",
     23: "Conv Halo Gather",
+    101: "Multicast Scheme 1",
+    102: "Multicast Scheme 2",
+    103: "Multicast Scheme 3",
+    104: "Multicast Scheme 4",
 }
 
 # Comments for each test explaining why we get the perf that we do
