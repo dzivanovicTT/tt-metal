@@ -795,7 +795,7 @@ void DumpDeviceProfileResults(
         if (tt_metal_device_profiler_map.find(device_id) != tt_metal_device_profiler_map.end()) {
             tt_metal_device_profiler_map.at(device_id).setDeviceArchitecture(device->arch());
             tt_metal_device_profiler_map.at(device_id).dumpResults(
-                device, worker_cores, state, ProfilerDataBufferSource::DRAM, metadata);
+                device, worker_cores, state, ProfilerDataBufferSource::L1, metadata);
             if (state == ProfilerDumpState::LAST_CLOSE_DEVICE) {
                 // Process is ending, no more device dumps are coming, reset your ref on the buffer so deallocate is the
                 // last owner. Sync program also contains a buffer so it is safter to release it here

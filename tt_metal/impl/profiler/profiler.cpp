@@ -1186,19 +1186,23 @@ void DeviceProfiler::dumpResults(
     } else {
         for (const auto& worker_core : worker_cores) {
             if (do_L1_data_buffer) {
+                const HalProgrammableCoreType core_type = tt::llrt::get_core_type(device_id, worker_core);
+
                 ZoneScopedN("Reading L1 profiler Data buffer");
                 readControlBuffers(device, worker_core, state);
                 resetControlBuffers(device, worker_core, state);
 
                 std::vector<uint32_t> core_l1_data_buffer;
-                if (tt::DevicePool::instance().is_dispatch_firmware_active()) {
-                    if (rtoptions.get_profiler_do_dispatch_cores() || state == ProfilerDumpState::FORCE_UMD_READ) {
-                        core_l1_data_buffer = issueSlowDispatchReadFromL1DataBuffer(device, worker_core);
+                if (core_type != HalProgrammableCoreType::ACTIVE_ETH) {
+                    if (tt::DevicePool::instance().is_dispatch_firmware_active()) {
+                        if (rtoptions.get_profiler_do_dispatch_cores() || state == ProfilerDumpState::FORCE_UMD_READ) {
+                            core_l1_data_buffer = issueSlowDispatchReadFromL1DataBuffer(device, worker_core);
+                        } else {
+                            core_l1_data_buffer = issueFastDispatchReadFromL1DataBuffer(device, worker_core);
+                        }
                     } else {
-                        core_l1_data_buffer = issueFastDispatchReadFromL1DataBuffer(device, worker_core);
+                        core_l1_data_buffer = issueSlowDispatchReadFromL1DataBuffer(device, worker_core);
                     }
-                } else {
-                    core_l1_data_buffer = issueSlowDispatchReadFromL1DataBuffer(device, worker_core);
                 }
 
                 readRiscProfilerResults(
