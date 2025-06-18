@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       runner-label:
-        description: 'Valid inputs: ["P100", "P150"] (both cards), ["P100"] (P100 only), ["P150"] (P150 only)'
+        description: 'Valid inputs: ["P100", "tt-beta-ubuntu-2204-p150b-viommu-large-stable"] (both cards), ["P100"] (P100 only), ["tt-beta-ubuntu-2204-p150b-viommu-large-stable"] (P150 only)'
         required: false
         type: string
-        default: '["P100", "P150"]'
+        default: '["P100", "tt-beta-ubuntu-2204-p150b-viommu-large-stable"]'
   workflow_call:
     inputs:
       runner-label:
-        description: 'Valid inputs: ["P100", "P150"] (both cards), ["P100"] (P100 only), ["P150"] (P150 only)'
+        description: 'Valid inputs: ["P100", "tt-beta-ubuntu-2204-p150b-viommu-large-stable"] (both cards), ["P100"] (P100 only), ["tt-beta-ubuntu-2204-p150b-viommu-large-stable"] (P150 only)'
         required: false
         type: string
-        default: '["P100", "P150"]'
+        default: '["P100", "tt-beta-ubuntu-2204-p150b-viommu-large-stable"]'
   schedule:
     - cron: "0 */8 * * *"  # Every 8 hours at 0:00, 8:00, and 16:00 UTC
 
