@@ -34,12 +34,15 @@ template <
     uint32_t bf16_init_value,
     bool is_avg_pool,
     uint32_t clear_value_cb_id,
-    uint32_t in_cb_ntiles>
+    uint32_t in_cb_ntiles,
+    uint32_t interm_reduction_chunks,
+    uint32_t interm_cb_id>
 FORCE_INLINE void read_window_with_top_left_index(uint32_t ind, uint32_t in_l1_read_base_addr) {
     for (uint32_t c_i = 0; c_i < in_nblocks_c; c_i++) {
         uint32_t processed_rows = 0;
         cb_reserve_back(in_cb_id, 1);
         uint32_t out_l1_write_addr = get_write_ptr(in_cb_id);
+        uint32_t chunk = 0;
         for (uint32_t h = 0; h < window_h; ++h) {
             for (uint32_t w = 0; w < window_w; w++) {
                 const uint32_t stick_offset = ind + w + h * in_w_padded;
@@ -51,6 +54,7 @@ FORCE_INLINE void read_window_with_top_left_index(uint32_t ind, uint32_t in_l1_r
                 if ((processed_rows % max_rows_for_reduction) == 0) {
                     noc_async_read_barrier();
                     cb_push_back(in_cb_id, 1);
+                    chunk++;
                     cb_reserve_back(in_cb_id, 1);
                     out_l1_write_addr = get_write_ptr(in_cb_id);
                     // If next is last chunk, fill whole buffer with the init_value. note for max pool we do
@@ -64,6 +68,14 @@ FORCE_INLINE void read_window_with_top_left_index(uint32_t ind, uint32_t in_l1_r
                             clear_out_tiles<clear_value_cb_id, in_cb_ntiles>(
                                 get_noc_addr(out_l1_write_addr), get_noc_addr(get_read_ptr(clear_value_cb_id)));
                             }
+                    }
+                    if (chunk == interm_reduction_chunks - 1) {
+                        // signal to reader that we need the interm CB cleared
+                        // note this pushes the read pointer past the first row where we are accumulating so that won't
+                        // be cleared
+                        cb_push_back(interm_cb_id, 1);
+                        // wait for the reader to pop so we know the interm CB has been cleared
+                        cb_reserve_back(interm_cb_id, 33);
                     }
                 }
             }
@@ -151,7 +163,7 @@ void kernel_main() {
     constexpr uint32_t in_reader_indices_cb_id = get_compile_time_arg_val(19);
     constexpr uint32_t in_scalar_cb_id_0 = get_compile_time_arg_val(20);
     constexpr uint32_t in_scalar_cb_id_1 = get_compile_time_arg_val(21);
-    constexpr uint32_t interm_reduction_cb_id = get_compile_time_arg_val(22);
+    constexpr uint32_t interm_cb_id = get_compile_time_arg_val(22);
     constexpr uint32_t in_one_cb_id = get_compile_time_arg_val(23);
     constexpr uint32_t clear_value_cb_id = get_compile_time_arg_val(24);
     constexpr bool is_avg_pool = (bool)get_compile_time_arg_val(25);
@@ -211,7 +223,7 @@ void kernel_main() {
     if constexpr (reader_id == 0) {
         constexpr uint32_t bf16_one_u16 = bf16_one_u32 >> 16;
         // initialize buffers
-        clear_out_tiles<interm_reduction_cb_id, clear_value_cb_id>();
+        clear_out_tiles<interm_cb_id, clear_value_cb_id>();
         if constexpr (one_scalar_per_core) {
             fill_with_val(get_write_ptr(in_scalar_cb_id_0), TILE_WIDTH, bf16_scalar >> 16);
         }
@@ -304,7 +316,9 @@ void kernel_main() {
                 bf16_init_value,
                 is_avg_pool,
                 clear_value_cb_id,
-                in_cb_ntiles>(ind, in_l1_read_base_addr);
+                in_cb_ntiles,
+                interm_reduction_chunks,
+                interm_cb_id>(ind, in_l1_read_base_addr);
             if (split_reader && ind == end) {
                 first_row_value = false;
             }
@@ -332,6 +346,8 @@ void kernel_main() {
             bf16_init_value,
             is_avg_pool,
             clear_value_cb_id,
-            in_cb_ntiles>(0, in_l1_read_base_addr);
+            in_cb_ntiles,
+            interm_reduction_chunks,
+            interm_cb_id>(0, in_l1_read_base_addr);
     }
 }  // kernel_main()

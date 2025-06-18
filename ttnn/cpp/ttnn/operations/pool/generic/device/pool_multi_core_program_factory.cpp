@@ -342,7 +342,7 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     const uint32_t in_scalar_cb_id_0 = next_cb_index++;
     const uint32_t in_scalar_cb_pagesize = tile_size(in_df);
     const uint32_t in_scalar_cb_npages = 1 * multi_buffering_factor;
-    TT_FATAL(in_scalar_cb_npages == 2, "Kernel logic relys on scalar cb page number being 2");
+    TT_FATAL(in_scalar_cb_npages <= 2, "Kernel logic relys on scalar cb page number being <= 2");
     tt::tt_metal::create_cb(in_scalar_cb_id_0, program, all_cores, in_scalar_cb_pagesize, in_scalar_cb_npages, in_df);
     log_debug(tt::LogOp, "CB {} :: PS = {}, NP = {}", in_scalar_cb_id_0, in_scalar_cb_pagesize, in_scalar_cb_npages);
 
@@ -455,8 +455,9 @@ Pool2D::MultiCore::cached_program_t pool2d_multi_core_sharded_with_halo_v2_impl_
     uint32_t max_pool_partials_cb_id = 32;
     if (is_large_kernel) {
         max_pool_partials_cb_id = next_cb_index++;  // max_pool partials
-        const uint32_t max_pool_partials_cb_pagesize = in_cb_pagesize;
-        const uint32_t max_pool_partials_cb_npages = nblocks;
+        const uint32_t max_pool_partials_cb_pagesize = in_cb_pagesize / TILE_HEIGHT;  // page size is one row
+        const uint32_t max_pool_partials_cb_npages =
+            TILE_HEIGHT + 1;  // num_pages is 33 rows so we can use clear_tiles on the non-accumulation rows
 
         tt::tt_metal::create_cb(
             max_pool_partials_cb_id,
