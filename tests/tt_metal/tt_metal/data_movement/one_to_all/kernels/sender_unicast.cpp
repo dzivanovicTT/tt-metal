@@ -23,6 +23,7 @@ void kernel_main() {
 
     {
         DeviceZoneScopedN("RISCV0");
+        // DeviceZoneScopedN("RISCV1");
 
         for (uint32_t subordinate_num = 0; subordinate_num < num_subordinates; subordinate_num++) {
             uint32_t dest_coord_packed = get_arg_val<uint32_t>(subordinate_num);
