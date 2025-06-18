@@ -31,6 +31,12 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
         return tensor.get_padded_shape()[-1] * tensor.element_size();
     };
 
+    // If we have padded/logical shape being different, we only need to send the logical stick size from core to core.
+    // And we can ignore the padding.
+    auto compute_data_transfer_size = [&](const auto& tensor, const auto& data_format) {
+        return tensor.get_logical_shape()[-1] * tensor.element_size();
+    };
+
     uint32_t num_units = output.volume() / output.get_logical_shape()[-1];
 
     tt::tt_metal::CoreRangeSet worker_grid = input.memory_config().shard_spec().value().grid;
@@ -73,13 +79,17 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
         operation_attributes.stride_hw,
         per_core_height,
         per_core_width);
+    // This includes the padding
     auto stick_size_bytes = aligned_input_unit_size;
+    // This is the data transfer size, which is the logical size
+    auto stick_size_logical_bytes = compute_data_transfer_size(input, input_data_format);
     reader_compile_time_args = {
         (uint32_t)src_cb_id,
         (uint32_t)dst_cb_id,
         (uint32_t)per_core_width,
         (uint32_t)per_core_height,
         (uint32_t)stick_size_bytes,
+        (uint32_t)stick_size_logical_bytes,
         (uint32_t)operation_attributes.stride_hw[0],
         (uint32_t)operation_attributes.stride_hw[1],
         (uint32_t)operation_attributes.barrier_threshold,
@@ -91,6 +101,7 @@ DeinterleaveToBatchOperation::ProgramFactoryToBatch::create(
         (uint32_t)per_core_width,
         (uint32_t)per_core_height,
         (uint32_t)stick_size_bytes,
+        (uint32_t)stick_size_logical_bytes,
         (uint32_t)operation_attributes.stride_hw[0],
         (uint32_t)operation_attributes.stride_hw[1],
         (uint32_t)operation_attributes.barrier_threshold,

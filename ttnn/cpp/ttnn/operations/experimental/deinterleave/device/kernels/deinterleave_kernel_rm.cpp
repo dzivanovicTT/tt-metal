@@ -58,10 +58,11 @@ void kernel_main() {
     constexpr uint32_t width = get_compile_time_arg_val(2);
     constexpr uint32_t height = get_compile_time_arg_val(3);
     constexpr uint32_t stick_size_bytes = get_compile_time_arg_val(4);
-    constexpr uint32_t stride_h = get_compile_time_arg_val(5);
-    constexpr uint32_t stride_w = get_compile_time_arg_val(6);
-    constexpr uint32_t barrier_threshold = get_compile_time_arg_val(7) != 0
-                                               ? get_compile_time_arg_val(7)
+    constexpr uint32_t stick_size_logical_bytes = get_compile_time_arg_val(5);
+    constexpr uint32_t stride_h = get_compile_time_arg_val(6);
+    constexpr uint32_t stride_w = get_compile_time_arg_val(7);
+    constexpr uint32_t barrier_threshold = get_compile_time_arg_val(8) != 0
+                                               ? get_compile_time_arg_val(8)
                                                : get_barrier_read_threshold<stick_size_bytes, 2>();
 
     static_assert(stick_size_bytes <= NOC_MAX_BURST_SIZE, "stick size too big, cannot use one_packet API for reads");
@@ -94,7 +95,7 @@ void kernel_main() {
 
     for (uint32_t src_core = 0; src_core < num_src_cores; src_core += 2) {
         auto src_noc_address = get_noc_addr(src_noc_x, src_noc_y, get_read_ptr(src_cb_id)) + src_offset;
-        noc_async_read_one_packet_set_state(src_noc_address, stick_size_bytes);
+        noc_async_read_one_packet_set_state(src_noc_address, stick_size_logical_bytes);
 
         // Copy half of data data from src to dst
         for (uint32_t h = 0; h < height; h += stride_h) {
