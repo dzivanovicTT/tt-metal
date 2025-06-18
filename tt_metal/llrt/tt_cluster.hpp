@@ -111,6 +111,8 @@ public:
 
     size_t number_of_pci_devices() const { return this->driver_->get_target_mmio_device_ids().size(); }
 
+    int reset_cluster(int device_id) const { return this->driver_->arc_msg(device_id, 0xA3, true); }
+
     // TODO: UMD will eventually consolidate ethernet coordinates and unique ids, we can remove the ethernet coord
     // getter after that change is in
     const std::unordered_map<chip_id_t, uint64_t>& get_unique_chip_ids() const {
