@@ -235,7 +235,7 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         tt::tt_metal::split_work_to_cores(compute_with_storage_grid_size, total_rows_to_process);
 
     // compile arguments
-    uint32_t packed_scaler = pack_two_bfloat16_to_uint32(static_cast<float>(num_inner));
+    uint32_t packed_scaler = pack_two_bfloat16_to_uint32(static_cast<float>(1 / num_inner));
 
     // 2) Create and configure circular buffers
     // std::cerr << "Wt: " << Wt << std::endl;
