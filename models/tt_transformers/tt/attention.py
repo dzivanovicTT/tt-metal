@@ -817,17 +817,59 @@ class Attention(LightweightModule):
 
         # Non fused All Gather Matmul
         if self.use_fused_all_gather_matmul:  # is true for Ring topology
-            multi_device_global_semaphore = ttnn.create_global_semaphore(self.mesh_device, self.ccl_sub_device_crs, 0)
-
-            attn_output_11SH = ttnn.experimental.all_gather_async(
-                attn_output_11SH,
-                dim=3,
-                multi_device_global_semaphore=multi_device_global_semaphore,
-                num_links=1,
-                memory_config=ttnn.DRAM_MEMORY_CONFIG,
-                topology=self.ccl_topology,
-                subdevice_id=self.worker_sub_device_id,
+            use_all_gather_async_minimal_interleaved_any = (
+                not attn_output_11SH.is_sharded() and attn_output_11SH.layout == ttnn.TILE_LAYOUT
             )
+            if use_all_gather_async_minimal_interleaved_any:
+                ag_input_dtype = attn_output_11SH.dtype
+                ag_output_shape = list(attn_output_11SH.shape)
+                ag_output_shape[3] *= self.mesh_device.get_num_devices()
+
+                persistent_intermediate_buffer = ttnn.from_torch(
+                    torch.zeros(ag_output_shape),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ag_input_dtype,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                )
+
+                persistent_output_buffer = ttnn.from_torch(
+                    torch.zeros(ag_output_shape),
+                    device=self.mesh_device,
+                    layout=ttnn.TILE_LAYOUT,
+                    dtype=ag_input_dtype,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
+                )
+
+                multi_device_global_sem = [
+                    ttnn.create_global_semaphore(self.mesh_device, self.ccl_sub_device_crs, 0) for _ in range(2)
+                ]
+
+                attn_output_11SH = ttnn.experimental.all_gather_async(
+                    attn_output_11SH,
+                    persistent_intermediate_buffer=persistent_intermediate_buffer,
+                    persistent_output_buffer=persistent_output_buffer,
+                    dim=3,
+                    multi_device_global_semaphore=multi_device_global_sem,
+                    num_links=1,
+                    topology=self.ccl_topology,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    subdevice_id=self.worker_sub_device_id,
+                )
+            else:
+                multi_device_global_semaphore = ttnn.create_global_semaphore(self.device, self.ccl_sub_device_crs, 0)
+
+                attn_output_11SH = ttnn.experimental.all_gather_async(
+                    attn_output_11SH,
+                    dim=3,
+                    multi_device_global_semaphore=multi_device_global_semaphore,
+                    num_links=1,
+                    memory_config=ttnn.DRAM_MEMORY_CONFIG,
+                    topology=self.ccl_topology,
+                    subdevice_id=self.worker_sub_device_id,
+                )
 
             ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
 

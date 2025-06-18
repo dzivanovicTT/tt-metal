@@ -90,9 +90,7 @@ class DistributedNorm(LightweightModule):
 
         # Distributed norm requires a gather
         if self.args.is_distributed_norm(mode):
-            use_all_gather_async_minimal_interleaved_any = (
-                x.shape[0] == 1 and x.shape[1] == 1 and x.shape[2] != 32 and not x.is_sharded()
-            )
+            use_all_gather_async_minimal_interleaved_any = not x.is_sharded() and x.layout == ttnn.TILE_LAYOUT
             if use_all_gather_async_minimal_interleaved_any:
                 ag_input_dtype = x.dtype
                 ag_output_shape = list(x.shape)

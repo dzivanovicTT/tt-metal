@@ -153,9 +153,7 @@ class RMSNorm(LightweightModule):
         tt_stats = ttnn.rms_norm_pre_all_gather(inp, compute_kernel_config=compute_kernel_config, dtype=ttnn.bfloat16)
 
         # AllGather stats
-        use_all_gather_async_minimal_interleaved_any = (
-            tt_stats.shape[0] == 1 and tt_stats.shape[1] == 1 and tt_stats.shape[2] != 32 and not tt_stats.is_sharded()
-        )
+        use_all_gather_async_minimal_interleaved_any = not tt_stats.is_sharded() and tt_stats.layout == ttnn.TILE_LAYOUT
         if use_all_gather_async_minimal_interleaved_any:
             ag_input_dtype = tt_stats.dtype
             ag_output_shape = list(tt_stats.shape)
