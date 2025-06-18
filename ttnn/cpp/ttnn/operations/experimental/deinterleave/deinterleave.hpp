@@ -15,7 +15,8 @@ struct DeinterleaveToBatch {
         const uint32_t input_width,
         const std::array<uint32_t, 2> stride_hw,
         const uint32_t barrier_threshold,
-        const std::optional<DeviceComputeKernelConfig>& compute_kernel_config);
+        const std::optional<DeviceComputeKernelConfig>& compute_kernel_config,
+        const bool unpad_output = false);
 };
 
 struct DeinterleaveLocal {

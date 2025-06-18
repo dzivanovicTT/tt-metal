@@ -36,6 +36,7 @@ void bind_deinterleave_operation(py::module& module) {
             py::arg("stride_hw") = std::array<uint32_t, 2>{2, 2},
             py::arg("barrier_threshold") = 0,
             py::arg("compute_kernel_config") = std::nullopt,
+            py::arg("unpad_output") = false,
         });
 
     bind_registered_operation(

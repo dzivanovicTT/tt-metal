@@ -18,6 +18,8 @@ struct DeinterleaveToBatchOperation {
         const std::array<uint32_t, 2> stride_hw;
         const uint32_t barrier_threshold;
         const DeviceComputeKernelConfig compute_kernel_config;
+        const bool unpad_output;  // Ugly, ugly hack to avoid padding in the output tensor where needed *sigh* (conv
+                                  // with 56 channels works better if it has 64 input channels instead of 56)
     };
 
     struct tensor_args_t {
@@ -62,7 +64,8 @@ struct DeinterleaveToBatchOperation {
         const uint32_t input_width,
         const std::array<uint32_t, 2> stride_hw,
         const uint32_t barrier_threshold,
-        const std::optional<DeviceComputeKernelConfig>& compute_kernel_config);
+        const std::optional<DeviceComputeKernelConfig>& compute_kernel_config,
+        const bool unpad_output);
 };
 
 struct DeinterleaveLocalOperation {

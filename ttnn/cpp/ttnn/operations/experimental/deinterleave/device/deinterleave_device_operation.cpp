@@ -81,20 +81,39 @@ DeinterleaveToBatchOperation::spec_return_value_t DeinterleaveToBatchOperation::
     //         input.get_dtype(), tt::tt_metal::PageConfig(input.get_layout()), output_memory_config, output_shape,
     //         output_padded_shape));
 
-    log_debug(
-        tt::LogOp,
-        "DeinterleaveToBatchOperation::compute_output_specs logical shape: {} padded shape: {}",
-        input.get_logical_shape(),
-        input.get_padded_shape());
-    auto tensor_spec = TensorSpec(
-        input.get_logical_shape(),
-        tt::tt_metal::TensorLayout::fromPaddedShape(
-            input.get_dtype(),
-            tt::tt_metal::PageConfig(input.get_layout()),
-            input.memory_config(),
+    if (operation_attributes.unpad_output == true) {
+        std::array<uint32_t, 2> output_shard_shape = {
+            input.memory_config().shard_spec().value().shape[0], input.get_logical_shape()[-1]};
+
+        log_info(
+            tt::LogOp,
+            "DeinterleaveToBatchOperation::compute_output_spec (unpad output); output_shard_shape {}",
+            output_shard_shape);
+
+        auto output_shard_spec = tt::tt_metal::ShardSpec(
+            input.shard_spec()->grid, output_shard_shape, input.memory_config().shard_spec().value().orientation);
+
+        auto output_memory_config =
+            ttnn::MemoryConfig(input.memory_config().memory_layout(), ttnn::BufferType::L1, output_shard_spec);
+
+        return TensorSpec(
             input.get_logical_shape(),
-            input.get_padded_shape()));
-    return tensor_spec;
+            tt::tt_metal::TensorLayout::fromPaddedShape(
+                input.get_dtype(),
+                tt::tt_metal::PageConfig(input.get_layout()),
+                output_memory_config,
+                input.get_logical_shape(),
+                input.get_logical_shape()));
+    } else {
+        return TensorSpec(
+            input.get_logical_shape(),
+            tt::tt_metal::TensorLayout::fromPaddedShape(
+                input.get_dtype(),
+                tt::tt_metal::PageConfig(input.get_layout()),
+                input.memory_config(),
+                input.get_logical_shape(),
+                input.get_padded_shape()));
+    }
 };
 
 DeinterleaveToBatchOperation::tensor_return_value_t DeinterleaveToBatchOperation::create_output_tensors(
@@ -112,7 +131,8 @@ DeinterleaveToBatchOperation::invoke(
     const uint32_t input_width,
     const std::array<uint32_t, 2> stride_hw,
     const uint32_t barrier_threshold,
-    const std::optional<DeviceComputeKernelConfig>& compute_kernel_config) {
+    const std::optional<DeviceComputeKernelConfig>& compute_kernel_config,
+    const bool unpad_output) {
     return {
         operation_attributes_t{
             input_height,
@@ -120,7 +140,7 @@ DeinterleaveToBatchOperation::invoke(
             stride_hw,
             barrier_threshold,
             init_device_compute_kernel_config(input.device()->arch(), compute_kernel_config, MathFidelity::HiFi4),
-        },
+            unpad_output},
         tensor_args_t{input},
     };
 }
