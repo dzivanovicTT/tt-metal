@@ -390,6 +390,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool has_bias,
     const std::optional<unary::UnaryWithParam>& fused_activation,
     const OptimizedConvParallelizationConfig& parallelization_config,
+    const sliding_window::ParallelConfig& output_parallel_config,
     const OptimizedConvBlockConfig& block_config,
     bool transpose_mcast,
     Tensor& output,
@@ -502,8 +503,8 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
     // parallelization config
     const auto& p_config = parallelization_config;
-    uint32_t num_cores_x = p_config.grid_size.x;
-    uint32_t num_cores_y = p_config.grid_size.y;
+    uint32_t num_cores_x = output_parallel_config.grid.bounding_box().grid_size().x;
+    uint32_t num_cores_y = output_parallel_config.grid.bounding_box().grid_size().y;
     uint32_t total_num_cores = num_cores_x * num_cores_y;
 
     uint32_t per_core_out_matrix_width_ntiles = parallelization_config.per_core_out_matrix_width_ntile;
@@ -582,7 +583,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         optimized_conv_op_utils::compute_opt_conv_activation_as_mm_shape(
             ashape_with_channels_padded,
             sliding_window_config,
-            parallelization_config.num_cores_nhw,
+            output_parallel_config.grid.num_cores(),
             out_block_h_ntiles);
     TT_FATAL(act_matrix_shape.size() == 3, "act_matrix_shape should have be of size 3");
     TT_FATAL(act_matrix_shape[0] == 1, "act_matrix_shape should have 1 as the first dimension");
@@ -1757,6 +1758,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool untilize_out,
     const std::optional<unary::UnaryWithParam>& fused_activation,
     const OptimizedConvParallelizationConfig& parallelization_config,
+    const sliding_window::ParallelConfig& output_parallel_config,
     const OptimizedConvBlockConfig& block_config,
     DataType output_dtype,
     std::array<std::uint32_t, 4> input_tensor_shape,
@@ -1829,6 +1831,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         bias.has_value(),
         fused_activation,
         parallelization_config,
+        output_parallel_config,
         block_config,
         parallel_config.shard_orientation == ShardOrientation::COL_MAJOR,
         output,

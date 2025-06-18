@@ -488,7 +488,9 @@ Result conv2d_L1(
         in_channels,
         out_channels,
         mm_conv,
-        auto_shard);
+        auto_shard,
+        output_height,
+        output_width);
 
     const uint32_t input_channels_alignment = get_input_channels_alignment(
         input_tensor_post_tm.memory_config().memory_layout(),
@@ -621,7 +623,7 @@ Result conv2d_L1(
         }
 
         log_info(tt::LogOp, "input cores: {} output cores: {}", input_num_cores, output_num_output_cores);
-        assert(input_num_cores == output_num_output_cores);
+        // assert(input_num_cores == output_num_output_cores);
 
         auto conv_output = optimized_conv_new(
             input_tensor_post_tm,
@@ -633,6 +635,7 @@ Result conv2d_L1(
             conv_config.output_layout == Layout::ROW_MAJOR,
             conv_config.activation,
             opt_conv_op_parallel_config,
+            output_parallel_config,
             opt_conv_op_block_config,
             conv_out_memory_config,
             conv_config.dtype,

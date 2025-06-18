@@ -64,6 +64,7 @@ Tensor optimized_conv_new(
     bool untilize_out,
     const string& activation,
     const OptimizedConvParallelizationConfig& parallelization_config,
+    const sliding_window::ParallelConfig& output_parallel_config,
     const OptimizedConvBlockConfig& block_config,
     const MemoryConfig& memory_config,
     DataType dtype,
@@ -101,6 +102,7 @@ Tensor optimized_conv_new(
         bias.has_value(),
         activation,
         parallelization_config,
+        output_parallel_config,
         block_config,
         memory_config,
         dtype,
@@ -180,13 +182,18 @@ std::vector<TensorSpec> OptimizedConvNew::compute_output_specs(const std::vector
     if (this->memory_config.is_sharded()) {
         if (this->memory_config.memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED) {
             uint32_t total_height_tiles = padded_output_shape.volume() / padded_output_shape[-1] / TILE_HEIGHT;
-            uint32_t num_cores = total_height_tiles / this->parallelization_config.per_core_out_matrix_height_ntile;
+            uint32_t num_cores = output_parallel_config.grid.num_cores();
             std::array<uint32_t, 2> shard_shape = {
                 this->parallelization_config.per_core_out_matrix_height_ntile * TILE_HEIGHT, padded_output_shape[-1]};
             CoreRangeSet shard_grid =
                 tt::tt_metal::num_cores_to_corerangeset(num_cores, this->parallelization_config.grid_size, true);
             auto shard_spec = ShardSpec{shard_grid, shard_shape, ShardOrientation::ROW_MAJOR};
             auto mem_config = this->memory_config.with_shard_spec(shard_spec);
+            auto tensor_spec = TensorSpec(
+                output_shape,
+                TensorLayout::fromPaddedShape(
+                    dtype, PageConfig(output_layout), mem_config, output_shape, padded_output_shape));
+            log_info(tt::LogOp, "OptimizedConvNew output tensor spec: {}", tensor_spec);
             return {TensorSpec(
                 output_shape,
                 TensorLayout::fromPaddedShape(
@@ -218,6 +225,7 @@ std::vector<TensorSpec> OptimizedConvNew::compute_output_specs(const std::vector
             TT_THROW("Unsupported shard scheme");
         }
     }
+
     return {TensorSpec(
         output_shape,
         TensorLayout::fromPaddedShape(
@@ -253,6 +261,7 @@ operation::ProgramWithCallbacks OptimizedConvNew::create_program(
         untilize_out,
         fused_activation,
         parallelization_config,
+        output_parallel_config,
         block_config,
         dtype,
         input_tensor_shape,

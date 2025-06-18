@@ -66,11 +66,21 @@ sliding_window::ParallelConfig determine_parallel_config(
     bool is_shard_width_tile_multiple = true,
     uint32_t act_block_h_override = 0);
 
+// uint32_t get_num_of_output_cores(
+//     const sliding_window::ParallelConfig& input_parallel_config,
+//     const CoreCoord& compute_grid_size,
+//     uint32_t output_height,
+//     uint32_t output_width
+// );
+
 sliding_window::ParallelConfig determine_output_parallel_config(
     const sliding_window::ParallelConfig& input_parallel_config,
     const CoreCoord& compute_grid_size,
     uint32_t out_channels,
-    bool is_mm_conv);
+    bool is_mm_conv,
+    uint32_t output_batch_size = 1,
+    uint32_t output_height = 0,
+    uint32_t output_width = 0);
 
 std::tuple<uint32_t, uint32_t> calculate_output_image_size(
     std::array<uint32_t, 2> input_image_size,
@@ -182,7 +192,9 @@ shard_or_reshard_tensor_if_required(
     uint32_t in_channels,
     uint32_t out_channels,
     bool is_mm_conv,
-    bool auto_shard);
+    bool auto_shard,
+    uint32_t output_height = 0,
+    uint32_t output_width = 0);
 
 template <typename T>
 ttnn::Tensor fold_tensor(

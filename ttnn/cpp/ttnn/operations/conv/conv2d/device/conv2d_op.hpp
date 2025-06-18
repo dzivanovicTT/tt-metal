@@ -189,6 +189,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool untilize_out,
     const std::optional<unary::UnaryWithParam>& fused_activation,
     const OptimizedConvParallelizationConfig& parallelization_config,
+    const sliding_window::ParallelConfig& output_parallel_config,
     const OptimizedConvBlockConfig& block_config,
     tt::tt_metal::DataType dtype,
     std::array<std::uint32_t, 4> input_tensor_shape,
@@ -202,6 +203,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 // new micro op
 struct OptimizedConvNew {
     OptimizedConvParallelizationConfig parallelization_config;
+    sliding_window::ParallelConfig output_parallel_config;
     OptimizedConvBlockConfig block_config;
     const sliding_window::SlidingWindowConfig& sliding_window_config;
     const uint32_t output_channels;
@@ -225,6 +227,7 @@ struct OptimizedConvNew {
         bool has_bias,
         string activation,
         const OptimizedConvParallelizationConfig& p_config,
+        const sliding_window::ParallelConfig& output_parallel_config,
         const OptimizedConvBlockConfig& b_config,
         tt::tt_metal::MemoryConfig memory_config,
         tt::tt_metal::DataType dtype,
@@ -241,6 +244,7 @@ struct OptimizedConvNew {
         has_bias(has_bias),
         activation(activation),
         parallelization_config(p_config),
+        output_parallel_config(output_parallel_config),
         block_config(b_config),
         memory_config(memory_config),
         dtype(dtype),
@@ -311,6 +315,7 @@ Tensor optimized_conv_new(
     bool untilize_out,
     const string& activation,
     const OptimizedConvParallelizationConfig& parallelization_config,
+    const sliding_window::ParallelConfig& output_parallel_config,
     const OptimizedConvBlockConfig& block_config,
     const tt::tt_metal::MemoryConfig& memory_config,
     tt::tt_metal::DataType dtype,

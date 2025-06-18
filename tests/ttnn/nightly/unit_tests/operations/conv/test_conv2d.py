@@ -3719,7 +3719,7 @@ def test_conv2d_and_add(
     )
 
     input_tensor_b = ttnn.from_torch(
-        torch_tensor_b.reshape(1, 1, out_height * out_width, out_channels), layout=ttnn.TILE_LAYOUT, device=device, memory_config=ttnn.DRAM_MEMORY_CONFIG
+        torch_tensor_b.permute(0, 2, 3, 1), layout=ttnn.TILE_LAYOUT, device=device, memory_config=ttnn.DRAM_MEMORY_CONFIG
     )
 
     conv_config = ttnn.Conv2dConfig(
@@ -3773,8 +3773,7 @@ def test_conv2d_and_add(
         return_weights_and_bias=False,
     )
 
-    out = out_conv
-    out = out_conv + input_tensor_b
+    out = out_conv + input_tensor_b.reshape(1, 1, out_height * out_width, out_channels)
 
 
     tt_output_tensor = ttnn.from_device(out)
@@ -3784,8 +3783,5 @@ def test_conv2d_and_add(
     torch_output_tensor = torch.permute(torch_output_tensor, (0, 3, 1, 2))
 
     pcc, pcc_msg = assert_with_pcc(torch_output_tensor, ref, pcc=0.999)
-
-    print(torch_output_tensor)
-    print(ref)
 
     logger.info(f"PCC = {pcc_msg}. Threshold = {pcc}")

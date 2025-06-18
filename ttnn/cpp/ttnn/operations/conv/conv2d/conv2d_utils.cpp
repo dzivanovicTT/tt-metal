@@ -200,11 +200,32 @@ ParallelConfig determine_parallel_config(
     return pconfig;
 }
 
+uint32_t get_num_of_output_cores(
+    const sliding_window::ParallelConfig& input_parallel_config,
+    const CoreCoord& compute_grid_size,
+    uint32_t output_batch_size,
+    uint32_t output_height,
+    uint32_t output_width,
+    uint32_t output_channels) {
+    uint32_t num_cores_nhw = get_num_cores_nhw_from_parallel_config(input_parallel_config);
+    uint32_t num_cores_c = get_num_cores_channels_from_parallel_config(input_parallel_config);
+    if (input_parallel_config.shard_scheme == ttnn::TensorMemoryLayout::HEIGHT_SHARDED) {
+        uint32_t output_nhw = output_batch_size * output_height * output_width;
+        uint32_t output_nhw_padded = tt::round_up(output_nhw, num_cores_nhw * tt::constants::TILE_HEIGHT);
+        return tt::div_up(output_nhw, (output_nhw_padded / num_cores_nhw));
+    } else {
+        return input_parallel_config.grid.num_cores();
+    }
+}
+
 ParallelConfig determine_output_parallel_config(
     const ParallelConfig& input_parallel_config,
     const CoreCoord& compute_grid_size,
     uint32_t out_channels,
-    bool is_mm_conv) {
+    bool is_mm_conv,
+    uint32_t output_batch_size,
+    uint32_t output_height,
+    uint32_t output_width) {
     ParallelConfig output_parallel_config = input_parallel_config;
     if (input_parallel_config.shard_scheme == ttnn::TensorMemoryLayout::WIDTH_SHARDED && !is_mm_conv) {
         uint32_t max_num_cores = compute_grid_size.x * compute_grid_size.y;
@@ -216,6 +237,22 @@ ParallelConfig determine_output_parallel_config(
                 true),
             .shard_scheme = ttnn::TensorMemoryLayout::WIDTH_SHARDED,
             .shard_orientation = input_parallel_config.shard_orientation};
+    } else if (input_parallel_config.shard_scheme == ttnn::TensorMemoryLayout::HEIGHT_SHARDED && output_height != 0) {
+        output_parallel_config = {
+            .grid = tt::tt_metal::num_cores_to_corerangeset(
+                get_num_of_output_cores(
+                    input_parallel_config,
+                    compute_grid_size,
+                    output_batch_size,
+                    output_height,
+                    output_width,
+                    out_channels),
+                compute_grid_size,
+                true),
+            .shard_scheme = ttnn::TensorMemoryLayout::HEIGHT_SHARDED,
+            .shard_orientation = input_parallel_config.shard_orientation};
+
+        log_info(tt::LogOp, "Output parallel config: {}", output_parallel_config);
     }
     return output_parallel_config;
 }
@@ -658,7 +695,9 @@ std::tuple<ttnn::Tensor, ParallelConfig, ParallelConfig> shard_or_reshard_tensor
     uint32_t in_channels,
     uint32_t out_channels,
     bool is_mm_conv,
-    bool auto_shard) {
+    bool auto_shard,
+    uint32_t output_height,
+    uint32_t output_width) {
     ttnn::Tensor input_tensor = input_tensor_;  // tensor to return
     bool input_tensor_on_device = tt::tt_metal::is_device_tensor(input_tensor_);
     auto compute_grid_size = device->compute_with_storage_grid_size();
@@ -671,8 +710,8 @@ std::tuple<ttnn::Tensor, ParallelConfig, ParallelConfig> shard_or_reshard_tensor
         .shard_scheme = input_tensor_sharded_memory_config.memory_layout(),
         .shard_orientation = input_tensor_sharded_memory_config.shard_spec().value().orientation};
 
-    ParallelConfig output_parallel_config =
-        determine_output_parallel_config(parallel_config, compute_grid_size, out_channels, is_mm_conv);
+    ParallelConfig output_parallel_config = determine_output_parallel_config(
+        parallel_config, compute_grid_size, out_channels, is_mm_conv, batch_size, output_height, output_width);
 
     // We can have flat and unflattened (n, h, w, c) tensors here
     const auto flattened_input_shape = flatten_4d_shape(input_tensor.logical_shape());
@@ -870,7 +909,10 @@ Conv2dConfig determine_conv_config_for_auto_shard(
             input_parallel_config,
             compute_grid_size,
             out_channels,
-            is_mm_conv && conv_config.shard_layout != TensorMemoryLayout::WIDTH_SHARDED);
+            is_mm_conv && conv_config.shard_layout != TensorMemoryLayout::WIDTH_SHARDED,
+            batch_size,
+            output_height,
+            output_width);
 
         const uint32_t in_channels_padded = tt::round_up(
             in_channels, get_num_cores_channels_from_parallel_config(input_parallel_config) * input_channels_alignment);
@@ -971,17 +1013,22 @@ std::tuple<OptimizedConvParallelizationConfig, OptimizedConvBlockConfig, MemoryC
     uint32_t nhw_out = batch_size * output_height * output_width;
     uint32_t out_channels_padded = tt::round_up(
         out_channels, get_num_cores_channels_from_parallel_config(output_parallel_config) * tt::constants::TILE_WIDTH);
+    log_info(tt::LogOp, "my output_parallel_config: {}", output_parallel_config);
     MemoryConfig conv_out_memory_config = create_sharded_memory_config_from_parallel_config(
         ttnn::Shape({1, 1, nhw_out, out_channels_padded}), output_parallel_config, round_up_size);
+    log_info(tt::LogOp, "Output memory config: {}", conv_out_memory_config);
     ParallelConfig largest_parallel_config =
         output_parallel_config.grid.num_cores() > input_parallel_config.grid.num_cores() ? output_parallel_config
                                                                                          : input_parallel_config;
 
-    OptimizedConvParallelizationConfig opt_conv_op_parallel_config =
-        determine_conv_op_parallel_config_from_conv_output_mem_config(
-            conv_out_memory_config,
-            get_num_cores_nhw_from_parallel_config(largest_parallel_config),
-            get_num_cores_channels_from_parallel_config(largest_parallel_config));
+    const auto& shard_shape = conv_out_memory_config.shard_spec().value().shape;
+    OptimizedConvParallelizationConfig opt_conv_op_parallel_config = {
+        .grid_size = CoreCoord({8, 8}),
+        .num_cores_nhw = get_num_cores_nhw_from_parallel_config(largest_parallel_config),
+        .num_cores_c = get_num_cores_channels_from_parallel_config(largest_parallel_config),
+        .per_core_out_matrix_height_ntile = div_up(shard_shape[0], tt::constants::TILE_HEIGHT),
+        .per_core_out_matrix_width_ntile = div_up(shard_shape[1], tt::constants::TILE_WIDTH),
+    };
 
     uint32_t nhw_out_padded_ntile_per_core =
         conv_out_memory_config.shard_spec().value().shape[0] / tt::constants::TILE_HEIGHT;
@@ -1419,7 +1466,9 @@ template std::tuple<ttnn::Tensor, ParallelConfig, ParallelConfig> shard_or_resha
     uint32_t in_channels,
     uint32_t out_channels,
     bool is_mm_conv,
-    bool auto_shard);
+    bool auto_shard,
+    uint32_t output_height,
+    uint32_t output_width);
 
 template std::tuple<ttnn::Tensor, ParallelConfig, ParallelConfig> shard_or_reshard_tensor_if_required<MeshDevice>(
     MeshDevice* device,
@@ -1431,7 +1480,9 @@ template std::tuple<ttnn::Tensor, ParallelConfig, ParallelConfig> shard_or_resha
     uint32_t in_channels,
     uint32_t out_channel,
     bool is_mm_conv,
-    bool auto_shard);
+    bool auto_shard,
+    uint32_t output_height,
+    uint32_t output_width);
 
 template std::tuple<ttnn::Shape, ttnn::MemoryConfig> determine_input_memory_config<IDevice>(
     const Conv2dConfig& conv_config,

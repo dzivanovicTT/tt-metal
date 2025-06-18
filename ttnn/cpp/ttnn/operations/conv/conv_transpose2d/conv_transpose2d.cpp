@@ -281,6 +281,7 @@ Result conv_transpose2d(
         conv_config.output_layout == Layout::ROW_MAJOR,
         conv_config.activation,
         opt_conv_op_parallel_config,
+        output_parallel_config,
         opt_conv_op_block_config,
         conv_out_memory_config,
         conv_config.dtype,
