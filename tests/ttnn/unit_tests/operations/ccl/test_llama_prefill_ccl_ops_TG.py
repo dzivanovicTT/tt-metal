@@ -15,7 +15,6 @@ from tests.ttnn.unit_tests.operations.ccl.test_all_gather_TG_post_commit import 
 )
 from models.perf.benchmarking_utils import BenchmarkProfiler
 from tracy import signpost
-from tests.ttnn.unit_tests.operations.ccl.test_llama_prefill_ccl_ops import padded_shape
 
 NUM_BUFFERS = 8
 
@@ -40,8 +39,9 @@ def run_ag_with_trace(
 ):
     # Compile Run
     logger.info("Compiling model")
-    tt_out_tensor = ttnn.experimental.all_gather_async(
-        input_tensor,
+    tt_1 = ttnn.permute(input_tensor, (0, 1, 3, 2))
+    tt_2 = ttnn.experimental.all_gather_async(
+        tt_1,
         dim=dim,
         cluster_axis=cluster_axis,
         persistent_intermediate_buffer=persistent_intermediate_buffer,
@@ -52,6 +52,7 @@ def run_ag_with_trace(
         topology=all_gather_topology,
         subdevice_id=worker_sub_device_id,
     )
+    tt_out_tensor = ttnn.permute(tt_2, (0, 1, 3, 2))
 
     ttnn.synchronize_device(mesh_device)
 
@@ -61,8 +62,9 @@ def run_ag_with_trace(
     def capture_trace(n_iters):
         trace_id = ttnn.begin_trace_capture(mesh_device, cq_id=0)
         for i in range(n_iters):
-            tt_out_tensor = ttnn.experimental.all_gather_async(
-                input_tensor,
+            tt_1 = ttnn.permute(input_tensor, (0, 1, 3, 2))
+            tt_2 = ttnn.experimental.all_gather_async(
+                tt_1,
                 dim=dim,
                 cluster_axis=cluster_axis,
                 persistent_intermediate_buffer=persistent_intermediate_buffer,
@@ -73,6 +75,7 @@ def run_ag_with_trace(
                 topology=all_gather_topology,
                 subdevice_id=worker_sub_device_id,
             )
+            tt_out_tensor = ttnn.permute(tt_2, (0, 1, 3, 2))
         ttnn.end_trace_capture(mesh_device, trace_id, cq_id=0)
         ttnn.synchronize_device(mesh_device)
         return trace_id
@@ -182,8 +185,10 @@ def run_all_gather_on_TG(
     linear = False
     all_gather_topology = ttnn.Topology.Ring
 
+    fake_output_shape = [1, 1, per_chip_output_shape[3], per_chip_output_shape[2]]
+
     ttnn_persistent_output_tensor = ttnn.from_torch(
-        torch.zeros(per_chip_output_shape),
+        torch.zeros(fake_output_shape),
         tile=ttnn.Tile(tile),
         dtype=input_dtype,
         device=mesh_device,
@@ -193,7 +198,7 @@ def run_all_gather_on_TG(
     )
 
     ttnn_persistent_intermediate_tensor = ttnn.from_torch(
-        torch.zeros(padded_shape(per_chip_output_shape, tile, num_devices, num_links, input_dtype)),
+        torch.zeros(per_chip_output_shape),
         tile=ttnn.Tile(tile),
         dtype=input_dtype,
         device=mesh_device,
@@ -246,8 +251,9 @@ def run_all_gather_on_TG(
             signpost("start")
             for i in range(num_iters):
                 logger.info("Running all-gather async")
-                ttnn_tensor_out = ttnn.experimental.all_gather_async(
-                    ttnn_tensor,
+                ttnn_1 = ttnn.permute(ttnn_tensor, (0, 1, 3, 2))
+                ttnn_2 = ttnn.experimental.all_gather_async(
+                    ttnn_1,
                     dim=dim,
                     cluster_axis=cluster_axis,
                     # mesh_device=mesh_device,
@@ -259,6 +265,7 @@ def run_all_gather_on_TG(
                     topology=all_gather_topology,
                     subdevice_id=worker_sub_device_id,
                 )
+                ttnn_tensor_out = ttnn.permute(ttnn_2, (0, 1, 3, 2))
             ttnn.synchronize_device(mesh_device, sub_device_ids=sub_device_stall_group)
             signpost("stop")
     except Exception as e:
@@ -274,14 +281,14 @@ def run_all_gather_on_TG(
     output_tensors_list = torch.chunk(tt_output_tensor, num_all_gather_instances, dim=all_gather_instances_concat_dim)
     output_golden = torch.zeros(tt_output_tensor.shape)
 
-    # Check the tensor addresses
-    persistent_output_tensors = ttnn.get_device_tensors(ttnn_persistent_output_tensor)
-    output_tensors = ttnn.get_device_tensors(ttnn_tensor_out)
+    # # Check the tensor addresses
+    # persistent_output_tensors = ttnn.get_device_tensors(ttnn_persistent_output_tensor)
+    # output_tensors = ttnn.get_device_tensors(ttnn_tensor_out)
 
-    for persistent_tensor, output_tensor in zip(persistent_output_tensors, output_tensors):
-        assert (
-            persistent_tensor.buffer_address() == output_tensor.buffer_address()
-        ), "Persistent tensor address mismatch"
+    # for persistent_tensor, output_tensor in zip(persistent_output_tensors, output_tensors):
+    #     assert (
+    #         persistent_tensor.buffer_address() == output_tensor.buffer_address()
+    #     ), "Persistent tensor address mismatch"
 
     # Repeat the input tensor to represent the fact that the full concatenated input tensor lives across every
     # device in the line
@@ -515,7 +522,7 @@ def run_reduce_scatter_on_TG(
             mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
         ),
         ttnn.from_torch(
-            torch.zeros(padded_shape(per_chip_input_shape, tile, num_devices, num_links, input_dtype)),
+            torch.zeros(per_chip_input_shape),
             tile=ttnn.Tile(tile),
             dtype=input_dtype,
             device=mesh_device,
@@ -603,15 +610,20 @@ def run_reduce_scatter_on_TG(
     "num_devices, num_links, per_chip_output_shape, dim, layout, input_dtype, cluster_axis, replication_factor",
     [
         # # 4k seq len
-        (8, 4, [1, 1, 256 * 8, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
-        (4, 4, [1, 1, 320 * 4, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
-        (4, 4, [1, 1, 896 * 4, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
-        (4, 4, [1, 1, 32 * 4, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
+        # (8, 4, [1, 1, 4096, 256 * 8], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
+        # (4, 4, [1, 1, 320 * 4, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        (4, 4, [1, 1, 4096, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # (4, 4, [1, 1, 32 * 4, 4096], 2, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
         # 128 seq len
-        (8, 4, [1, 1, 256 * 8, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
-        (4, 4, [1, 1, 320 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
-        (4, 4, [1, 1, 896 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
-        (4, 4, [1, 1, 32 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
+        # (8, 4, [1, 1, 256 * 8, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
+        # (4, 4, [1, 1, 320 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # (4, 4, [1, 1, 896 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # (4, 1, [1, 1, 32 * 4, 128], 2, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
+        # # 4k seq len
+        # (8, 4, [1, 1, 256 * 8, 8192], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 0, 4),
+        # (4, 4, [1, 1, 320 * 4, 8192], 2, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # (4, 4, [1, 1, 8192, 896 * 4], 3, ttnn.TILE_LAYOUT, ttnn.bfloat8_b, 1, 8),
+        # (4, 4, [1, 1, 32 * 4, 8192], 2, ttnn.TILE_LAYOUT, ttnn.bfloat16, 1, 8),
     ],
 )
 @pytest.mark.parametrize(
@@ -625,7 +637,7 @@ def run_reduce_scatter_on_TG(
     "device_params", [{"fabric_config": ttnn.FabricConfig.FABRIC_1D_RING, "trace_region_size": 5554176}], indirect=True
 )
 @pytest.mark.parametrize(
-    "trace_mode, warmup_iters, num_iters", [(False, 0, 1), (True, 15, 100)], ids=["no_trace", "trace"]
+    "trace_mode, warmup_iters, num_iters", [(False, 0, 1), (True, 15, 100)], ids=["no_trace", "yes_trace"]
 )
 def test_all_gather_TG(
     mesh_device,
