@@ -1574,6 +1574,46 @@ def test_fabric_one_link_multihop_fused_write_atomic_inc_bw(
     )
 
 
+@pytest.mark.parametrize("num_messages", [200000])
+@pytest.mark.parametrize("num_op_invocations", [1])
+@pytest.mark.parametrize("line_sync", [True])
+@pytest.mark.parametrize("line_size", [4])
+@pytest.mark.parametrize("num_links", [1])
+@pytest.mark.parametrize("is_unicast", [False, True])
+@pytest.mark.parametrize("disable_sends_for_interior_workers", [False])
+@pytest.mark.parametrize("packet_size", [16, 4096])
+@pytest.mark.parametrize("unidirectional", [False])
+@pytest.mark.parametrize("noc_message_type", ["noc_fused_multicast_write_flush_atomic_inc"])
+@pytest.mark.parametrize("fabric_test_mode", [FabricTestMode.Linear, FabricTestMode.RingAsLinear])
+def test_fabric_one_link_multihop_fused_multicast_write_atomic_inc_bw(
+    is_unicast,
+    num_messages,
+    num_links,
+    num_op_invocations,
+    line_sync,
+    line_size,
+    packet_size,
+    disable_sends_for_interior_workers,
+    noc_message_type,
+    unidirectional,
+    fabric_test_mode,
+):
+    run_fabric_edm(
+        is_unicast=is_unicast,
+        num_messages=num_messages,
+        num_links=num_links,
+        noc_message_type=noc_message_type,
+        num_op_invocations=num_op_invocations,
+        line_sync=line_sync,
+        line_size=line_size,
+        packet_size=packet_size,
+        fabric_mode=fabric_test_mode,
+        disable_sends_for_interior_workers=disable_sends_for_interior_workers,
+        unidirectional=unidirectional,
+        senders_are_unidirectional=True,
+    )
+
+
 def print_bandwidth_summary():
     """Print a summary table of all test results by packet size"""
     csv_path = os.path.join(os.environ["TT_METAL_HOME"], "generated/profiler/.logs/bandwidth_summary.csv")

@@ -1885,7 +1885,7 @@ FORCE_INLINE void noc_async_write_one_packet_with_trid_with_state(
     }
 }
 
-template <bool update_counter = true, bool posted = false>
+template <bool update_counter = true, bool posted = false, bool mcast = false>
 FORCE_INLINE void noc_async_write_one_packet_with_trid(
     std::uint32_t src_local_l1_addr,
     std::uint64_t dst_noc_addr,
@@ -1894,6 +1894,8 @@ FORCE_INLINE void noc_async_write_one_packet_with_trid(
     uint8_t cmd_buf = write_cmd_buf,
     uint8_t noc = noc_index,
     uint8_t vc = NOC_UNICAST_WRITE_VC) {
+    static_assert(!mcast || posted, "Mcast writes must be posted");
+
     if constexpr (noc_mode == DM_DYNAMIC_NOC) {
         if constexpr (update_counter) {
             if constexpr (posted) {
@@ -1912,7 +1914,7 @@ FORCE_INLINE void noc_async_write_one_packet_with_trid(
 
     uint32_t noc_cmd_field = NOC_CMD_CPY | NOC_CMD_WR | NOC_CMD_VC_STATIC | NOC_CMD_STATIC_VC(vc) |
                              0x0 |  // (linked ? NOC_CMD_VC_LINKED : 0x0)
-                             0x0 |  // (mcast ? (NOC_CMD_PATH_RESERVE | NOC_CMD_BRCST_PACKET) : 0x0)
+                             (mcast ? (NOC_CMD_PATH_RESERVE | NOC_CMD_BRCST_PACKET) : 0x0) |
                              (posted ? 0 : NOC_CMD_RESP_MARKED);
 
     NOC_CMD_BUF_WRITE_REG(noc, cmd_buf, NOC_CTRL, noc_cmd_field);

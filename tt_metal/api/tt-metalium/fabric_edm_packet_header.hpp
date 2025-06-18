@@ -54,7 +54,8 @@ enum NocSendType : uint8_t {
     NOC_MULTICAST_WRITE = 2,
     NOC_UNICAST_ATOMIC_INC = 3,
     NOC_FUSED_UNICAST_ATOMIC_INC = 4,
-    NOC_MULTICAST_ATOMIC_INC = 5,
+    NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC = 5,
+    NOC_MULTICAST_ATOMIC_INC = 6,
     NOC_SEND_TYPE_LAST = NOC_MULTICAST_ATOMIC_INC
 };
 // How to send the payload across the cluster
@@ -129,6 +130,17 @@ struct NocMulticastAtomicIncCommandHeader {
     uint8_t size_x;
     uint8_t size_y;
 };
+struct NocFusedMulticastWriteAndAtomicIncCommandHeader {
+    uint32_t address;
+    uint8_t noc_x_start;
+    uint8_t noc_y_start;
+    uint8_t mcast_rect_size_x;
+    uint8_t mcast_rect_size_y;
+    uint64_t semaphore_noc_address;
+    uint16_t val;
+    bool flush;
+};
+
 static_assert(sizeof(NocUnicastCommandHeader) == 8, "NocUnicastCommandHeader size is not 8 bytes");
 static_assert(sizeof(NocMulticastCommandHeader) == 8, "NocMulticastCommandHeader size is not 8 bytes");
 static_assert(sizeof(NocUnicastInlineWriteCommandHeader) == 16, "NocMulticastCommandHeader size is not 16 bytes");
@@ -136,13 +148,17 @@ static_assert(sizeof(NocUnicastAtomicIncCommandHeader) == 16, "NocUnicastCommand
 static_assert(
     sizeof(NocUnicastAtomicIncFusedCommandHeader) == 24, "NocUnicastAtomicIncFusedCommandHeader size is not 24 bytes");
 static_assert(sizeof(NocMulticastAtomicIncCommandHeader) == 12, "NocAtomicIncCommandHeader size is not 12 bytes");
+static_assert(
+    sizeof(NocFusedMulticastWriteAndAtomicIncCommandHeader) == 24,
+    "NocFusedMulticastWriteAndAtomicIncCommandHeader size is not 24 bytes");
 union NocCommandFields {
     NocUnicastCommandHeader unicast_write;
     NocUnicastInlineWriteCommandHeader unicast_inline_write;
     NocMulticastCommandHeader mcast_write;
     NocUnicastAtomicIncCommandHeader unicast_seminc;
-    NocUnicastAtomicIncFusedCommandHeader unicast_seminc_fused;
+    NocUnicastAtomicIncFusedCommandHeader fused_unicast_write_with_seminc;
     NocMulticastAtomicIncCommandHeader mcast_seminc;
+    NocFusedMulticastWriteAndAtomicIncCommandHeader fused_mcast_write_with_seminc;
 };
 static_assert(sizeof(NocCommandFields) == 24, "CommandFields size is not 24 bytes");
 
@@ -346,12 +362,43 @@ struct PacketHeaderBase {
             semaphore_noc_address_components.second,
             edm_to_local_chip_noc);
 
-        this->command_fields.unicast_seminc_fused.noc_address = noc_addr;
-        this->command_fields.unicast_seminc_fused.semaphore_noc_address = semaphore_noc_addr;
-        this->command_fields.unicast_seminc_fused.val = noc_fused_unicast_write_atomic_inc_command_header.val;
-        this->command_fields.unicast_seminc_fused.wrap = noc_fused_unicast_write_atomic_inc_command_header.wrap;
-        this->command_fields.unicast_seminc_fused.flush = noc_fused_unicast_write_atomic_inc_command_header.flush;
+        this->command_fields.fused_unicast_write_with_seminc.noc_address = noc_addr;
+        this->command_fields.fused_unicast_write_with_seminc.semaphore_noc_address = semaphore_noc_addr;
+        this->command_fields.fused_unicast_write_with_seminc.val =
+            noc_fused_unicast_write_atomic_inc_command_header.val;
+        this->command_fields.fused_unicast_write_with_seminc.wrap =
+            noc_fused_unicast_write_atomic_inc_command_header.wrap;
+        this->command_fields.fused_unicast_write_with_seminc.flush =
+            noc_fused_unicast_write_atomic_inc_command_header.flush;
 
+        this->payload_size_bytes = payload_size_bytes;
+#else
+        TT_THROW("Calling to_noc_unicast_atomic_inc from host is unsupported");
+#endif
+        return static_cast<volatile Derived*>(this);
+    }
+
+    inline volatile Derived* to_noc_fused_multicast_write_atomic_inc(
+        const NocFusedMulticastWriteAndAtomicIncCommandHeader& noc_fused_multicast_write_atomic_inc_command_header,
+        size_t payload_size_bytes) volatile {
+#if defined(KERNEL_BUILD) || defined(FW_BUILD)
+        this->noc_send_type = NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC;
+        this->command_fields.fused_mcast_write_with_seminc.address =
+            noc_fused_multicast_write_atomic_inc_command_header.address;
+        this->command_fields.fused_mcast_write_with_seminc.noc_x_start =
+            noc_fused_multicast_write_atomic_inc_command_header.noc_x_start;
+        this->command_fields.fused_mcast_write_with_seminc.noc_y_start =
+            noc_fused_multicast_write_atomic_inc_command_header.noc_y_start;
+        this->command_fields.fused_mcast_write_with_seminc.mcast_rect_size_x =
+            noc_fused_multicast_write_atomic_inc_command_header.mcast_rect_size_x;
+        this->command_fields.fused_mcast_write_with_seminc.mcast_rect_size_y =
+            noc_fused_multicast_write_atomic_inc_command_header.mcast_rect_size_y;
+        this->command_fields.fused_mcast_write_with_seminc.semaphore_noc_address =
+            noc_fused_multicast_write_atomic_inc_command_header.semaphore_noc_address;
+        this->command_fields.fused_mcast_write_with_seminc.val =
+            noc_fused_multicast_write_atomic_inc_command_header.val;
+        this->command_fields.fused_mcast_write_with_seminc.flush =
+            noc_fused_multicast_write_atomic_inc_command_header.flush;
         this->payload_size_bytes = payload_size_bytes;
 #else
         TT_THROW("Calling to_noc_unicast_atomic_inc from host is unsupported");

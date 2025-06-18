@@ -59,6 +59,8 @@ struct TestParams {
     size_t dest_noc_y_bwd = 0;
     size_t dest_bank_addr_bwd = 0;
     size_t payload_size_bytes = 0;
+    size_t mcast_rect_size_x = 0;
+    size_t mcast_rect_size_y = 0;
     tt::tt_fabric::ChipSendType chip_send_type = tt::tt_fabric::CHIP_UNICAST;
     bool flush = true;
 };
@@ -285,7 +287,80 @@ void send_packets<tt::tt_fabric::NocSendType::NOC_FUSED_UNICAST_ATOMIC_INC>(
     }
 }
 
+template <>
+void send_packets<tt::tt_fabric::NocSendType::NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC>(
+    FabricConnectionManager& fabric_connection,
+    volatile PACKET_HEADER_TYPE* pkt_hdr_fwd,
+    volatile PACKET_HEADER_TYPE* pkt_hdr_bwd,
+    const TestParams& params,
+    size_t source_buffer_address) {
+    using namespace tt::tt_fabric;
+
+    // Setup packet headers for both directions
+    setup_packet_header(pkt_hdr_fwd, params.num_fwd_hops, params.chip_send_type);
+    setup_packet_header(pkt_hdr_bwd, params.num_bwd_hops, params.chip_send_type);
+
+    DPRINT << "NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC\n";
+    DPRINT << "params.dest_noc_x_fwd: " << (uint32_t)params.dest_noc_x_fwd << "\n";
+    DPRINT << "params.dest_noc_y_fwd: " << (uint32_t)params.dest_noc_y_fwd << "\n";
+    DPRINT << "params.dest_noc_x_bwd: " << (uint32_t)params.dest_noc_x_bwd << "\n";
+    DPRINT << "params.dest_noc_y_bwd: " << (uint32_t)params.dest_noc_y_bwd << "\n";
+    DPRINT << "params.dest_bank_addr_fwd: " << (uint32_t)params.dest_bank_addr_fwd << "\n";
+    DPRINT << "params.dest_bank_addr_bwd: " << (uint32_t)params.dest_bank_addr_bwd << "\n";
+    DPRINT << "params.mcast_rect_size_x: " << (uint32_t)params.mcast_rect_size_x << "\n";
+    DPRINT << "params.mcast_rect_size_y: " << (uint32_t)params.mcast_rect_size_y << "\n";
+    auto dest_noc_mcast_address = get_noc_multicast_addr(
+        params.dest_noc_x_fwd,
+        params.dest_noc_y_fwd,
+        params.dest_noc_x_fwd + params.mcast_rect_size_x,
+        params.dest_noc_y_fwd + params.mcast_rect_size_y,
+        params.dest_bank_addr_fwd);
+
+    auto dest_semaphore_inc_noc_address = safe_get_noc_addr(
+        static_cast<uint8_t>(params.dest_noc_x_fwd),
+        static_cast<uint8_t>(params.dest_noc_y_fwd),
+        params.dest_bank_addr_fwd + 4,
+        0);
+
+    auto sem_noc0_dest_addr = safe_get_noc_addr(
+        static_cast<uint8_t>(params.dest_noc_x_bwd),
+        static_cast<uint8_t>(params.dest_noc_y_bwd),
+        params.dest_bank_addr_bwd + 4,
+        0);
+
+    const auto mcast_header = NocFusedMulticastWriteAndAtomicIncCommandHeader{
+        params.dest_bank_addr_fwd,
+        static_cast<uint8_t>(params.dest_noc_x_fwd),
+        static_cast<uint8_t>(params.dest_noc_y_fwd),
+        static_cast<uint8_t>(params.mcast_rect_size_x),
+        static_cast<uint8_t>(params.mcast_rect_size_y),
+        sem_noc0_dest_addr,
+        1,
+        params.flush};
+    pkt_hdr_fwd->to_noc_fused_multicast_write_atomic_inc(mcast_header, params.payload_size_bytes);
+    pkt_hdr_bwd->to_noc_fused_multicast_write_atomic_inc(mcast_header, params.payload_size_bytes);
+    for (size_t i = 0; i < params.send_count; i++) {
+        // Forward direction
+        if (params.num_fwd_hops > 0) {
+            fabric_connection.get_forward_connection().wait_for_empty_write_slot();
+            // Don't send payload from worker since we only want to test fabric, not worker
+            fabric_connection.get_forward_connection().send_payload_flush_non_blocking_from_address(
+                (uint32_t)pkt_hdr_fwd, sizeof(PACKET_HEADER_TYPE));
+        }
+
+        // Backward direction
+        if (params.num_bwd_hops > 0) {
+            fabric_connection.get_backward_connection().wait_for_empty_write_slot();
+            fabric_connection.get_backward_connection().send_payload_flush_non_blocking_from_address(
+                (uint32_t)pkt_hdr_bwd, sizeof(PACKET_HEADER_TYPE));
+        }
+
+        noc_async_writes_flushed();
+    }
+}
+
 void kernel_main() {
+    DPRINT << "START\n";
     using namespace tt::tt_fabric;
     size_t arg_idx = 0;
 
@@ -295,6 +370,9 @@ void kernel_main() {
     const size_t dest_noc_y_fwd = get_arg_val<uint32_t>(arg_idx++);
     const size_t dest_noc_x_bwd = get_arg_val<uint32_t>(arg_idx++);
     const size_t dest_noc_y_bwd = get_arg_val<uint32_t>(arg_idx++);
+
+    const size_t mcast_rect_size_x = get_arg_val<uint32_t>(arg_idx++);
+    const size_t mcast_rect_size_y = get_arg_val<uint32_t>(arg_idx++);
 
     const size_t num_send_types = get_arg_val<uint32_t>(arg_idx++);
     size_t* send_types_int = reinterpret_cast<size_t*>(get_arg_addr(arg_idx));
@@ -345,13 +423,19 @@ void kernel_main() {
     const size_t finish_sync_val = 3 * total_workers_per_sync;
     const size_t second_finish_sync_val = 4 * total_workers_per_sync;
 
+    DPRINT << "CONNECTING\n";
     fabric_connection.open();
+    DPRINT << "CONNECTED\n";
 
+    DPRINT << "_A\n";
     cb_reserve_back(source_l1_cb_index, 1);
+    DPRINT << "0\n";
     cb_reserve_back(packet_header_cb, 1);
+    DPRINT << "1\n";
     const auto source_l1_buffer_address = get_write_ptr(source_l1_cb_index);
+    DPRINT << "2\n";
     const auto packet_header_buffer_address = get_write_ptr(packet_header_cb);
-
+    DPRINT << "3\n";
     auto* fwd_packet_header = reinterpret_cast<volatile PACKET_HEADER_TYPE*>(packet_header_buffer_address);
     auto* bwd_packet_header =
         reinterpret_cast<volatile PACKET_HEADER_TYPE*>(packet_header_buffer_address + sizeof(PACKET_HEADER_TYPE));
@@ -359,15 +443,16 @@ void kernel_main() {
         reinterpret_cast<volatile PACKET_HEADER_TYPE*>(packet_header_buffer_address + sizeof(PACKET_HEADER_TYPE) * 2);
     auto* sync_bwd_packet_header =
         reinterpret_cast<volatile PACKET_HEADER_TYPE*>(packet_header_buffer_address + sizeof(PACKET_HEADER_TYPE) * 3);
-
+    DPRINT << "4\n";
     if (enable_any_synchronization) {
         sync_fwd_packet_header->to_chip_multicast(
             MulticastRoutingCommandHeader{1, static_cast<uint8_t>(sync_mcast_fwd_hops)});
         sync_bwd_packet_header->to_chip_multicast(
             MulticastRoutingCommandHeader{1, static_cast<uint8_t>(sync_mcast_bwd_hops)});
     }
-
+    DPRINT << "5\n";
     if (enable_start_synchronization) {
+        DPRINT << "START SYNC\n";
         line_sync(
             fabric_connection,
             sync_fwd,
@@ -389,6 +474,7 @@ void kernel_main() {
             sync_noc_x,
             sync_noc_y,
             2 * start_sync_val);
+        DPRINT << "START SYNC DONE\n";
     }
 
     {
@@ -396,6 +482,7 @@ void kernel_main() {
         {
             DeviceZoneScopedN("MAIN-TEST-BODY-INNER");
             for (size_t i = 0; i < num_send_types; i++) {
+                DPRINT << "SEND TYPE\n";
                 auto send_type = static_cast<NocSendType>(send_types_int[i]);
                 auto chip_send_type = static_cast<ChipSendType>(chip_send_types_int[i]);
 
@@ -412,6 +499,8 @@ void kernel_main() {
                 params.payload_size_bytes = send_type_payload_sizes[i];
                 params.chip_send_type = chip_send_type;
                 params.flush = flush_send[i];
+                params.mcast_rect_size_x = mcast_rect_size_x;
+                params.mcast_rect_size_y = mcast_rect_size_y;
 
                 switch (send_type) {
                     case NocSendType::NOC_UNICAST_WRITE:
@@ -426,12 +515,17 @@ void kernel_main() {
                         send_packets<NocSendType::NOC_FUSED_UNICAST_ATOMIC_INC>(
                             fabric_connection, fwd_packet_header, bwd_packet_header, params, source_l1_buffer_address);
                         break;
+                    case NocSendType::NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC:
+                        send_packets<NocSendType::NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC>(
+                            fabric_connection, fwd_packet_header, bwd_packet_header, params, source_l1_buffer_address);
+                        break;
                     default: ASSERT(false); break;
                 }
             }
         }
 
         if (enable_finish_synchronization) {
+            DPRINT << "FINISH SYNC\n";
             // Send a completion message
             line_sync(
                 fabric_connection,
@@ -445,6 +539,7 @@ void kernel_main() {
                 finish_sync_val);
             // Ack the completion and wait for everyone to do the same. This guarantees
             // all other workers have received all messages.
+            DPRINT << "FINISH SYNC 1\n";
             line_sync(
                 fabric_connection,
                 sync_fwd,
@@ -455,19 +550,24 @@ void kernel_main() {
                 sync_noc_x,
                 sync_noc_y,
                 second_finish_sync_val);
-
+            DPRINT << "FINISH SYNC DONE\n";
             if (sync_noc_x == my_x[0] && sync_noc_y == my_y[0]) {
                 // Sanity check to ensure we don't receive more acks than expected
                 ASSERT(*reinterpret_cast<volatile tt_l1_ptr uint32_t*>(sync_bank_addr) == second_finish_sync_val);
                 // reset the global semaphore in case it is used in a op/kernel invocation
                 *reinterpret_cast<volatile tt_l1_ptr uint32_t*>(sync_bank_addr) = 0;
             }
+            DPRINT << "FINISH SYNC DONE2\n";
         }
     }
 
     {
+        DPRINT << "WR-CLOSE\n";
         DeviceZoneScopedN("WR-CLOSE");
         fabric_connection.close();
     }
+
+    DPRINT << "WR-BARRIER\n";
     noc_async_write_barrier();
+    DPRINT << "WR-BARRIER DONE\n";
 }

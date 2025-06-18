@@ -8,8 +8,10 @@
 #include "fabric_edm_packet_header.hpp"
 #include "edm_fabric_worker_adapters.hpp"
 #include "fabric_edm_types.hpp"
+#include "tt_metal/fabric/hw/inc/edm_fabric/edm_fabric_utils.hpp"
 #include "tt_metal/fabric/hw/inc/edm_fabric/1d_fabric_constants.hpp"
 #include <cstdint>
+#include <tuple>
 
 // If the hop/distance counter equals to the below value, it indicates that it has
 // arrived at (atleast one of) the intended destination(s)
@@ -117,6 +119,42 @@ FORCE_INLINE void flush_write_to_noc_pipeline(uint8_t rx_channel_id) {
     }
 }
 
+template <typename T>
+FORCE_INLINE std::tuple<uint64_t, uint32_t> get_mcast_dest_address_and_num_dests(const T& mcast_write_header) {
+    static_assert(
+        std::is_same_v<T, tt::tt_fabric::NocMulticastCommandHeader> ||
+            std::is_same_v<T, tt::tt_fabric::NocFusedMulticastWriteAndAtomicIncCommandHeader>,
+        "Invalid header type passed to get_mcast_dest_address_and_num_dests. Supported types are "
+        "NocMulticastCommandHeader and NocFusedMulticastWriteAndInlineWriteCommandHeader");
+    if constexpr (tt::tt_fabric::edm_to_local_chip_noc == 1) {
+        const auto mcast_dest_address = get_noc_multicast_addr(
+            mcast_write_header.noc_x_start + mcast_write_header.mcast_rect_size_x - 1,
+            mcast_write_header.noc_y_start + mcast_write_header.mcast_rect_size_y - 1,
+            mcast_write_header.noc_x_start,
+            mcast_write_header.noc_y_start,
+            mcast_write_header.address);
+        const auto num_dests = mcast_write_header.mcast_rect_size_x * mcast_write_header.mcast_rect_size_y;
+        return std::make_tuple(mcast_dest_address, num_dests);
+    } else {
+        const auto mcast_dest_address = get_noc_multicast_addr(
+            mcast_write_header.noc_x_start,
+            mcast_write_header.noc_y_start,
+            mcast_write_header.noc_x_start + mcast_write_header.mcast_rect_size_x,
+            mcast_write_header.noc_y_start + mcast_write_header.mcast_rect_size_y,
+            mcast_write_header.address);
+        const auto num_dests = mcast_write_header.mcast_rect_size_x * mcast_write_header.mcast_rect_size_y;
+        return std::make_tuple(mcast_dest_address, num_dests);
+    }
+}
+
+FORCE_INLINE void execute_semaphore_inc(uint64_t dest_address, uint16_t increment, bool flush, uint8_t rx_channel_id) {
+    if (flush) {
+        flush_write_to_noc_pipeline(rx_channel_id);
+    }
+    noc_semaphore_inc<true>(
+        dest_address, increment, tt::tt_fabric::edm_to_local_chip_noc, tt::tt_fabric::forward_and_local_write_noc_vc);
+}
+
 // Since we unicast to local, we must omit the packet header
 // This function only does reads, and within scope there are no modifications to the packet header
 __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_to_local_chip(
@@ -147,30 +185,18 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
         case tt::tt_fabric::NocSendType::NOC_MULTICAST_WRITE: {
             ASSERT(payload_size_bytes > 0);
             // TODO: confirm if we need to adjust dest core count if we span eth or dram cores
-            const auto mcast_dest_address = get_noc_multicast_addr(
-                header.command_fields.mcast_write.noc_x_start,
-                header.command_fields.mcast_write.noc_y_start,
-                header.command_fields.mcast_write.noc_x_start + header.command_fields.mcast_write.mcast_rect_size_x,
-                header.command_fields.mcast_write.noc_y_start + header.command_fields.mcast_write.mcast_rect_size_y,
-                header.command_fields.mcast_write.address);
-            const auto num_dests = header.command_fields.mcast_write.mcast_rect_size_x *
-                                   header.command_fields.mcast_write.mcast_rect_size_y;
-            noc_async_write_one_packet_with_trid(
+            const auto [mcast_dest_address, num_dests] =
+                get_mcast_dest_address_and_num_dests(header.command_fields.mcast_write);
+            noc_async_write_one_packet_with_trid<false, true, true>(
                 payload_start_address, mcast_dest_address, payload_size_bytes, num_dests, transaction_id);
         } break;
 
         case tt::tt_fabric::NocSendType::NOC_UNICAST_ATOMIC_INC: {
-            const uint64_t dest_address = header.command_fields.unicast_seminc.noc_address;
-            const auto increment = header.command_fields.unicast_seminc.val;
-            if (header.command_fields.unicast_seminc.flush) {
-                flush_write_to_noc_pipeline(rx_channel_id);
-            }
-            noc_semaphore_inc<true>(
-                dest_address,
-                increment,
-                tt::tt_fabric::edm_to_local_chip_noc,
-                tt::tt_fabric::forward_and_local_write_noc_vc);
-
+            execute_semaphore_inc(
+                header.command_fields.unicast_seminc.noc_address,
+                header.command_fields.unicast_seminc.val,
+                header.command_fields.unicast_seminc.flush,
+                rx_channel_id);
         } break;
 
         case tt::tt_fabric::NocSendType::NOC_UNICAST_INLINE_WRITE: {
@@ -185,8 +211,8 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
         } break;
 
         case tt::tt_fabric::NocSendType::NOC_FUSED_UNICAST_ATOMIC_INC: {
-            const auto dest_address = header.command_fields.unicast_seminc_fused.noc_address;
-            noc_async_write_one_packet_with_trid<false, false>(
+            const auto dest_address = header.command_fields.fused_unicast_write_with_seminc.noc_address;
+            noc_async_write_one_packet_with_trid<false, true, true>(
                 payload_start_address,
                 dest_address,
                 payload_size_bytes,
@@ -195,17 +221,25 @@ __attribute__((optimize("jump-tables"))) FORCE_INLINE void execute_chip_unicast_
                 tt::tt_fabric::edm_to_local_chip_noc,
                 tt::tt_fabric::forward_and_local_write_noc_vc);
 
-            const uint64_t semaphore_dest_address = header.command_fields.unicast_seminc_fused.semaphore_noc_address;
-            const auto increment = header.command_fields.unicast_seminc_fused.val;
-            if (header.command_fields.unicast_seminc_fused.flush) {
-                flush_write_to_noc_pipeline(rx_channel_id);
-            }
-            noc_semaphore_inc<true>(
-                semaphore_dest_address,
-                increment,
-                tt::tt_fabric::edm_to_local_chip_noc,
-                tt::tt_fabric::forward_and_local_write_noc_vc);
+            execute_semaphore_inc(
+                header.command_fields.fused_unicast_write_with_seminc.semaphore_noc_address,
+                header.command_fields.fused_unicast_write_with_seminc.val,
+                header.command_fields.fused_unicast_write_with_seminc.flush,
+                rx_channel_id);
         } break;
+
+        case tt::tt_fabric::NocSendType::NOC_FUSED_MULTICAST_WRITE_WITH_ATOMIC_INC: {
+            const auto [mcast_dest_address, num_dests] =
+                get_mcast_dest_address_and_num_dests(header.command_fields.fused_mcast_write_with_seminc);
+            noc_async_write_one_packet_with_trid<false, true, true>(
+                payload_start_address, mcast_dest_address, payload_size_bytes, num_dests, transaction_id);
+
+            execute_semaphore_inc(
+                header.command_fields.fused_mcast_write_with_seminc.semaphore_noc_address,
+                header.command_fields.fused_mcast_write_with_seminc.val,
+                header.command_fields.fused_mcast_write_with_seminc.flush,
+                rx_channel_id);
+        }
 
         case tt::tt_fabric::NocSendType::NOC_MULTICAST_ATOMIC_INC:
         default: {

@@ -2846,12 +2846,26 @@ void Run1DFabricPacketSendTest(
                 }
 
                 size_t num_send_types = disable_sends_for_worker ? 0 : test_specs.size();
+                tt_xy_pair last_core = tt_xy_pair(device->logical_grid_size().x - 1, device->logical_grid_size().y - 1);
+                size_t mcast_rect_size_x = device->worker_core_from_logical_core(last_core).x - dest_noc_x_fwd;
+                size_t mcast_rect_size_y = device->worker_core_from_logical_core(last_core).y - dest_noc_y_fwd;
+                log_info(
+                    tt::LogTest, "mcast_rect_size_x: {}, mcast_rect_size_y: {}", mcast_rect_size_x, mcast_rect_size_y);
+                log_info(
+                    tt::LogTest,
+                    "dest_noc_x_fwd: {}, dest_noc_y_fwd: {}, dest_noc_x_bwd: {}, dest_noc_y_bwd: {}",
+                    dest_noc_x_fwd,
+                    dest_noc_y_fwd,
+                    dest_noc_x_bwd,
+                    dest_noc_y_bwd);
                 std::vector<uint32_t> rt_args = {
                     dest_bank_addr,
                     dest_noc_x_fwd,
                     dest_noc_y_fwd,
                     dest_noc_x_bwd,
                     dest_noc_y_bwd,
+                    mcast_rect_size_x,
+                    mcast_rect_size_y,
                     num_send_types,
                 };
 
@@ -3272,12 +3286,25 @@ void generate_1d_fabric_on_full_mesh_worker_rt_args(
         const size_t dest_noc_x_bwd = device->worker_core_from_logical_core(dest_core_coord[l]).x;
         const size_t dest_noc_y_bwd = device->worker_core_from_logical_core(dest_core_coord[l]).y;
         size_t num_send_types = !disable_sends_for_worker;
+        tt_xy_pair last_core = tt_xy_pair(device->logical_grid_size().x - 1, device->logical_grid_size().y - 1);
+        size_t mcast_rect_size_x = device->worker_core_from_logical_core(last_core).x - dest_noc_x_fwd;
+        size_t mcast_rect_size_y = device->worker_core_from_logical_core(last_core).y - dest_noc_y_fwd;
+        log_info(tt::LogTest, "mcast_rect_size_x: {}, mcast_rect_size_y: {}", mcast_rect_size_x, mcast_rect_size_y);
+        log_info(
+            tt::LogTest,
+            "dest_noc_x_fwd: {}, dest_noc_y_fwd: {}, dest_noc_x_bwd: {}, dest_noc_y_bwd: {}",
+            dest_noc_x_fwd,
+            dest_noc_y_fwd,
+            dest_noc_x_bwd,
+            dest_noc_y_bwd);
         std::vector<uint32_t> rt_args = {
             dest_bank_addr,
             dest_noc_x_fwd,
             dest_noc_y_fwd,
             dest_noc_x_bwd,
             dest_noc_y_bwd,
+            mcast_rect_size_x,
+            mcast_rect_size_y,
             num_send_types,
         };
 
@@ -3804,12 +3831,25 @@ void RunRingDeadlockStabilityTestWithPersistentFabric(
 
             // Initialize the base runtime args
             // RT ARGS
+            tt_xy_pair last_core = tt_xy_pair(device->logical_grid_size().x - 1, device->logical_grid_size().y - 1);
+            size_t mcast_rect_size_x = device->worker_core_from_logical_core(last_core).x - dest_noc_x;
+            size_t mcast_rect_size_y = device->worker_core_from_logical_core(last_core).y - dest_noc_y;
+            log_info(tt::LogTest, "mcast_rect_size_x: {}, mcast_rect_size_y: {}", mcast_rect_size_x, mcast_rect_size_y);
+            log_info(
+                tt::LogTest,
+                "dest_noc_x_fwd: {}, dest_noc_y_fwd: {}, dest_noc_x_bwd: {}, dest_noc_y_bwd: {}",
+                dest_noc_x,
+                dest_noc_y,
+                dest_noc_x,
+                dest_noc_y);
             std::vector<uint32_t> rt_args = {
                 dest_bank_addr,
                 dest_noc_x,
                 dest_noc_y,
                 dest_noc_x,
                 dest_noc_y,
+                mcast_rect_size_x,
+                mcast_rect_size_y,
 
                 // Number of send types
                 num_send_types};

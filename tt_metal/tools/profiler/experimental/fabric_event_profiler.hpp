@@ -43,7 +43,8 @@ void record_fabric_header(const volatile PACKET_HEADER_TYPE* fabric_header_ptr) 
             break;
         }
         case tt::tt_fabric::NocSendType::NOC_FUSED_UNICAST_ATOMIC_INC: {
-            const volatile auto& unicast_write_cmd = fabric_header_ptr->get_command_fields().unicast_seminc_fused;
+            const volatile auto& unicast_write_cmd =
+                fabric_header_ptr->get_command_fields().fused_unicast_write_with_seminc;
             noc_event_profiler::recordFabricNocEvent(
                 KernelProfilerNocEventMetadata::NocEventType::FABRIC_FUSED_UNICAST_ATOMIC_INC,
                 routing_fields_type,
