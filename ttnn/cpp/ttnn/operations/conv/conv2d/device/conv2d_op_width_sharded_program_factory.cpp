@@ -773,6 +773,11 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_width_sh
                                   cb_config_output.globally_allocated_address().value();
     }
 
+    bool no_float32 = act_df != tt::DataFormat::Float32 && weight_df != tt::DataFormat::Float32 &&
+                      out_df != tt::DataFormat::Float32 && bias_df != tt::DataFormat::Float32;
+    bool fast_tilize_mode = no_float32;
+    log_info(tt::LogOp, "fast_tilize_mode: {}", fast_tilize_mode);
+
     compute_kernel_args = {
         act_block_w_ntiles,      // in0_block_w
         act_num_subblocks,       // in0_num_sublocks
@@ -808,8 +813,7 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_width_sh
         0,
         partials_cb_uses_output,
         input_num_cores,  // in0_nblocks_w_tilize. Repeat tilize after all cores have done one round of MCAST.
-
-    };
+        fast_tilize_mode};
 
     activation_kernel_compile_args = {
         (uint32_t)stride_w,
