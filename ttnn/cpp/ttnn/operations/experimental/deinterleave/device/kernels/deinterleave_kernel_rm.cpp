@@ -63,7 +63,7 @@ void kernel_main() {
     constexpr uint32_t stride_w = get_compile_time_arg_val(7);
     constexpr uint32_t barrier_threshold = get_compile_time_arg_val(8) != 0
                                                ? get_compile_time_arg_val(8)
-                                               : get_barrier_read_threshold<stick_size_logical_bytes, 2>();
+                                               : get_barrier_read_threshold<dst_stick_size_bytes, 2>();
 
     static_assert(
         stick_size_logical_bytes <= NOC_MAX_BURST_SIZE, "stick size too big, cannot use one_packet API for reads");
@@ -82,20 +82,6 @@ void kernel_main() {
     const uint32_t dst_rollover_offset = get_arg_val<uint32_t>(12);
 
     uint32_t barrier_count = 0;
-
-    // constexpr uint32_t stick_size_logical_bytes = get_compile_time_arg_val(4);
-    // constexpr uint32_t dst_stick_size_bytes = get_compile_time_arg_val(5);
-
-    DPRINT << "src_cb_id: " << src_cb_id << ENDL();
-    DPRINT << "dst_cb_id: " << dst_cb_id << ENDL();
-    DPRINT << "width: " << width << ENDL();
-    DPRINT << "height: " << height << ENDL();
-    DPRINT << "stick_size_logical_bytes: " << stick_size_logical_bytes << ENDL();
-    DPRINT << "dst_stick_size_bytes: " << dst_stick_size_bytes << ENDL();  // dst address se inkrementiraS
-    DPRINT << "stride_h: " << stride_h << ENDL();
-    DPRINT << "stride_w: " << stride_w << ENDL();
-    DPRINT << "barrier_threshold: " << barrier_threshold << ENDL();
-    DPRINT << "dst_size_bytes: " << dst_size_bytes << ENDL();
 
     // Go through nodes (start_x, start_y) to (end_x, end_y)
     // Copy your stick (dst_batch) to the dst buffer
