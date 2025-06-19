@@ -34,6 +34,7 @@ void kernel_main() {
     constexpr uint32_t ELEMENT_SIZE = get_compile_time_arg_val(20);
     constexpr bool is_causal = get_compile_time_arg_val(21) == 1;
     constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(22);
+    constexpr uint32_t q_heads_parallel_factor = get_compile_time_arg_val(23);
 
     uint32_t arg_idx = 0;
     const uint32_t out_addr = get_arg_val<uint32_t>(arg_idx++);
@@ -64,7 +65,7 @@ void kernel_main() {
             cb_wait_front(cb_index_id, 1);
             uint32_t index_cb_ptr = get_read_ptr(cb_index_id);
             volatile tt_l1_ptr uint32_t* index_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(index_cb_ptr);
-            cur_pos = index_ptr[cur_batch];
+            cur_pos = index_ptr[(uint32_t)(cur_batch / q_heads_parallel_factor)];
         }
 
         if (cur_pos == UINT32_MAX) {

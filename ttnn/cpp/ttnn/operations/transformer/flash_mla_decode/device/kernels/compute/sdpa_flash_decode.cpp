@@ -47,6 +47,7 @@ void MAIN {
     constexpr bool use_attention_mask = get_compile_time_arg_val(22) == 1;
     constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(23);
     constexpr bool tilize_q = get_compile_time_arg_val(24) == 1;
+    constexpr uint32_t q_heads_parallel_factor = get_compile_time_arg_val(25);
 
     constexpr uint32_t q_chunk_tiles = Sq_chunk_t * DHt;
     constexpr uint32_t out_chunk_tiles = Sq_chunk_t * vDHt;
@@ -108,7 +109,7 @@ void MAIN {
             cb_wait_front(cb_index_id, 1);
             volatile uint32_t* index_addr_ptr;
             cb_get_tile(cb_index_id, 0, &index_addr_ptr);
-            cur_pos = index_addr_ptr[4 + cur_batch];
+            cur_pos = index_addr_ptr[4 + (cur_batch / q_heads_parallel_factor)];
             cb_release_tile(cb_index_id);
         }
 

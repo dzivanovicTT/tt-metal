@@ -62,6 +62,27 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     uint32_t num_q_heads = q_shape_unpadded[2];
     uint32_t page_block_size_t = 0;
 
+    bool is_q_sharded = input_tensor_q.is_sharded();
+    bool is_output_sharded = output_tensor.is_sharded();
+
+    // balance the number of cores to use based on batch
+    uint32_t q_heads_parallel_factor = 1;
+    if (is_q_sharded) {
+        uint32_t q_shard_height = input_tensor_q.memory_config().shard_spec()->shape[0];
+        q_heads_parallel_factor = std::max((uint32_t)1, num_q_heads / q_shard_height);
+
+        if (q_heads_parallel_factor > 1) {
+            TT_FATAL(
+                num_kv_heads == 1,
+                "If parallelizing over Q num heads (with parallelization factor q_heads_parallel_factor: {}), then "
+                "num_kv_heads must be 1, but got num_kv_heads: {}",
+                q_heads_parallel_factor,
+                num_kv_heads);
+        }
+
+        B *= q_heads_parallel_factor;  // adjust batch size to account for Q sharding
+    }
+
     if (is_paged_attention) {
         uint32_t block_size = k_shape[2];
         page_block_size_t = block_size / TILE_HEIGHT;
@@ -72,12 +93,10 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
     uint32_t St = S / TILE_HEIGHT;
     uint32_t DHt = DH / TILE_WIDTH;
     uint32_t vDHt = head_dim_v / TILE_WIDTH;
-    uint32_t PNHt = PNH / TILE_HEIGHT;
+    uint32_t PNHt = PNH / q_heads_parallel_factor / TILE_HEIGHT;
 
     const uint32_t Sk_chunk_t = k_chunk_size / TILE_HEIGHT;
 
-    bool is_q_sharded = input_tensor_q.is_sharded();
-    bool is_output_sharded = output_tensor.is_sharded();
     if (!share_cache.has_value()) {
         // default share_cache to false
         share_cache = false;
@@ -631,6 +650,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         num_kv_heads,
         page_block_size_t,
         Bkv,
+        q_heads_parallel_factor,
         num_cores_per_head,
         num_heads_per_core,
         num_output_cores,
@@ -664,6 +684,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         output_tensor.element_size(),
         is_causal,
         max_dynamic_chunk_size,
+        q_heads_parallel_factor,
     };
 
     std::vector<uint32_t> compute_compile_time_args_common = {
@@ -692,6 +713,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         use_attention_mask,
         max_dynamic_chunk_size,
         tilize_q,
+        q_heads_parallel_factor,
     };
 
     // Determine granularity for compute loops
@@ -767,7 +789,8 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
         uint32_t core_num_in_reduce = i % num_cores_per_head;
         uint32_t core_num_in_output = i % num_cores_per_batch;
 
-        uint32_t cur_pos = (use_cur_pos_tensor || !is_causal) ? -1 : cur_pos_ids.at(cur_batch);
+        uint32_t cur_pos =
+            (use_cur_pos_tensor || !is_causal) ? -1 : cur_pos_ids.at((uint32_t)(cur_batch / q_heads_parallel_factor));
 
         log_debug(tt::LogOp, "---- core_id: {}, coord: {} ----", i, core);
         log_debug(tt::LogOp, "worker_id_for_reduce: {}", worker_id_for_reduce);
@@ -854,6 +877,7 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
          is_output_sharded,
          cb_out4_id,
          B,
+         q_heads_parallel_factor,
          use_cur_pos_tensor,
          use_attention_mask,
          is_paged_attention,
@@ -897,7 +921,8 @@ operation::ProgramWithCallbacks flash_mla_decode_multi_core(
                 uint32_t cur_batch = i / num_cores_per_batch;
                 uint32_t core_num_in_reduce = (num_cores_per_head == 0) ? 0 : i % num_cores_per_head;
                 uint32_t core_num_in_output = i % num_cores_per_batch;
-                uint32_t cur_pos = (use_cur_pos_tensor || !is_causal) ? -1 : cur_pos_ids.at(cur_batch);
+                uint32_t cur_pos =
+                    (use_cur_pos_tensor || !is_causal) ? -1 : cur_pos_ids.at((cur_batch / q_heads_parallel_factor));
 
                 auto& reader_args = reader_args_by_core[core.x][core.y];
                 auto& writer_args = writer_args_by_core[core.x][core.y];

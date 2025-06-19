@@ -77,6 +77,7 @@ def run_flash_mla_decode_impl(
     nkv,
     kv_lora_rank,
     d_rope,
+    q_num_cores,
     q_dtype,
     dtype,
 ):
@@ -86,45 +87,6 @@ def run_flash_mla_decode_impl(
     q = torch.randn(batch, nh, 1, kv_lora_rank + d_rope).float()  # (B, H, S (1 for decode), D)
     k = torch.randn(batch, nkv, seq_len, kv_lora_rank + d_rope).float()  # (B, H, S, D)
     v = k[..., :kv_lora_rank]  # (B, H, S, D)
-
-    # —— FOLD HEADS INTO BATCH TO AVOID OOM FOR DEEPSEEK CONFIG ——
-    # Decide how many cores to fold, BUT keep ≥32 heads per core
-    grid = device.compute_with_storage_grid_size()  # CoreCoord(x=8,y=8)
-    full_cores = grid.x  # 8 on a TG
-    min_heads = 32
-    # At most floor(nh/min_heads) cores, but ≥1
-    max_cores = max(1, nh // min_heads)
-    num_cores = min(full_cores, max_cores)  # fold across at most 4 cores
-    # how many heads each core should handle
-    heads_per_core = nh // num_cores
-    # new batch and head counts
-    new_batch = batch * num_cores
-    new_nh = heads_per_core
-
-    # reshape Q: [B, H, 1, D] → [new_batch, new_nh, 1, D]
-    q = q.view(batch, num_cores, new_nh, 1, -1).permute(0, 1, 3, 2, 4).reshape(new_batch, new_nh, 1, -1)
-
-    # reshape K: [B, nkv, S, D] → [new_batch, nkv, S, D]
-    k = (
-        k.unsqueeze(1)  # [B,1,nkv,S,D]
-        .repeat(1, num_cores, 1, 1, 1)  # [B,num_cores,nkv,S,D]
-        .reshape(new_batch, nkv, seq_len, -1)
-    )
-    # derive V again
-    v = k[..., :kv_lora_rank]
-
-    # override for rest of function
-    batch, nh = new_batch, new_nh
-
-    # rebuild start_indices for the expanded batch
-    max_start_idx = seq_len // 2
-    base_starts = (
-        np.linspace(0, max_start_idx, batch // num_cores, dtype=np.int32).tolist()
-        if (batch // num_cores) > 1
-        else [max_start_idx]
-    )
-    start_indices = [s for s in base_starts for _ in range(num_cores)]
-    # —— END FOLD HEADS INTO BATCH ——
 
     ######################
     ### TT Setup
@@ -155,12 +117,42 @@ def run_flash_mla_decode_impl(
         packer_l1_acc=False,
     )
 
+    # Set up input tensors
+    if q_num_cores < 1:
+        q_mem_config = ttnn.DRAM_MEMORY_CONFIG
+        out_mem_config = ttnn.DRAM_MEMORY_CONFIG
+    else:
+        num_cores_x, num_cores_y = device.compute_with_storage_grid_size().x, device.compute_with_storage_grid_size().y
+        assert (
+            q_num_cores <= num_cores_x * num_cores_y
+        ), "q_num_cores must be less than or equal to the number of cores in the device."
+
+        q_core_grid = ttnn.num_cores_to_corerangeset(
+            q_num_cores, device.compute_with_storage_grid_size(), row_wise=True
+        )
+        block_height = nearest_n(
+            np.prod(q.shape[:-1]) // q_num_cores, ttnn.TILE_SIZE
+        )  # TODO: is the nearest_n necessary here?
+
+        q_mem_config = ttnn.create_sharded_memory_config(
+            shape=(block_height, q.shape[-1]),
+            core_grid=q_core_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            use_height_and_width_as_shard_shape=True,
+        )
+        out_mem_config = ttnn.create_sharded_memory_config(
+            shape=(block_height, v.shape[-1]),
+            core_grid=q_core_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            use_height_and_width_as_shard_shape=True,
+        )
+
     tt_q = ttnn.from_torch(
         q.permute(2, 0, 1, 3),  # (B, H, S, D) -> (S, B, H, D)
         device=device,
         dtype=q_dtype,
         layout=ttnn.TILE_LAYOUT,
-        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+        memory_config=q_mem_config,
     )
     tt_k = ttnn.from_torch(
         k,
@@ -184,7 +176,7 @@ def run_flash_mla_decode_impl(
         scale=scale,
         program_config=sdpa_program_config,
         compute_kernel_config=compute_kernel_config,
-        memory_config=ttnn.DRAM_MEMORY_CONFIG,
+        memory_config=out_mem_config,
     )
     tt_out_torch = ttnn.to_torch(tt_out)[..., :nh, :].permute(1, 2, 0, 3)  # (S, B, H, D) -> (B, H, S, D)
 
@@ -206,10 +198,6 @@ def run_flash_mla_decode_impl(
     if dtype == ttnn.bfloat8_b:
         pcc_threshold = 0.97
 
-    # override for the 512+64 head-dim DeepSeek shape
-    if kv_lora_rank == 512 and d_rope == 64:
-        pcc_threshold = 0.94
-
     out_pass, out_pcc = comp_pcc(tt_out_torch, out_t, pcc_threshold)
     logger.info(f"Output PCC: {out_pcc}")
 
@@ -217,15 +205,21 @@ def run_flash_mla_decode_impl(
 
 
 @pytest.mark.parametrize(
-    "batch, seq_len, nh, nkv, kv_lora_rank, d_rope",
-    # batch, seq_len, num heads q, num heads kv, kv lora rank, dim rope
+    "batch, seq_len, nh, nkv, kv_lora_rank, d_rope, q_num_cores",
+    # batch, seq_len, num heads q, num heads kv, kv lora rank, dim rope, number of cores to shard q on
     [
-        (2, 1024, 128, 1, 512, 64),  # DeepSeek V3 TG DP=32
-        (2, 8 * 1024, 8, 1, 128, 64),
-        (2, 8 * 1024, 64, 1, 256, 0),
-        (2, 8 * 1024, 64, 1, 32, 64),
-        (8, 4 * 1024, 8, 1, 128, 32),
-        # (32, 8 * 1024, 8, 1, 128, 32),  # Gives bad PCC
+        (2, 16 * 1024, 128, 1, 512, 64, 8),  # DeepSeek V3 TG full DP
+        (2, 16 * 1024, 128, 1, 256, 64, 16),
+        (2, 16 * 1024, 128, 1, 256, 64, 32),
+        (2, 16 * 1024, 128, 1, 256, 64, 64),
+        (8, 16 * 1024, 128, 1, 256, 64, 64),
+        # (8, 16 * 1024, 16, 1, 256, 64, 64), # TODO: Need to debug this
+        # (8, 16 * 1024, 48, 1, 256, 64, 64), # TODO: Need to debug this
+        (2, 8 * 1024, 8, 1, 128, 64, 0),
+        (2, 8 * 1024, 64, 1, 256, 0, 0),
+        (2, 8 * 1024, 64, 1, 32, 64, 0),
+        (8, 4 * 1024, 8, 1, 128, 32, 0),
+        # (16, 8 * 1024, 8, 1, 128, 32, 0),  # Gives bad PCC, seems to be worse as batch increases
     ],
 )
 @pytest.mark.parametrize(
@@ -245,6 +239,7 @@ def test_flash_mla_decode(
     nkv,
     kv_lora_rank,
     d_rope,
+    q_num_cores,
     q_dtype,
     dtype,
     use_program_cache,
@@ -259,6 +254,7 @@ def test_flash_mla_decode(
         nkv,
         kv_lora_rank,
         d_rope,
+        q_num_cores,
         q_dtype,
         dtype,
     )

@@ -30,13 +30,14 @@ void kernel_main() {
     constexpr uint32_t num_kv_heads = get_compile_time_arg_val(12);
     constexpr uint32_t block_size_t = get_compile_time_arg_val(13);
     constexpr uint32_t Bkv = get_compile_time_arg_val(14);
-    constexpr uint32_t num_cores_per_head = get_compile_time_arg_val(15);
-    constexpr uint32_t num_heads_per_core = get_compile_time_arg_val(16);
-    constexpr uint32_t num_output_cores = get_compile_time_arg_val(17);
-    constexpr bool is_causal = get_compile_time_arg_val(18) == 1;
-    constexpr bool use_attention_mask = get_compile_time_arg_val(19) == 1;
-    constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(20);
-    constexpr bool tilize_q = get_compile_time_arg_val(21) == 1;
+    constexpr uint32_t q_heads_parallel_factor = get_compile_time_arg_val(15);
+    constexpr uint32_t num_cores_per_head = get_compile_time_arg_val(16);
+    constexpr uint32_t num_heads_per_core = get_compile_time_arg_val(17);
+    constexpr uint32_t num_output_cores = get_compile_time_arg_val(18);
+    constexpr bool is_causal = get_compile_time_arg_val(19) == 1;
+    constexpr bool use_attention_mask = get_compile_time_arg_val(20) == 1;
+    constexpr uint32_t max_dynamic_chunk_size = get_compile_time_arg_val(21);
+    constexpr bool tilize_q = get_compile_time_arg_val(22) == 1;
 
     uint32_t arg_idx = 0;
     const uint32_t q_addr = get_arg_val<uint32_t>(arg_idx++);
@@ -78,7 +79,7 @@ void kernel_main() {
             noc_async_read_barrier();
             cb_push_back(cb_index_id, 1);
             volatile tt_l1_ptr uint32_t* index_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(index_cb_wr_ptr);
-            cur_pos = index_ptr[cur_batch];
+            cur_pos = index_ptr[cur_batch / q_heads_parallel_factor];
         }
 
         if (cur_pos == UINT32_MAX) {
@@ -212,7 +213,7 @@ void kernel_main() {
     for (uint32_t cur_head = cur_head_group * num_heads_per_core;
          cur_head < cur_head_group * num_heads_per_core + num_heads_per_core;
          ++cur_head) {
-        const uint32_t mask_batch_offset = (cur_batch % Bkv) * PNHt * St;
+        const uint32_t mask_batch_offset = ((cur_batch / q_heads_parallel_factor) % Bkv) * PNHt * St;
         const uint32_t mask_chunk_offset = k_chunk_start * Sk_chunk_t_dynamic;
         uint32_t mask_start_tile_id = mask_batch_offset + mask_chunk_offset;
         if constexpr (is_paged_attention) {
@@ -274,8 +275,9 @@ void kernel_main() {
             }
         } else {
             // Offset for current batch
-            const uint32_t k_batch_offset = (cur_batch % Bkv) * num_kv_heads * St * DHt;
-            const uint32_t v_batch_offset = (cur_batch % Bkv) * num_kv_heads * St * DHt;  // Use K's head dim
+            const uint32_t k_batch_offset = ((cur_batch / q_heads_parallel_factor) % Bkv) * num_kv_heads * St * DHt;
+            const uint32_t v_batch_offset =
+                ((cur_batch / q_heads_parallel_factor) % Bkv) * num_kv_heads * St * DHt;  // Use K's head dim
             const uint32_t k_head_offset = cur_head * St * DHt;
             const uint32_t v_head_offset = cur_head * St * DHt;  // Use K's head dim
 
