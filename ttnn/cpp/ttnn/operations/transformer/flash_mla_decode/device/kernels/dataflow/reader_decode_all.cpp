@@ -287,7 +287,7 @@ void kernel_main() {
             uint32_t k_start_tile_id = k_batch_offset + k_head_offset + k_chunk_offset;
             uint32_t v_start_tile_id = v_batch_offset + v_head_offset + v_chunk_offset;
 
-            const bool reuse_k = false;  // Reuse K for V, as they are the same in FlashMLA
+            const bool reuse_k = true;  // Reuse K for V, as they are the same in FlashMLA
 
             read_kv_mask_chunks<
                 DHt,

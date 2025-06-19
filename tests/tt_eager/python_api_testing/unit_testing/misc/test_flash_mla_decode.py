@@ -218,7 +218,7 @@ def run_flash_mla_decode_impl(
     if dtype == ttnn.bfloat4_b:
         pcc_threshold = 0.91
     if dtype == ttnn.bfloat8_b:
-        pcc_threshold = 0.90
+        pcc_threshold = 0.98
 
     out_pass, out_pcc = comp_pcc(tt_out_torch, out_t, pcc_threshold)
     logger.info(f"Output PCC: {out_pcc}")
@@ -241,7 +241,7 @@ def run_flash_mla_decode_impl(
         (2, 8 * 1024, 64, 1, 256, 0, 0),
         (2, 8 * 1024, 64, 1, 32, 64, 0),
         (8, 4 * 1024, 8, 1, 128, 32, 0),
-        # (16, 8 * 1024, 8, 1, 128, 32, 0),  # Gives bad PCC, seems to be worse as batch increases
+        (16, 8 * 1024, 8, 1, 128, 32, 0),
     ],
 )
 @pytest.mark.parametrize(
@@ -285,7 +285,7 @@ def test_flash_mla_decode(
 @pytest.mark.parametrize(
     "batch",
     [
-        # 1,  # Single batch # TODO: Debug this case
+        1,  # Single batch
         2,  # Multiple batches
         8,  # Even larger batch size
     ],

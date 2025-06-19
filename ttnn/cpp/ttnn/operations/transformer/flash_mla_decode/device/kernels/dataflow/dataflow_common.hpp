@@ -455,6 +455,7 @@ void read_kv_mask_chunks(
                     v_tile_id++;
                     v_write_ptr += v_tile_bytes;
                 }
+                v_tile_id += (DHt - vDHt);  // Skip the padding!
             }
             noc_async_read_barrier();
             cb_push_back(cb_v_in, v_chunk_tiles);
