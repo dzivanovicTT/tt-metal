@@ -20,12 +20,15 @@ inline void calculate_sigmoid_appx() {
     vUInt l2 = l_reg[LRegs::LReg2];
 
 #pragma GCC unroll 8
-    for (int d = 0; d < ITERATIONS; d++) {
+    // ultra hack to iterate only on data we need
+    for (int d = 0; d < ITERATIONS; d += 2) {
         vFloat val = dst_reg[0];
 
         dst_reg[0] = lut(val, l0, l1, l2) + 0.5f;
 
-        dst_reg++;
+        // dst_reg++;
+        // dst_reg++;
+        dst_reg += 2;
     }
 
     l_reg[LRegs::LReg0] = l0;
