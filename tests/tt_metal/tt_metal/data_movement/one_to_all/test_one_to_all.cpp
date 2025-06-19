@@ -7,6 +7,7 @@
 #include "tt_metal/test_utils/stimulus.hpp"
 #include "tt_metal/test_utils/print_helpers.hpp"
 #include "dm_common.hpp"
+#include "test_one_to_all.hpp"
 
 namespace tt::tt_metal {
 
@@ -36,6 +37,8 @@ struct OneToAllConfig {
     bool loopback = false;
     bool is_multicast = false;
     bool is_linked = false;
+
+    uint32_t multicast_scheme_type = 0;
 
     // TODO: Add the following parameters
     //  1. Virtual Channel (only useful for unicast)
@@ -143,7 +146,10 @@ bool run_dm(IDevice* device, const OneToAllConfig& test_config) {
              (uint32_t)sub_worker_start_coord.x,
              (uint32_t)sub_worker_start_coord.y,
              (uint32_t)sub_worker_end_coord.x,
-             (uint32_t)sub_worker_end_coord.y});
+             (uint32_t)sub_worker_end_coord.y,
+             (uint32_t)test_config.multicast_scheme_type,
+             (uint32_t)test_config.sub_grid_size.x,
+             (uint32_t)test_config.sub_grid_size.y});
         sender_kernel_path += "sender_multicast.cpp";
     } else {  // Unicast Sender Kernel
         sender_kernel_path += "sender.cpp";
@@ -231,7 +237,8 @@ void directed_ideal_test(
     bool is_linked,
     CoreCoord mst_core_coord,
     CoreCoord sub_start_core_coord,
-    CoreCoord sub_grid_size) {
+    CoreCoord sub_grid_size,
+    uint32_t multicast_scheme_type) {
     // Parameters
     NOC noc_id = NOC::NOC_0;
     bool loopback = true;
@@ -261,6 +268,7 @@ void directed_ideal_test(
         .loopback = loopback,
         .is_multicast = is_multicast,
         .is_linked = is_linked,
+        .multicast_scheme_type = multicast_scheme_type,
     };
 
     // Run

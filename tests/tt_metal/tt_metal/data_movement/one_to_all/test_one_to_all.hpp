@@ -1,3 +1,6 @@
+#ifndef TEST_ONE_TO_ALL_HPP
+#define TEST_ONE_TO_ALL_HPP
+
 namespace tt::tt_metal::unit_tests::dm::core_to_all {
 
 void directed_ideal_test(
@@ -9,6 +12,8 @@ void directed_ideal_test(
     bool is_linked,
     CoreCoord mst_core_coord,
     CoreCoord sub_start_core_coord,
-    CoreCoord sub_grid_size);
-
+    CoreCoord sub_grid_size,
+    uint32_t multicast_scheme_type = 0);
 }
+
+#endif  // TEST_ONE_TO_ALL_HPP

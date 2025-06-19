@@ -22,6 +22,11 @@ void kernel_main() {
     constexpr uint32_t end_x = get_compile_time_arg_val(11);
     constexpr uint32_t end_y = get_compile_time_arg_val(12);
 
+    // Specific for Multicast Schemes
+    constexpr uint32_t multicast_scheme_type = get_compile_time_arg_val(13);
+    constexpr uint32_t sub_grid_size_x = get_compile_time_arg_val(14);
+    constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(15);
+
     // Derivative values
     constexpr uint32_t bytes_per_transaction = pages_per_transaction * bytes_per_page;
     constexpr uint32_t bytes = bytes_per_transaction * num_of_transactions;
@@ -61,4 +66,11 @@ void kernel_main() {
     DeviceTimestampedData("Number of transactions", num_of_transactions);
     DeviceTimestampedData("Transaction size in bytes", bytes_per_transaction);
     DeviceTimestampedData("Test id", test_id);
+
+    // For multicast schemes, we can also log the multicast scheme type and grid size
+    if (multicast_scheme_type != 0) {
+        DeviceTimestampedData("Multicast Scheme Type", multicast_scheme_type);
+        DeviceTimestampedData("Subordinate Grid Size X", sub_grid_size_x);
+        DeviceTimestampedData("Subordinate Grid Size Y", sub_grid_size_y);
+    }
 }
