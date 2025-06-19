@@ -7,6 +7,7 @@ import ttnn
 
 
 def test_ttnn_where():
+    torch.manual_seed(0)
     C = torch.ones(4, 4, dtype=torch.float32)
     T = torch.randn(4, 4, dtype=torch.float32)
     F = torch.ones(4, 4, dtype=torch.float32) * 10
@@ -17,7 +18,7 @@ def test_ttnn_where():
         ttnn_F = ttnn.from_torch(F, dtype=ttnn.float32, layout=ttnn.TILE_LAYOUT, device=dev)
         ttnn_result = ttnn.where(ttnn_C, ttnn_T, ttnn_F)
         result = ttnn.to_torch(ttnn_result)
-        print(result)
+        print("tt res", result)
     print(golden)
 
 
