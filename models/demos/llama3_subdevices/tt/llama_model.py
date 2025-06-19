@@ -342,7 +342,7 @@ class TtTransformer(LightweightModule):
         tt_tokens = self.embd(tokens)
         return tt_tokens, current_pos, tt_rot_mats, page_table
 
-    def process_output_prefill(self, tt_out, last_token_idx):
+    def process_output_prefill(self, tt_out, last_token_idx, tt_out_logits_saved=None):
         """
         Input is ttnn device tensor of logits. Output is torch logits tensor.
         NOTE: In this model, prefill always uses get_last_token
@@ -374,8 +374,13 @@ class TtTransformer(LightweightModule):
             tt_out = tt_out[0]
 
         toks = ttnn.to_torch(ttnn.get_device_tensors(tt_out)[0]).float()[0, 0, 0, :1]
-        logits = ttnn.to_torch(ttnn.get_device_tensors(tt_logits)[0]).float()
-        return logits, toks
+
+        if tt_out_logits_saved is not None:
+            # make sure tt_out_logits_saved is mutable
+            logits_saved = ttnn.to_torch(ttnn.get_device_tensors(tt_logits)[0]).float()[0, 0, :, :]
+            tt_out_logits_saved.copy_(logits_saved)
+
+        return toks
 
     def process_output_decode(self, tt_out):
         """
@@ -426,6 +431,7 @@ class TtTransformer(LightweightModule):
         rot_mat_idxs,
         page_table=None,
         kv_cache=None,
+        tt_out_logits_saved=None,
     ):
         """
         This method will take device tensors and any other args to run forward.
@@ -445,6 +451,17 @@ class TtTransformer(LightweightModule):
         # sampling
         tt_tok = self.tt_sampling(tt_logits[0], x)
 
+        # Save otuput logits to global python object
+        if tt_out_logits_saved is not None:
+            tt_out_logits = ttnn.to_torch(
+                tt_logits[0],
+                mesh_composer=ttnn.ConcatMesh2dToTensor(
+                    self.mesh_device, dims=(3, 1), mesh_shape=self.args.cluster_shape
+                ),
+            )
+            tt_out_logits = tt_out_logits[0, 0, 0, :128256]
+            tt_out_logits_saved.copy_(tt_out_logits)
+
         ttnn.plus_one(
             current_pos,
             sub_core_grids=ttnn.CoreRangeSet([ttnn.CoreRange(ttnn.CoreCoord(1, 0), ttnn.CoreCoord(1, 0))]),
@@ -453,7 +470,7 @@ class TtTransformer(LightweightModule):
             rot_mat_idxs,
             sub_core_grids=ttnn.CoreRangeSet([ttnn.CoreRange(ttnn.CoreCoord(1, 0), ttnn.CoreCoord(1, 0))]),
         )
-        return tt_logits, tt_tok
+        return tt_tok
 
     def switch_mode(self, mode):
         if mode == "decode":
