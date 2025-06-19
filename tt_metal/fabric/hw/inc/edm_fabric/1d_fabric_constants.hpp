@@ -381,7 +381,7 @@ constexpr std::array<uint32_t, MAX_NUM_SENDER_CHANNELS> to_sender_packets_comple
             to_sender_3_pkts_completed_id, to_sender_4_pkts_completed_id});
 
 // Miscellaneous configuration
-constexpr size_t DEFAULT_HANDSHAKE_CONTEXT_SWITCH_TIMEOUT = 0;
+constexpr size_t DEFAULT_HANDSHAKE_CONTEXT_SWITCH_TIMEOUT = 4096;
 
 namespace tt::tt_fabric {
 static_assert(
