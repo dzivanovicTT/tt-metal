@@ -400,7 +400,7 @@ operation::ProgramWithCallbacks reshard_multi_core_same_width(const Tensor& inpu
         device->allocator()->get_bank_ids_from_logical_core(remote_buffer_type, remote_cores[remote_core_idx])[0];
 
     std::array<tt::tt_metal::KernelHandle, 2> kernels = {kernel_id_0, kernel_id_1};
-    std::array<float, 2> kernel_ratios = {0.70f, 0.30f};
+    std::array<float, 2> kernel_ratios = {0.67f, 0.33f};
     uint32_t local_units_left = num_units;
     for (const auto& core : local_cores) {
         uint32_t local_units_per_core = std::min(local_units_left, local_units_per_shard);
