@@ -150,14 +150,7 @@ void kernel_main() {
                     stride_w,
                     0,  // TODO(sjovic): fix this
                     weight_size_w,
-                    0>(
-                    packed_reader_indices_ptr,
-                    reader_offset,
-                    l1_write_addr_act,
-                    reader_idx,
-                    false,
-                    0,
-                    0);
+                    0>(packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx, false, 0, 0);
                 noc_async_read_barrier();
                 cb_push_back(cb_id_act_second_reader, act_block_num_tiles);
 

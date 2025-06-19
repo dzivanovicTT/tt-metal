@@ -43,11 +43,14 @@ FORCE_INLINE void read_sticks(
     uint32_t& reader_idx,
     bool first_write,
     uint32_t cb_start_addr,
-    uint32_t cb_end_addr) {
-    uint16_t num_elems = packed_reader_indices_ptr[reader_idx] & 0xffff;
+    uint32_t first_in_block_h) {
+    // uint16_t num_elems = packed_reader_indices_ptr[reader_idx] & 0xffff;
 
     // while (num_elems--) {
+    if (first_in_block_h) {
         reader_idx++;
+    }
+
         uint16_t start_ind = packed_reader_indices_ptr[reader_idx] & 0xffff;
         uint16_t end_ind = packed_reader_indices_ptr[reader_idx] >> 16;
 
@@ -57,7 +60,7 @@ FORCE_INLINE void read_sticks(
                 uint32_t outer = first_write ? 0 : window_outer - 1;
                 l1_write_addr_act += outer * coalesced_read_bytes;
                 act_l1_offset += outer * stride_h_bytes;
-    
+
                 for (uint32_t i = outer; i < window_outer; i++) {
                     noc_async_read_one_packet_with_state<true>(act_l1_offset, l1_write_addr_act);
                     l1_write_addr_act += coalesced_read_bytes;

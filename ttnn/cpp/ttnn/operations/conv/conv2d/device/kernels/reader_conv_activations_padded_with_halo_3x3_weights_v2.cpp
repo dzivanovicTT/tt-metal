@@ -76,12 +76,11 @@ void kernel_main() {
 
     constexpr uint32_t stride_w_bytes = dilation_w * conv_act_c_read_bytes;
     for (uint32_t bh = 0; bh < act_num_blocks_h; bh++) {
-        uint32_t cb_start_addr, l1_write_addr_act, cb_end_addr;
+        uint32_t cb_start_addr, l1_write_addr_act;
         for (uint32_t loop = 0; loop < reuse_loops; loop++) {
             cb_reserve_back(cb_id_act, act_cb_tiles);
             if (loop == 0 && bh == 0) {
                 cb_start_addr = get_write_ptr(cb_id_act);
-                cb_end_addr = cb_start_addr + (act_cb_tiles + 3) * 2048;
                 l1_write_addr_act = cb_start_addr;
             } else {
                 l1_write_addr_act = cb_start_addr + (bh * reuse_loops + loop) * weight_size_w * conv_act_c_read_bytes;
@@ -106,7 +105,7 @@ void kernel_main() {
                 reader_idx,
                 loop == 0 && bh == 0,
                 cb_start_addr,
-                cb_end_addr);
+                loop == 0);
 
             noc_async_read_barrier();
 
