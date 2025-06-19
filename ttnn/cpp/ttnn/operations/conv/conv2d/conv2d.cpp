@@ -624,7 +624,9 @@ Result conv2d_L1(
             compute_config,
             conv_config.enable_act_double_buffer,
             conv_config.enable_weights_double_buffer,
-            enable_split_reader);
+            enable_split_reader,
+            false,  // enable_subblock_padding
+            conv_config.simulate_conv3_0);
 
         if (memory_config.has_value() && memory_config.value() != conv_output.memory_config()) {
             conv_output = ttnn::to_memory_config(conv_output, memory_config.value(), std::nullopt);

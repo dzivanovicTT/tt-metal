@@ -4,6 +4,7 @@
 
 #include "dataflow_api.h"
 #include "height_sharded_reader_common.hpp"
+#include "debug/dprint.h"
 
 void kernel_main() {
     constexpr uint32_t dilation_h = get_compile_time_arg_val(0);
@@ -28,6 +29,14 @@ void kernel_main() {
     uint32_t i = 0;
     uint32_t noop = get_arg_val<uint32_t>(i);
     i += 1;
+
+#ifdef SIMULATE_CONV3_0
+    DPRINT << "SIMULATE_CONV3_0 enabled_3x3" << ENDL();
+#endif
+
+#ifndef SIMULATE_CONV3_0
+    DPRINT << "SIMULATE_CONV3_0 disabled_3x3" << ENDL();
+#endif
 
     if (noop) {
         return;
@@ -73,7 +82,7 @@ void kernel_main() {
 
             cb_reserve_back(cb_id_act, act_block_num_tiles);
             uint32_t l1_write_addr_act = get_write_ptr(cb_id_act);
-
+#ifndef SIMULATE_CONV3_0
             read_sticks<
                 dilation_w,
                 coalesced_read_bytes,
@@ -82,6 +91,7 @@ void kernel_main() {
                 stride_w_bytes,
                 weight_size_w,
                 stride_w>(packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx);
+#endif
 
             noc_async_read_barrier();
 

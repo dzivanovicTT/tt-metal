@@ -40,6 +40,14 @@ void kernel_main() {
         return;
     }
 
+#ifdef SIMULATE_CONV3_0
+    DPRINT << "SIMULATE_CONV3_0 enabled_reciever" << ENDL();
+#endif
+
+#ifndef SIMULATE_CONV3_0
+    DPRINT << "SIMULATE_CONV3_0 disabled_reciever" << ENDL();
+#endif
+
     if constexpr (split_reader && needs_act_block_zero_out) {
         zero_out_tiles<cb_id_act_second_reader>();
     }
@@ -94,6 +102,7 @@ void kernel_main() {
                 reader_idx = start_reader_idx;
                 cb_reserve_back(cb_id_act_second_reader, act_block_num_tiles);
                 uint32_t l1_write_addr_act = get_write_ptr(cb_id_act_second_reader);
+#ifndef SIMULATE_CONV3_0
                 read_sticks<
                     dilation_w,
                     coalesced_read_bytes,
@@ -102,6 +111,7 @@ void kernel_main() {
                     stride_w_bytes,
                     weight_size_w,
                     stride_w>(packed_reader_indices_ptr, reader_offset, l1_write_addr_act, reader_idx);
+#endif
                 noc_async_read_barrier();
                 cb_push_back(cb_id_act_second_reader, act_block_num_tiles);
 

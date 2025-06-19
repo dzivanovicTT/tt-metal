@@ -396,7 +396,8 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool enable_act_double_buffer,
     bool enable_weights_double_buffer,
     bool enable_split_reader,
-    bool enable_subblock_padding) {
+    bool enable_subblock_padding,
+    bool simulate_conv3_0) {
     using tt::tt_metal::CBHandle;
     using tt::tt_metal::CircularBuffer;
     using tt::tt_metal::CircularBufferConfig;
@@ -758,6 +759,10 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
 
     if (conv_act_c_blocks > 1) {
         reader_defines["ACT_W_OUTER_BLOCKS"] = "1";
+    }
+
+    if (simulate_conv3_0) {
+        reader_defines["SIMULATE_CONV3_0"] = "1";
     }
 
     uint32_t output_height_padded_to_tile_height = round_up(act_matrix_height_unpadded, TILE_HEIGHT);
@@ -1374,6 +1379,10 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         writer_mcast_sender_defines["FUSE_BIAS"] = "1";
         compute_defines["FUSE_BIAS"] = "1";
     }
+    if (simulate_conv3_0) {
+        writer_mcast_sender_defines["SIMULATE_CONV3_0"] = "1";
+        writer_defines["SIMULATE_CONV3_0"] = "1";
+    }
     if (fused_activation.has_value()) {
         if (fused_activation.value().op_type == unary::UnaryOpType::RELU) {
             compute_defines["PACK_RELU"] = "1";
@@ -1793,7 +1802,8 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
     bool enable_act_double_buffer,
     bool enable_weights_double_buffer,
     bool enable_split_reader,
-    bool enable_subblock_padding) {
+    bool enable_subblock_padding,
+    bool simulate_conv3_0) {
     tt_metal::Program program = tt_metal::CreateProgram();
 
     ttnn::operations::sliding_window::ParallelConfig parallel_config{
@@ -1855,7 +1865,8 @@ tt::tt_metal::operation::ProgramWithCallbacks multi_core_optimized_conv_sharded_
         enable_act_double_buffer,
         enable_weights_double_buffer,
         enable_split_reader,
-        enable_subblock_padding);
+        enable_subblock_padding,
+        simulate_conv3_0);
 }
 }  // namespace conv2d
 
