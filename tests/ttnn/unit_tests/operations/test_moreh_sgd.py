@@ -204,19 +204,19 @@ def test_moreh_sgd(
 
     print("model.weight", model.weight)
     print("param_result", param_result)
-    # assert passing
+    assert passing
 
-    # # check momentum_out
-    # if momentum != 0:
-    #     momentum_buffer_result = ttnn.to_torch(dev_momentum_buffer_out).to(cpu_dtype)
+    # check momentum_out
+    if momentum != 0:
+        momentum_buffer_result = ttnn.to_torch(dev_momentum_buffer_out).to(cpu_dtype)
 
-    #     passing, out = comp_allclose_and_pcc(cpu_momentum_out, momentum_buffer_result, pcc=0.99, rtol=rtol, atol=atol)
-    #     logger.debug(f"Momentum_out passing (param)={passing}")
-    #     logger.debug(f"Momentum_out pcc={out}")
+        passing, out = comp_allclose_and_pcc(cpu_momentum_out, momentum_buffer_result, pcc=0.99, rtol=rtol, atol=atol)
+        logger.debug(f"Momentum_out passing (param)={passing}")
+        logger.debug(f"Momentum_out pcc={out}")
 
-    #     assert passing
-    # if momentum == 0:
-    #     assert dev_momentum_buffer_out == None
+        assert passing
+    if momentum == 0:
+        assert dev_momentum_buffer_out == None
 
 
 # @pytest.mark.parametrize(

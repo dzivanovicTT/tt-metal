@@ -207,7 +207,17 @@ MorehSgdOperation::ProgramFactory::cached_program_t MorehSgdOperation::ProgramFa
     ////////////////////////////////////////////////////////////////////////////
 
     //RankCRTA | NumBanksCRTA | TensorShapeCRTA | ShardShapeCRTA | BankCoordsCRTA
-    ArgsConfig crta_config = {ArgConfig::NumBanksCRTA | ArgConfig::TensorShapeCRTA | ArgConfig::ShardShapeCRTA | ArgConfig::BankCoordsCRTA};
+    // ArgsConfig crta_config = {ArgConfig::NumBanksCRTA | ArgConfig::TensorShapeCRTA | ArgConfig::ShardShapeCRTA | ArgConfig::BankCoordsCRTA};
+    
+    
+    // // Rank and NumBanks are CTA
+    ArgsConfig crta_config = {ArgConfig::TensorShapeCRTA | ArgConfig::ShardShapeCRTA | ArgConfig::BankCoordsCRTA};
+
+    // Rank is CTA
+    // ArgsConfig crta_config = {ArgConfig::NumBanksCRTA | ArgConfig::TensorShapeCRTA | ArgConfig::ShardShapeCRTA | ArgConfig::BankCoordsCRTA};
+
+    // All CRTA
+    // ArgsConfig crta_config = {ArgConfig::CRTA};
 
 
     // param_in

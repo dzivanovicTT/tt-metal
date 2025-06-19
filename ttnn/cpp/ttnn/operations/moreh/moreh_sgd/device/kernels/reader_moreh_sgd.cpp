@@ -35,13 +35,12 @@ void kernel_main() {
 #ifdef PARAM_IN_SHARDED
     constexpr uint32_t param_in_base_idx_cta = 3;
     constexpr uint32_t param_in_base_idx_crta = 0;
-    using param_in_dspec = nd_sharding::distribution_spec_t<param_in_base_idx_cta, param_in_base_idx_crta>;
+    auto param_in_args = nd_sharding::make_args<param_in_base_idx_cta, param_in_base_idx_crta>();
 
-    auto param_in_sharded_accessor =
-        nd_sharding::ShardedAccessor<param_in_dspec>{param_in_addr, param_in_page_size};
+    auto param_in_sharded_accessor = nd_sharding::make_sharded_accessor_from_args(param_in_args, param_in_addr, param_in_page_size);
 
-    constexpr uint32_t param_in_cta_skip = nd_sharding::compile_time_args_skip<param_in_dspec>();
-    constexpr auto param_in_crta_skip = nd_sharding::runtime_args_skip<param_in_dspec>();
+    constexpr uint32_t param_in_cta_skip = param_in_args.compile_time_args_skip();
+    constexpr auto param_in_crta_skip = param_in_args.runtime_args_skip();
 #else
     constexpr uint32_t param_in_base_idx_cta = 3;
     constexpr uint32_t param_in_base_idx_crta = 0;
@@ -52,14 +51,11 @@ void kernel_main() {
 #endif
 
 #ifdef GRAD_SHARDED
-    // constexpr uint32_t grad_base_idx_cta = param_in_base_idx_cta + param_in_cta_skip;
-    // constexpr uint32_t grad_base_idx_crta = param_in_base_idx_crta + param_in_crta_skip;
-    // DPRINT << "grad_base_idx_cta: " << grad_base_idx_cta
-    //        << ", grad_base_idx_crta: " << grad_base_idx_crta << "\n";;
-    // using grad_dspec = nd_sharding::distribution_spec_t<grad_base_idx_cta, grad_base_idx_crta>;
+    constexpr uint32_t grad_base_idx_cta = param_in_base_idx_cta + param_in_cta_skip;
+    constexpr uint32_t grad_base_idx_crta = param_in_base_idx_crta + param_in_crta_skip;
+    auto grad_args = nd_sharding::make_args<grad_base_idx_cta, grad_base_idx_crta>();
     
-    // auto grad_sharded_accessor =
-    //     nd_sharding::ShardedAccessor<grad_dspec>{grad_addr, grad_page_size};
+    auto grad_sharded_accessor = nd_sharding::make_sharded_accessor_from_args(grad_args, grad_addr, grad_page_size);
 #else
     auto grad = InterleavedAddrGenFastHelper(grad_addr, cb_grad, 1);
 #endif
@@ -93,9 +89,9 @@ void kernel_main() {
         // grad
 #ifdef GRAD_SHARDED
         cb_reserve_back(cb_grad, 1);
-        // l1_write_addr = get_write_ptr(cb_grad);
-        // grad_sharded_accessor.noc_async_read_page(curr_tile, l1_write_addr);
-        // noc_async_read_barrier();
+        l1_write_addr = get_write_ptr(cb_grad);
+        grad_sharded_accessor.noc_async_read_page(curr_tile, l1_write_addr);
+        noc_async_read_barrier();
         cb_push_back(cb_grad, 1);
 #else
         noc_async_read_tile_helper(cb_grad, onetile, curr_tile, grad);
