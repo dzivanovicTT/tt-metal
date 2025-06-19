@@ -126,7 +126,7 @@ void MAIN {
 #endif
 
 #ifdef SFPU_OP_INIT_ACTIVATION
-    SFPU_OP_INIT_ACTIVATION
+    sigmoid_tile_init<1u>();
 #endif
 
 #ifdef IN1_TRANSPOSE_TILE
@@ -219,7 +219,7 @@ void MAIN {
 // If we fuse bias, we will pack out and run bias + optional sfpu in a separate loop
 #if not defined FUSE_BIAS and defined SFPU_OP_INIT_ACTIVATION
                                 for (uint32_t i = 0; i < out_subblock_num_tiles; i++) {
-                                    SFPU_OP_FUNC_ACTIVATION
+                                    sigmoid_tile<2, 1u>(i);
                                 }
 #endif
                                 tile_regs_commit();
@@ -350,7 +350,7 @@ void MAIN {
 // sfpu activation
 #ifdef SFPU_OP_INIT_ACTIVATION
                         for (uint32_t i = 0; i < out_subblock_num_tiles; i++) {
-                            SFPU_OP_FUNC_ACTIVATION
+                            sigmoid_tile<2, 1u>(i);
                         }
                         tile_regs_commit();
 #endif
