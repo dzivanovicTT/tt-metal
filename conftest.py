@@ -909,24 +909,9 @@ def pytest_handlecrashitem(crashitem, report, sched):
 def reset_tensix(tt_open_devices=None):
     import shutil
 
-    if is_galaxy():
-        logger.info("Skipping reset for Galaxy systems, need a new reset.json scheme")
-        return
+    logger.info(f"Skipping tt-smi reset between tests!")
 
-    # Check if tt-smi exists
-    if not shutil.which("tt-smi"):
-        logger.error("tt-smi command not found. Cannot reset devices. Please install tt-smi.")
-        return
-
-    if tt_open_devices is None:
-        logger.info(f"Running reset for all pci devices")
-        smi_reset_result = run_process_and_get_result(f"tt-smi -r")
-    else:
-        tt_open_devices_str = ",".join([str(i) for i in tt_open_devices])
-        logger.info(f"Running reset for pci devices: {tt_open_devices_str}")
-        smi_reset_result = run_process_and_get_result(f"tt-smi -r {tt_open_devices_str}")
-
-    logger.info(f"tt-smi reset status: {smi_reset_result.returncode}")
+    return
 
 
 @pytest.hookimpl(tryfirst=True)
