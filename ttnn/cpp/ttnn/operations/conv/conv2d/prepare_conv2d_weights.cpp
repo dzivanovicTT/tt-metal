@@ -1042,8 +1042,9 @@ std::pair<ttnn::Tensor, std::optional<ttnn::Tensor>> prepare_conv_weights_biases
     }
 
     if (parameters_on_device) {
-        log_info(tt::LogOp, "Moving weight tensor to device");
+        log_info(tt::LogOp, "Calling to_device to move weight tensor");
         weight_tensor_ = ttnn::operations::core::to_device(weight_tensor_, device, std::nullopt);
+        log_info(tt::LogOp, "Finished calling to_device to move weight tensor");
     }
 
     if (bias_tensor.has_value()) {
