@@ -37,6 +37,7 @@ void test(
     uint32_t num_devices_,
     uint32_t test_case_id,
     uint32_t sub_grid_dimension_size,
+    NOC noc_id,
     MulticastSchemeType multicast_scheme_type) {  // Use enum type here
     bool is_multicast = true;
     bool is_linked = true;
@@ -79,6 +80,7 @@ void test(
         mst_core_coord,
         sub_start_core_coord,
         sub_grid_size,
+        noc_id,
         multicast_scheme_type);
 }
 
@@ -95,21 +97,24 @@ TEST_F(DeviceFixture, TensixDataMovementOneToAllMulticastSchemes) {
     uint32_t sub_grid_dimension_limit =
         tt::tt_metal::unit_tests::dm::core_to_all::multicast_schemes::determine_max_grid_dimension(devices_);
 
-    for (uint32_t multicast_scheme_type =
-             unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType::SenderInGridMiddle;
-         multicast_scheme_type <=
-         unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType::num_multicast_scheme_types;
-         multicast_scheme_type++) {  // Use enum values in the loop
-        for (uint32_t sub_grid_dimension_size = 2; sub_grid_dimension_size <= sub_grid_dimension_limit;
-             sub_grid_dimension_size++) {
-            tt::tt_metal::unit_tests::dm::core_to_all::multicast_schemes::test(
-                arch_,
-                devices_,
-                num_devices_,
-                test_case_id,
-                sub_grid_dimension_size,
-                static_cast<unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType>(
-                    multicast_scheme_type));  // Cast to enum
+    for (uint8_t noc_id = NOC::NOC_1; noc_id <= NOC::NOC_1; noc_id++) {
+        for (uint32_t multicast_scheme_type =
+                 unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType::SenderInGridMiddle;
+             multicast_scheme_type <=
+             unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType::num_multicast_scheme_types;
+             multicast_scheme_type++) {  // Use enum values in the loop
+            for (uint32_t sub_grid_dimension_size = 2; sub_grid_dimension_size <= sub_grid_dimension_limit;
+                 sub_grid_dimension_size++) {
+                tt::tt_metal::unit_tests::dm::core_to_all::multicast_schemes::test(
+                    arch_,
+                    devices_,
+                    num_devices_,
+                    test_case_id,
+                    sub_grid_dimension_size,
+                    static_cast<NOC>(noc_id),  // Cast to enum
+                    static_cast<unit_tests::dm::core_to_all::multicast_schemes::MulticastSchemeType>(
+                        multicast_scheme_type));  // Cast to enum
+            }
         }
     }
 }

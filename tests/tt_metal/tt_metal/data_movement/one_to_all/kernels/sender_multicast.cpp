@@ -28,6 +28,7 @@ void kernel_main() {
     constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(15);
 
     // Derivative values
+    const char* riscv_str = (noc_index == 0) ? "RISCV0" : "RISCV1";
     constexpr uint32_t bytes_per_transaction = pages_per_transaction * bytes_per_page;
     constexpr uint32_t bytes = bytes_per_transaction * num_of_transactions;
 
@@ -36,7 +37,8 @@ void kernel_main() {
     // uint64_t sem_noc_addr = get_noc_addr(receiver_x_coord, receiver_y_coord, sem_addr);
 
     {
-        DeviceZoneScopedN("RISCV0");
+        // DeviceZoneScopedN(riscv_str);
+        DeviceZoneScopedN("RISCV1");
 
         for (uint32_t i = 0; i < num_of_transactions - 1; i++) {
             noc_async_write_multicast_loopback_src(

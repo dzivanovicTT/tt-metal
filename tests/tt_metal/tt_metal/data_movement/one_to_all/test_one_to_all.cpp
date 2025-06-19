@@ -127,8 +127,8 @@ bool run_dm(IDevice* device, const OneToAllConfig& test_config) {
 
     // Sender Kernel
 
-    vector<uint32_t> sender_compile_args = {// 0 - 7
-                                            (uint32_t)mst_l1_base_address,
+    vector<uint32_t> sender_compile_args = {                                // 0 - 7
+                                            (uint32_t)mst_l1_base_address,  // Master L1 base address
                                             (uint32_t)sub_l1_base_address,
                                             (uint32_t)test_config.num_of_transactions,
                                             (uint32_t)test_config.pages_per_transaction,
@@ -141,7 +141,7 @@ bool run_dm(IDevice* device, const OneToAllConfig& test_config) {
     if (test_config.is_multicast) {  // Multicast Sender Kernel
         sender_compile_args.insert(
             sender_compile_args.end(),
-            {// 8 - 12
+            {// 8+
              (uint32_t)test_config.is_linked,
              (uint32_t)sub_worker_start_coord.x,
              (uint32_t)sub_worker_start_coord.y,
@@ -155,14 +155,14 @@ bool run_dm(IDevice* device, const OneToAllConfig& test_config) {
         sender_kernel_path += "sender.cpp";
     }
 
+    DataMovementProcessor data_movement_processor =
+        test_config.noc_id ? DataMovementProcessor::RISCV_1 : DataMovementProcessor::RISCV_0;
     auto sender_kernel = CreateKernel(
         program,
         sender_kernel_path,
         mst_logical_core_set,
         DataMovementConfig{
-            .processor = DataMovementProcessor::RISCV_0,
-            .noc = test_config.noc_id,
-            .compile_args = sender_compile_args});
+            .processor = data_movement_processor, .noc = test_config.noc_id, .compile_args = sender_compile_args});
 
     // Receiver Kernel (currently deprecated)
     /*vector<uint32_t> receiver_compile_args = {
@@ -238,9 +238,9 @@ void directed_ideal_test(
     CoreCoord mst_core_coord,
     CoreCoord sub_start_core_coord,
     CoreCoord sub_grid_size,
+    NOC noc_id,
     uint32_t multicast_scheme_type) {
     // Parameters
-    NOC noc_id = NOC::NOC_0;
     bool loopback = true;
 
     // Physical Constraints
