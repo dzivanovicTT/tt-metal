@@ -45,15 +45,9 @@ void kernel_main() {
         l1_write_addr_in0 = get_write_ptr(cb_id_in0);
         noc_async_read_tile(tile_id, s0, l1_write_addr_in0);
 
-        noc_async_read_barrier();
-        cb_push_back(cb_id_in0, onetile);
-
         cb_reserve_back(cb_id_in1, onetile);
         l1_write_addr_in1 = get_write_ptr(cb_id_in1);
         noc_async_read_tile(tile_id, s1, l1_write_addr_in1);
-
-        noc_async_read_barrier();
-        cb_push_back(cb_id_in1, onetile);
 
         cb_reserve_back(cb_id_in2, onetile);
         l1_write_addr_in2 = get_write_ptr(cb_id_in2);
@@ -61,6 +55,8 @@ void kernel_main() {
 
         noc_async_read_barrier();
 
+        cb_push_back(cb_id_in0, onetile);
+        cb_push_back(cb_id_in1, onetile);
         cb_push_back(cb_id_in2, onetile);
     }
 }
