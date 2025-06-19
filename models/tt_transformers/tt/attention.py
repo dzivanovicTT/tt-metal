@@ -843,7 +843,7 @@ class Attention(LightweightModule):
                     mesh_mapper=ttnn.ReplicateTensorToMesh(self.mesh_device),
                 )
 
-                multi_device_global_sem = [
+                multi_device_global_semaphore = [
                     ttnn.create_global_semaphore(self.mesh_device, self.ccl_sub_device_crs, 0) for _ in range(2)
                 ]
 
@@ -852,7 +852,7 @@ class Attention(LightweightModule):
                     persistent_intermediate_buffer=persistent_intermediate_buffer,
                     persistent_output_buffer=persistent_output_buffer,
                     dim=3,
-                    multi_device_global_semaphore=multi_device_global_sem,
+                    multi_device_global_semaphore=multi_device_global_semaphore,
                     num_links=1,
                     topology=self.ccl_topology,
                     memory_config=ttnn.DRAM_MEMORY_CONFIG,
@@ -872,14 +872,6 @@ class Attention(LightweightModule):
                 )
 
             ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
-
-            print("33333333")
-            print(attn_output_11SH.shape[0])
-            print(attn_output_11SH.shape[1])
-            print(attn_output_11SH.shape[2])
-            print(attn_output_11SH.shape[3])
-            print(attn_output_11SH.dtype)
-            print("---------")
 
         output_11SH = ttnn.linear(
             attn_output_11SH,

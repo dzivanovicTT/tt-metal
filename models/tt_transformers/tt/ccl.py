@@ -72,14 +72,16 @@ def tt_all_reduce(
             mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
         )
 
-        multi_device_global_sem = [ttnn.create_global_semaphore(mesh_device, ccl_sub_device_crs, 0) for _ in range(3)]
+        multi_device_global_semaphore = [
+            ttnn.create_global_semaphore(mesh_device, ccl_sub_device_crs, 0) for _ in range(3)
+        ]
 
         reduced = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor,
             persistent_intermediate_buffer=persistent_intermediate_buffer,
             persistent_output_buffer=persistent_output_buffer,
             dim=dim,
-            multi_device_global_semaphore=multi_device_global_sem,
+            multi_device_global_semaphore=multi_device_global_semaphore,
             num_links=num_reduce_scatter_links,
             memory_config=memory_config,
             topology=topology,

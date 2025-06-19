@@ -177,7 +177,7 @@ class RMSNorm(LightweightModule):
                 mesh_mapper=ttnn.ReplicateTensorToMesh(self.device),
             )
 
-            multi_device_global_sem = [
+            multi_device_global_semaphore = [
                 ttnn.create_global_semaphore(self.device, self.ccl_sub_device_crs, 0) for _ in range(2)
             ]
 
@@ -186,7 +186,7 @@ class RMSNorm(LightweightModule):
                 persistent_intermediate_buffer=persistent_intermediate_buffer,
                 persistent_output_buffer=persistent_output_buffer,
                 dim=3,
-                multi_device_global_semaphore=multi_device_global_sem,
+                multi_device_global_semaphore=multi_device_global_semaphore,
                 num_links=1,
                 topology=self.ccl_topology,
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
@@ -206,14 +206,6 @@ class RMSNorm(LightweightModule):
             )
 
         ttnn.synchronize_device(self.device, sub_device_ids=[self.worker_sub_device_id])
-
-        print("11111111")
-        print(tt_stats.shape[0])
-        print(tt_stats.shape[1])
-        print(tt_stats.shape[2])
-        print(tt_stats.shape[3])
-        print(tt_stats.dtype)
-        print("---------")
 
         # Run distributed rmsnorm part 2
         tt_out = ttnn.rms_norm_post_all_gather(
