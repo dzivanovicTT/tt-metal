@@ -5,7 +5,6 @@
 
 import requests
 import torch
-import torch.nn.functional as F
 from loguru import logger
 from PIL import Image
 from transformers import SegformerForSemanticSegmentation, SegformerImageProcessor
@@ -128,26 +127,20 @@ class SegformerTestInfra:
             core_grid = ttnn.CoreGrid(y=8, x=8)
         else:
             exit("Unsupported device")
-        num_devices = device.get_num_devices()
         # torch tensor
         torch_input_tensor = self.torch_input if self.torch_input is None else self.torch_input
 
         n, c, h, w = torch_input_tensor.shape
         # sharded mem config for fold input
-        num_cores = core_grid.x * core_grid.y
-        shard_h = (n * w * h + num_cores - 1) // num_cores
-        grid_size = core_grid
-        grid_coord = ttnn.CoreCoord(grid_size.x - 1, grid_size.y - 1)
-        shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), grid_coord)})
-        shard_spec = ttnn.ShardSpec(shard_grid, (shard_h, 16), ttnn.ShardOrientation.ROW_MAJOR)
-        input_mem_config = ttnn.MemoryConfig(
-            ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
+        if c == 3:
+            c = 16
+        input_mem_config = ttnn.create_sharded_memory_config(
+            [n, c, h, w],
+            ttnn.CoreGrid(x=8, y=8),
+            ttnn.ShardStrategy.HEIGHT,
         )
-        torch_input_tensor = torch_input_tensor.permute(0, 2, 3, 1)
-        torch_input_tensor = F.pad(torch_input_tensor, (0, 13))
-        # torch_input_tensor = torch_input_tensor.reshape(1, 1, h * w * n, c)
         tt_inputs_host = ttnn.from_torch(torch_input_tensor, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT)
-        # tt_inputs_host = ttnn.pad(tt_inputs_host, [1, 1, n * h * w, 16], [0, 0, 0, 0], 0)
+
         return tt_inputs_host, input_mem_config
 
     def setup_dram_sharded_input(self, device, torch_input_tensor=None, mesh_mapper=None, mesh_composer=None):
@@ -159,7 +152,7 @@ class SegformerTestInfra:
             ),
             [
                 divup(tt_inputs_host.volume() // tt_inputs_host.shape[-1], (dram_grid_size.x * dram_grid_size.y)),
-                16,
+                tt_inputs_host.shape[-1],
             ],
             ttnn.ShardOrientation.ROW_MAJOR,
         )

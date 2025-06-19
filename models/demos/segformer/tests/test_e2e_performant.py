@@ -6,10 +6,8 @@ import time
 
 import pytest
 import torch
-import torch.nn.functional as F
 from loguru import logger
 
-import ttnn
 from models.demos.segformer.tests.segformer_e2e_performant import SegformerTrace2CQ
 from models.utility_functions import run_for_wormhole_b0
 
@@ -37,15 +35,11 @@ def test_run_segformer_trace_2cqs_inference(
 
     input_shape = (batch_size, 3, 512, 512)
     torch_input_tensor = torch.randn(input_shape, dtype=torch.float32)
-    n, c, h, w = torch_input_tensor.shape
-    torch_input_tensor = torch_input_tensor.permute(0, 2, 3, 1)
-    torch_input_tensor = F.pad(torch_input_tensor, (0, 13))
-    tt_inputs_host = ttnn.from_torch(torch_input_tensor, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT)
     inference_iter_count = 10
     inference_time_iter = []
     for iter in range(0, inference_iter_count):
         t0 = time.time()
-        output = segformer_trace_2cq.execute_segformer_trace_2cqs_inference(tt_inputs_host)
+        output = segformer_trace_2cq.run(torch_input_tensor)
         t1 = time.time()
         inference_time_iter.append(t1 - t0)
     segformer_trace_2cq.release_segformer_trace_2cqs_inference()

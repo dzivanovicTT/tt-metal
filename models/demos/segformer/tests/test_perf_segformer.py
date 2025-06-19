@@ -117,31 +117,21 @@ def test_segformer_for_semantic_segmentation(device, is_ci_env):
             layout=ttnn.TILE_LAYOUT,
         )
     else:
-        torch_input_tensor_permuted = torch.permute(inputs.pixel_values, (0, 2, 3, 1))
-        N, H, W, C = torch_input_tensor_permuted.shape
-        shard_grid = ttnn.CoreRangeSet(
-            {
-                ttnn.CoreRange(
-                    ttnn.CoreCoord(0, 0),
-                    ttnn.CoreCoord(7, 7),
-                ),
-            }
+        N, C, H, W = inputs.pixel_values.shape
+        if C == 3:
+            C = 16
+        input_mem_config = ttnn.create_sharded_memory_config(
+            [N, C, H, W],
+            ttnn.CoreGrid(x=8, y=8),
+            ttnn.ShardStrategy.HEIGHT,
         )
-        n_cores = 64
-        shard_spec = ttnn.ShardSpec(
-            shard_grid, [N * H * W // n_cores, C], ttnn.ShardOrientation.ROW_MAJOR, ttnn.ShardMode.PHYSICAL
-        )
-        input_mem_config = ttnn.MemoryConfig(
-            ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
-        )
-        ttnn_input_tensor_unpadded = ttnn.from_torch(
-            torch_input_tensor_permuted,
+        ttnn_input_tensor = ttnn.from_torch(
+            inputs.pixel_values,
             dtype=ttnn.bfloat16,
             layout=ttnn.ROW_MAJOR_LAYOUT,
             device=device,
             memory_config=input_mem_config,
         )
-        ttnn_input_tensor = ttnn.pad(ttnn_input_tensor_unpadded, [N, H, W, 8], [0, 0, 0, 0], 0)
 
     logger.info(f"Compiling model with warmup run")
     profiler.start(f"inference_and_compile_time")
@@ -163,14 +153,13 @@ def test_segformer_for_semantic_segmentation(device, is_ci_env):
     outputs = []
     logger.info(f"Running inference for {iterations} iterations")
     for idx in range(iterations):
-        ttnn_input_tensor_unpadded = ttnn.from_torch(
-            torch_input_tensor_permuted,
+        ttnn_input_tensor = ttnn.from_torch(
+            inputs.pixel_values,
             dtype=ttnn.bfloat16,
             layout=ttnn.ROW_MAJOR_LAYOUT,
             device=device,
             memory_config=input_mem_config,
         )
-        ttnn_input_tensor = ttnn.pad(ttnn_input_tensor_unpadded, [N, H, W, 8], [0, 0, 0, 0], 0)
         profiler.start("inference_time")
         profiler.start(f"inference_time_{idx}")
         ttnn_output = ttnn_model(
