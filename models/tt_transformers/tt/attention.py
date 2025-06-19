@@ -383,10 +383,10 @@ class Attention(LightweightModule):
         kv_cache=None,
     ) -> ttnn.Tensor:
         """
-
         x: (seq_len, 1, batch, dim)
         current_pos: (batch_size), current token position in the sequence for each user
         """
+
         ###
         # QKV matmuls
         # Use HiFi2 for DRAM-sharded matmuls as they are otherwise flop-bound. Loses 1 bit of activation precision.
