@@ -27,6 +27,7 @@ def main():
             layout=ttnn.TILE_LAYOUT,
             device=device,
         )
+
         tt_t2 = ttnn.zeros(
             shape=(32, 32),
             dtype=ttnn.bfloat16,
