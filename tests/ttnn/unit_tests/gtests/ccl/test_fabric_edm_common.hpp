@@ -412,13 +412,16 @@ void generate_sender_worker_kernels(
     uint32_t dram_output_buffer_base_addr,
     bool dest_is_dram,
     uint32_t worker_buffer_index_semaphore_id,
-    uint32_t packet_header_buffer_cb_id) {
+    // farthest to closest
+    const std::vector<tt::tt_fabric::edm_termination_info_t>& edm_termination_infos,
+    bool scatter_write) {
     const auto& edm_noc_core = CoreCoord(worker_fabric_connection.edm_noc_x, worker_fabric_connection.edm_noc_y);
     std::vector<uint32_t> sender_worker_reader_compile_args{
         src_is_dram,      //
         num_pages_total,  //
-        page_size,
-        num_pages_per_edm_buffer};
+        page_plus_header_size - PACKET_HEADER_SIZE_BYTES,
+        num_pages_per_edm_buffer,
+        scatter_write};
     std::vector<uint32_t> sender_worker_reader_runtime_args{dram_input_buffer_base_addr};
 
     log_trace(tt::LogTest, "\tSenderReader CT Args");
@@ -436,7 +439,8 @@ void generate_sender_worker_kernels(
         page_size,
         worker_fabric_connection.num_buffers_per_channel,
         dest_is_dram,
-        std::holds_alternative<mcast_send>(mode) ? 1 : 0};
+        std::holds_alternative<mcast_send>(mode) ? 1 : 0,
+        scatter_write};
     log_trace(tt::LogTest, "worker_fabric_connection.edm_l1_sem_addr: {}", worker_fabric_connection.edm_l1_sem_addr);
     log_trace(tt::LogTest, "worker_buffer_index_semaphore_id: {}", worker_buffer_index_semaphore_id);
     log_trace(tt::LogTest, "last_message_semaphore_address: {}", local_worker_last_message_semaphore_id);
@@ -518,7 +522,9 @@ bool RunLoopbackTest(
     bool dest_is_dram,
     std::vector<Program>& programs,
     tt::tt_fabric::FabricEriscDatamoverBuilder& chip_0_edm_builder,
-    std::optional<SubdeviceInfo>& subdevice_managers) {
+    std::optional<SubdeviceInfo>& subdevice_managers,
+    bool enable_persistent_fabric,
+    bool scatter_write) {
     auto& sender_program = programs.at(0);
     std::size_t tensor_size_bytes = num_pages_total * page_size;
 
@@ -596,7 +602,8 @@ bool RunLoopbackTest(
         local_output_buffer_address,
         dest_is_dram,
         worker_buffer_index_semaphore_id,
-        packet_header_buffer_cb_id);
+        edm_termination_infos,
+        scatter_write);
 
     ////////////////////////////////////////////////////////////////////////////
     //                      Compile and Execute Application
@@ -985,7 +992,10 @@ bool RunLineFabricTest(
     bool dest_is_dram,
 
     std::optional<SubdeviceInfo>& subdevice_managers,
-    ttnn::ccl::EdmLineFabricOpInterface& line_fabric) {
+    ttnn::ccl::EdmLineFabricOpInterface& line_fabric,
+    bool enable_persistent_fabric,
+    bool scatter_write) {
+    std::size_t page_plus_header_size = page_size + sizeof(tt::tt_fabric::PacketHeader);
     std::size_t tensor_size_bytes = num_pages_total * page_size;
 
     const std::size_t edm_buffer_size_no_header =
@@ -1081,7 +1091,15 @@ bool RunLineFabricTest(
         local_output_buffer_address,
         dest_is_dram,
         worker_buffer_index_semaphore_id,
-        packet_header_buffer_cb_id);
+        edm_termination_infos,
+        scatter_write);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Build EDM Kernels
+    ////////////////////////////////////////////////////////////////////////////
+    if (!enable_persistent_fabric) {
+        line_fabric.build_kernels();
+    }
 
     ////////////////////////////////////////////////////////////////////////////
     //                      Compile and Execute Application
@@ -1190,7 +1208,9 @@ int TestLineFabricEntrypoint(
     const uint32_t page_size,
     const uint32_t num_pages_total,
     const bool src_is_dram,
-    const bool dest_is_dram) {
+    const bool dest_is_dram,
+    bool enable_persistent_fabric,
+    bool scatter_write = false) {
     // argv[0]: program
     // argv[1]: buffer_size_bytes
     // argv[2]: num_loops
@@ -1234,7 +1254,9 @@ int TestLineFabricEntrypoint(
                 dest_is_dram,
 
                 subdevice_managers,
-                line_fabric.value());
+                line_fabric.value(),
+                enable_persistent_fabric,
+                scatter_write);
 
         } catch (std::exception& e) {
             log_error(tt::LogTest, "Caught exception: {}", e.what());
@@ -1256,7 +1278,12 @@ int TestLineFabricEntrypoint(
 }
 
 int TestLoopbackEntrypoint(
-    const uint32_t page_size, const uint32_t num_pages_total, const bool src_is_dram, const bool dest_is_dram) {
+    const uint32_t page_size,
+    const uint32_t num_pages_total,
+    const bool src_is_dram,
+    const bool dest_is_dram,
+    bool enable_persistent_fabric,
+    bool scatter_write = false) {
     // argv[0]: program
     // argv[1]: buffer_size_bytes
     // argv[2]: num_loops
@@ -1353,7 +1380,9 @@ int TestLoopbackEntrypoint(
             dest_is_dram,
             programs,
             chip_0_edm_builder,
-            subdevice_managers);
+            subdevice_managers,
+            enable_persistent_fabric,
+            scatter_write);
     } catch (std::exception& e) {
         log_error(tt::LogTest, "Caught exception: {}", e.what());
         test_fixture.TearDown();
@@ -1378,7 +1407,9 @@ int TestLoopbackEntrypoint(
                 dest_is_dram,
                 second_programs,
                 chip_0_edm_builder,
-                subdevice_managers);
+                subdevice_managers,
+                enable_persistent_fabric,
+                scatter_write);
         } catch (std::exception& e) {
             log_error(tt::LogTest, "Caught exception: {}", e.what());
             test_fixture.TearDown();
@@ -2569,7 +2600,8 @@ void Run1DFabricPacketSendTest(
     // static constexpr size_t source_l1_buffer_address = 1000000;
     static constexpr uint32_t packet_header_cb_index = tt::CB::c_in0;
     static constexpr uint32_t source_payload_cb_index = tt::CB::c_in1;
-    static constexpr size_t packet_header_cb_size_in_headers = 5;
+    static constexpr size_t packet_header_cb_size_in_headers = 7;
+    static constexpr bool enable_persistent_fabric_mode = true;
     auto max_packet_payload_size_bytes =
         std::max_element(test_specs.begin(), test_specs.end(), [](const auto& a, const auto& b) {
             return a.packet_payload_size_bytes < b.packet_payload_size_bytes;
@@ -3610,7 +3642,8 @@ void RunRingDeadlockStabilityTestWithPersistentFabric(
     // static constexpr size_t source_l1_buffer_address = 1000000;
     static constexpr uint32_t packet_header_cb_index = tt::CB::c_in0;
     static constexpr uint32_t source_payload_cb_index = tt::CB::c_in1;
-    static constexpr size_t packet_header_cb_size_in_headers = 5;
+    static constexpr size_t packet_header_cb_size_in_headers = 7;
+    static constexpr bool enable_persistent_fabric_mode = true;
     size_t dest_buffer_size = packet_payload_size_bytes * 4;
     static constexpr tt::DataFormat cb_df = tt::DataFormat::Bfp8;
 
