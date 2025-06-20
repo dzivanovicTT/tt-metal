@@ -2,7 +2,10 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <elf.h>
+#include <cstdint>
 #include "reinterleave_device_operation.hpp"
+#include "tt-metalium/kernel_types.hpp"
 
 // Program factory for ReinterleaveFromBatch.
 namespace ttnn::operations::experimental::reinterleave {
@@ -108,17 +111,33 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
         (uint32_t)operation_attributes.barrier_threshold,
     };
 
-    auto read_kernel_id = CreateKernel(
-        program,
-        "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm.cpp",
-        worker_grid,
-        ReaderDataMovementConfig(reader_compile_time_args, {}));
+    KernelHandle read_kernel_id;
+    KernelHandle write_kernel_id;
+    if (operation_attributes.split_work) {
+        read_kernel_id = CreateKernel(
+            program,
+            "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm_work_split.cpp",
+            worker_grid,
+            ReaderDataMovementConfig(reader_compile_time_args, {}));
 
-    auto write_kernel_id = CreateKernel(
-        program,
-        "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm.cpp",
-        worker_grid,
-        WriterDataMovementConfig(writer_compile_time_args, {}));
+        write_kernel_id = CreateKernel(
+            program,
+            "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm_work_split.cpp",
+            worker_grid,
+            WriterDataMovementConfig(writer_compile_time_args, {}));
+    } else {
+        read_kernel_id = CreateKernel(
+            program,
+            "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm.cpp",
+            worker_grid,
+            ReaderDataMovementConfig(reader_compile_time_args, {}));
+
+        write_kernel_id = CreateKernel(
+            program,
+            "ttnn/cpp/ttnn/operations/experimental/reinterleave/device/kernels/reinterleave_kernel_rm.cpp",
+            worker_grid,
+            WriterDataMovementConfig(writer_compile_time_args, {}));
+    }
 
     TT_FATAL(worker_grid.size() == 1, "Deinterleave: shard spec CoreRangeSet must have single range");
     tt::tt_metal::CoreCoord device_grid =
@@ -171,140 +190,206 @@ ReinterleaveFromBatchOperation::ProgramFactoryFromBatch::create(
         return {x, y};
     };
 
-    for (const auto& core : cores) {
-        auto this_core = core.x + core.y * device_grid.x;
+    if (operation_attributes.split_work) {
+        // IDEA: calculate number of elements each core has to send to every other core
+        // then divvy up those elements between DM0 and DM1 somehow
+        // hardcode for 3x2 chained reinterleave case for now
+        // each core contains one type of stick, writes to every other core
+        for (const auto& core : cores) {
+            auto this_core = core.x + core.y * device_grid.x;
 
-        // number of input batches,for ABAB;CDCD => 4 batches AAAA;BBBB;CCCD;DDDD
-        // also turns out this is the number of src core one writes to
-        uint32_t num_src_cores = in_batches;
-        // number of cores containing one input batch
-        uint32_t cores_in_batch = num_of_shards / in_batches;
-        // batch this core is processing [0-3]
-        uint32_t src_batch = this_core / cores_in_batch;
-        // chainted deinterleave messes up order, use mapping
-        src_batch = batch_mapping[src_batch];
+            // calculate work split
+            uint32_t num_units_per_output_core = num_units_per_core / num_of_shards;
+            uint32_t work_split_ratio_dm0 = 3;
+            uint32_t work_split_ratio_dm1 = 2;
+            uint32_t units_to_transfer_dm0 =
+                num_units_per_output_core / (work_split_ratio_dm0 + work_split_ratio_dm1) * work_split_ratio_dm0;
+            uint32_t units_to_transfer_dm1 = num_units_per_output_core - units_to_transfer_dm0;
 
-        // id of this core in batch
-        uint32_t id_in_batch = this_core % cores_in_batch;
-        uint32_t start_id = id_in_batch * num_src_cores;
-        CoreCoord start = {start_id % device_grid.x, start_id / device_grid.x};
-        CoreCoord end = core_coord_get_end_loc(start, device_grid, num_src_cores);
+            // calculate offsets for input and output
+            // after transferring units_to_transfer_dm0 units to one core, dm0 will start writing to the next core
+            // dm1 will use that as an offset for writing to the same core, then write to the next
+            uint32_t input_offset_dm0 = 0;
+            uint32_t input_offset_dm1 = units_to_transfer_dm0 * aligned_input_unit_size;
+            uint32_t output_stride_width =
+                operation_attributes.stride_hw[1] * aligned_output_unit_size;  // next relevant element in same row
+            uint32_t output_stride_height =
+                (operation_attributes.stride_hw[0] - 1) * output_per_core_width * aligned_output_unit_size +
+                output_stride_width;  // skip to beginning of next row from end
+            uint32_t output_stride_height_keep_x = operation_attributes.stride_hw[0] * output_per_core_width *
+                                                   aligned_output_unit_size;  // skip to next row, keep x position
 
-        // core should proccess data from start_xy to end_xy, but we dont want every core writing to the same dest
-        // to start from the same point but offset and process the data in a round robin fashion. cores that write same
-        // dests have same id_in_batch, but different dst_batch
-        CoreCoord offset_dm0 = core_range_offset(start, end, device_grid, src_batch);
-        CoreCoord offset_dm1 = core_range_offset(start, end, device_grid, (src_batch + 1) % in_batches);
+            // different input cores write to different places in the output cores
+            // this offset is calculated based purely on input core position and determines where cores will start to
+            // write
+            uint32_t output_offset_dm0 =
+                core.x * aligned_output_unit_size + core.y * output_per_core_width * aligned_output_unit_size;
+            // start where dm0 does, offset by number of rows written by dm0 and then by leftover units in the row
+            uint32_t output_offset_dm1 =
+                output_offset_dm0 +
+                (units_to_transfer_dm0 / operation_attributes.input_width) * output_stride_height_keep_x +
+                (units_to_transfer_dm0 % operation_attributes.input_width) * output_stride_width;
+            // for purposes of row and column wrapping in kernel
+            uint32_t start_col = units_to_transfer_dm0 % operation_attributes.input_width;
 
-        // dest offset are not affected by offset change, because we always write all data to one dest and ordering
-        // here is not important.
-        uint32_t dst_width_stride = operation_attributes.stride_hw[1] * stick_size_bytes;
-        uint32_t dst_height_offset_to_next =
-            (operation_attributes.stride_hw[0] - 1) * output_per_core_width * stick_size_bytes;
+            SetRuntimeArgs(
+                program,
+                read_kernel_id,
+                core,
+                {(uint32_t)units_to_transfer_dm0,
+                 (uint32_t)input_offset_dm0,
+                 (uint32_t)0,
+                 (uint32_t)output_stride_width,
+                 (uint32_t)output_stride_height,
+                 (uint32_t)output_offset_dm0});
+            SetRuntimeArgs(
+                program,
+                write_kernel_id,
+                core,
+                {(uint32_t)units_to_transfer_dm1,
+                 (uint32_t)input_offset_dm1,
+                 (uint32_t)start_col,
+                 (uint32_t)output_stride_width,
+                 (uint32_t)output_stride_height,
+                 (uint32_t)output_offset_dm1});
+        }
+    } else {
+        for (const auto& core : cores) {
+            auto this_core = core.x + core.y * device_grid.x;
 
-        uint32_t dst_datum_width_offset = (src_batch % operation_attributes.stride_hw[0]) * stick_size_bytes;
-        uint32_t dst_datum_height_offset =
-            (src_batch / operation_attributes.stride_hw[1]) * output_per_core_width * stick_size_bytes;
+            // number of input batches,for ABAB;CDCD => 4 batches AAAA;BBBB;CCCD;DDDD
+            // also turns out this is the number of src core one writes to
+            uint32_t num_src_cores = in_batches;
+            // number of cores containing one input batch
+            uint32_t cores_in_batch = num_of_shards / in_batches;
+            // batch this core is processing [0-3]
+            uint32_t src_batch = this_core / cores_in_batch;
+            // chainted deinterleave messes up order, use mapping
+            src_batch = batch_mapping[src_batch];
 
-        uint32_t dst_offset = dst_datum_width_offset + dst_datum_height_offset;
+            // id of this core in batch
+            uint32_t id_in_batch = this_core % cores_in_batch;
+            uint32_t start_id = id_in_batch * num_src_cores;
+            CoreCoord start = {start_id % device_grid.x, start_id / device_grid.x};
+            CoreCoord end = core_coord_get_end_loc(start, device_grid, num_src_cores);
 
-        // stride to move for one dst_core output in the src buffer
-        uint32_t src_height = output_per_core_height / operation_attributes.stride_hw[0];
-        uint32_t src_width = output_per_core_width / operation_attributes.stride_hw[1];
+            // core should proccess data from start_xy to end_xy, but we dont want every core writing to the same dest
+            // to start from the same point but offset and process the data in a round robin fashion. cores that write
+            // same dests have same id_in_batch, but different dst_batch
+            CoreCoord offset_dm0 = core_range_offset(start, end, device_grid, src_batch);
+            CoreCoord offset_dm1 = core_range_offset(start, end, device_grid, (src_batch + 1) % in_batches);
 
-        uint32_t src_b1_size_bytes = src_height * src_width * stick_size_bytes;
-        uint32_t src_offset_dm0 = src_batch * src_b1_size_bytes;
-        uint32_t src_offset_dm1 = (src_offset_dm0 + src_b1_size_bytes) % (in_batches * src_b1_size_bytes);
+            // dest offset are not affected by offset change, because we always write all data to one dest and ordering
+            // here is not important.
+            uint32_t dst_width_stride = operation_attributes.stride_hw[1] * stick_size_bytes;
+            uint32_t dst_height_offset_to_next =
+                (operation_attributes.stride_hw[0] - 1) * output_per_core_width * stick_size_bytes;
 
-        uint32_t dst_rollover_offset_dm0 =
-            (src_batch % 2 == 0) ? 0 : src_b1_size_bytes;  // div by 2 for two data movement processors
-        uint32_t dst_rollover_offset_dm1 =
-            (src_batch % 2 == 0) ? src_b1_size_bytes : 0;  // div by 2 for two data movement processors
+            uint32_t dst_datum_width_offset = (src_batch % operation_attributes.stride_hw[0]) * stick_size_bytes;
+            uint32_t dst_datum_height_offset =
+                (src_batch / operation_attributes.stride_hw[1]) * output_per_core_width * stick_size_bytes;
 
-        log_debug(
-            tt::LogOp,
-            "DeinterleaveToBatchOperation::ProgramFactoryToBatch::create; core: {} myid {}, start {}-{}, end {}-{}, "
-            "dst_batch "
-            "{}, "
-            "id_in_batch {} offset_dm0 {}-{} offset_dm1 {}-{}",
-            core,
-            this_core,
-            start.y,
-            start.x,
-            end.y,
-            end.x,
-            src_batch,
-            id_in_batch,
-            offset_dm0.y,
-            offset_dm0.x,
-            offset_dm1.y,
-            offset_dm1.x);
-        TT_FATAL(end.x > 0, "Deinterleave: end.x {} == 0 | ", end.x);
-        TT_FATAL(end.y > 0, "Deinterleave: end.y {} == 0 | start={} num_src_cores={}", end.y, start, num_src_cores);
+            uint32_t dst_offset = dst_datum_width_offset + dst_datum_height_offset;
 
-        TT_FATAL(
-            end.x <= device_grid.x,
-            "Deinterleave: unsupported configuration. {} end.x {} cannot be larger than device_grid.x {}",
-            core,
-            end.x,
-            device_grid.x);
+            // stride to move for one dst_core output in the src buffer
+            uint32_t src_height = output_per_core_height / operation_attributes.stride_hw[0];
+            uint32_t src_width = output_per_core_width / operation_attributes.stride_hw[1];
 
-        TT_FATAL(
-            end.y <= device_grid.y,
-            "Deinterleave: unsupported configuration. {} end.y {} cannot be larger than device_grid.y {}",
-            core,
-            end.y,
-            device_grid.y);
+            uint32_t src_b1_size_bytes = src_height * src_width * stick_size_bytes;
+            uint32_t src_offset_dm0 = src_batch * src_b1_size_bytes;
+            uint32_t src_offset_dm1 = (src_offset_dm0 + src_b1_size_bytes) % (in_batches * src_b1_size_bytes);
 
-        log_debug(
-            tt::LogOp,
-            "src_width_stride {}, src_height_offset_to_next {}",
-            dst_width_stride,
-            dst_height_offset_to_next);
-        log_debug(
-            tt::LogOp,
-            "dst_batch {}, src_offset_dm0 {}, src_offset_dm1 {}, dst_b1_size_bytes {}, dst_offset_dm0 {}, "
-            "dst_offset_dm1 {}",
-            src_batch,
-            dst_offset,
-            dst_offset,
-            src_b1_size_bytes,
-            src_offset_dm0,
-            src_offset_dm1);
-        SetRuntimeArgs(
-            program,
-            read_kernel_id,
-            core,
-            {(uint32_t)start.x,
-             (uint32_t)end.x,
-             (uint32_t)start.y,
-             (uint32_t)end.y,
-             (uint32_t)dst_width_stride,
-             (uint32_t)dst_height_offset_to_next,
-             (uint32_t)dst_offset,
-             (uint32_t)src_b1_size_bytes,
-             (uint32_t)src_offset_dm0,
-             (uint32_t)offset_dm0.x,
-             (uint32_t)offset_dm0.y,
-             (uint32_t)num_src_cores,
-             (uint32_t)dst_rollover_offset_dm0});
-        SetRuntimeArgs(
-            program,
-            write_kernel_id,
-            core,
-            {(uint32_t)start.x,
-             (uint32_t)end.x,
-             (uint32_t)start.y,
-             (uint32_t)end.y,
-             (uint32_t)dst_width_stride,
-             (uint32_t)dst_height_offset_to_next,
-             (uint32_t)dst_offset,
-             (uint32_t)src_b1_size_bytes,
-             (uint32_t)src_offset_dm1,
-             (uint32_t)offset_dm1.x,
-             (uint32_t)offset_dm1.y,
-             (uint32_t)num_src_cores,
-             (uint32_t)dst_rollover_offset_dm1});
+            uint32_t dst_rollover_offset_dm0 =
+                (src_batch % 2 == 0) ? 0 : src_b1_size_bytes;  // div by 2 for two data movement processors
+            uint32_t dst_rollover_offset_dm1 =
+                (src_batch % 2 == 0) ? src_b1_size_bytes : 0;  // div by 2 for two data movement processors
+
+            log_debug(
+                tt::LogOp,
+                "DeinterleaveToBatchOperation::ProgramFactoryToBatch::create; core: {} myid {}, start {}-{}, end "
+                "{}-{}, "
+                "dst_batch "
+                "{}, "
+                "id_in_batch {} offset_dm0 {}-{} offset_dm1 {}-{}",
+                core,
+                this_core,
+                start.y,
+                start.x,
+                end.y,
+                end.x,
+                src_batch,
+                id_in_batch,
+                offset_dm0.y,
+                offset_dm0.x,
+                offset_dm1.y,
+                offset_dm1.x);
+            TT_FATAL(end.x > 0, "Deinterleave: end.x {} == 0 | ", end.x);
+            TT_FATAL(end.y > 0, "Deinterleave: end.y {} == 0 | start={} num_src_cores={}", end.y, start, num_src_cores);
+
+            TT_FATAL(
+                end.x <= device_grid.x,
+                "Deinterleave: unsupported configuration. {} end.x {} cannot be larger than device_grid.x {}",
+                core,
+                end.x,
+                device_grid.x);
+
+            TT_FATAL(
+                end.y <= device_grid.y,
+                "Deinterleave: unsupported configuration. {} end.y {} cannot be larger than device_grid.y {}",
+                core,
+                end.y,
+                device_grid.y);
+
+            log_debug(
+                tt::LogOp,
+                "src_width_stride {}, src_height_offset_to_next {}",
+                dst_width_stride,
+                dst_height_offset_to_next);
+            log_debug(
+                tt::LogOp,
+                "dst_batch {}, src_offset_dm0 {}, src_offset_dm1 {}, dst_b1_size_bytes {}, dst_offset_dm0 {}, "
+                "dst_offset_dm1 {}",
+                src_batch,
+                dst_offset,
+                dst_offset,
+                src_b1_size_bytes,
+                src_offset_dm0,
+                src_offset_dm1);
+            SetRuntimeArgs(
+                program,
+                read_kernel_id,
+                core,
+                {(uint32_t)start.x,
+                 (uint32_t)end.x,
+                 (uint32_t)start.y,
+                 (uint32_t)end.y,
+                 (uint32_t)dst_width_stride,
+                 (uint32_t)dst_height_offset_to_next,
+                 (uint32_t)dst_offset,
+                 (uint32_t)src_b1_size_bytes,
+                 (uint32_t)src_offset_dm0,
+                 (uint32_t)offset_dm0.x,
+                 (uint32_t)offset_dm0.y,
+                 (uint32_t)num_src_cores,
+                 (uint32_t)dst_rollover_offset_dm0});
+            SetRuntimeArgs(
+                program,
+                write_kernel_id,
+                core,
+                {(uint32_t)start.x,
+                 (uint32_t)end.x,
+                 (uint32_t)start.y,
+                 (uint32_t)end.y,
+                 (uint32_t)dst_width_stride,
+                 (uint32_t)dst_height_offset_to_next,
+                 (uint32_t)dst_offset,
+                 (uint32_t)src_b1_size_bytes,
+                 (uint32_t)src_offset_dm1,
+                 (uint32_t)offset_dm1.x,
+                 (uint32_t)offset_dm1.y,
+                 (uint32_t)num_src_cores,
+                 (uint32_t)dst_rollover_offset_dm1});
+        }
     }
 
     return {std::move(program), {src_cb, dst_cb}};

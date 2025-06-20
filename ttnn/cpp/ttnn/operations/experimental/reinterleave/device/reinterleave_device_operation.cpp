@@ -120,6 +120,7 @@ ReinterleaveFromBatchOperation::invoke(
             input_width,
             stride_hw,
             barrier_threshold,
+            false,
             init_device_compute_kernel_config(input.device()->arch(), compute_kernel_config, MathFidelity::HiFi4),
         },
         tensor_args_t{input},

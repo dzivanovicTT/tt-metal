@@ -16,6 +16,7 @@ struct ReinterleaveFromBatchOperation {
         const uint32_t input_width;
         const std::array<uint32_t, 2> stride_hw;
         const uint32_t barrier_threshold;
+        const bool split_work = false;  // Whether to split work between DM0 and DM1
         const DeviceComputeKernelConfig compute_kernel_config;
     };
 
