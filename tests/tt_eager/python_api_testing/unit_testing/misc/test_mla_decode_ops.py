@@ -15,9 +15,19 @@ from loguru import logger
 import pytest
 from dataclasses import dataclass
 
+from models.tt_transformers.tt.rope import RotarySetup
+from tests.tt_eager.python_api_testing.unit_testing.misc.mla_decode_ops_common import (
+    precompute_freqs_cis,
+    apply_rotary_emb,
+)
+
 
 TP = 8
 DP = 4
+
+
+def nearest_n(x, n):
+    return ((x + n - 1) // n) * n
 
 
 @dataclass
@@ -44,10 +54,11 @@ class ModelArgs:
     # yarn
     original_seq_len: int = 4096
     rope_theta: float = 10000.0
-    rope_factor: float = 40
-    beta_fast: int = 32
+    rope_factor: float = 1  # 40 # TODO: Only test without scaling for now!
+    beta_fast: int = 1  # 32 # TODO: Only test without scaling for now!
     beta_slow: int = 1
     mscale: float = 1.0
+    max_seq_len: int = 128 * 1024  # TODO: Confirm this
 
 
 class ModelConfig:
@@ -55,6 +66,7 @@ class ModelConfig:
         self.args = model_args
         self.args.qk_head_dim = self.args.qk_nope_head_dim + self.args.qk_rope_head_dim
 
+        self.grid_size = (8, 8)
         self.bsz = 64
         self.configs = {}
 
@@ -132,8 +144,42 @@ class ModelConfig:
         self.configs["WO_IN1_MEM_CFG"] = ttnn.DRAM_MEMORY_CONFIG
         self.configs["WO_OUT_MEM_CFG"] = ttnn.DRAM_MEMORY_CONFIG
 
+        # q_rope
+        self.configs["QROPE_SHAPE"] = (1, self.bsz // DP, self.args.n_heads // TP, self.args.qk_rope_head_dim)
+        self.configs["QROPE_DTYPE"] = ttnn.bfloat16
+
+        q_rope_shard_height = nearest_n(self.configs["QROPE_SHAPE"][2], ttnn.TILE_SIZE)
+        q_rope_shard_width = self.configs["QROPE_SHAPE"][3]
+        q_rope_num_cores = self.configs["QROPE_SHAPE"][1]
+        q_rope_core_grid = ttnn.num_cores_to_corerangeset(q_rope_num_cores, self.grid_size, row_wise=True)
+        self.configs["QROPE_MEM_CFG"] = ttnn.create_sharded_memory_config(
+            shape=(q_rope_shard_height, q_rope_shard_width),
+            core_grid=q_rope_core_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            use_height_and_width_as_shard_shape=True,
+        )
+
+        # k_rope
+        self.configs["KROPE_SHAPE"] = (1, self.bsz // DP // TP, 1, self.args.qk_rope_head_dim)
+        self.configs["KROPE_DTYPE"] = ttnn.bfloat16
+        k_rope_shard_height = nearest_n(self.configs["KROPE_SHAPE"][2], ttnn.TILE_SIZE)
+        k_rope_shard_width = self.configs["KROPE_SHAPE"][3]
+        k_rope_num_cores = self.configs["KROPE_SHAPE"][1]
+        k_rope_core_grid = ttnn.num_cores_to_corerangeset(k_rope_num_cores, self.grid_size, row_wise=True)
+        self.configs["KROPE_MEM_CFG"] = ttnn.create_sharded_memory_config(
+            shape=(k_rope_shard_height, k_rope_shard_width),
+            core_grid=k_rope_core_grid,
+            strategy=ttnn.ShardStrategy.HEIGHT,
+            use_height_and_width_as_shard_shape=True,
+        )
+
 
 cfg = ModelConfig(ModelArgs())
+
+
+#################
+### Helper Funcs
+#################
 
 
 def run_matmul_impl(
@@ -203,6 +249,83 @@ def run_matmul_impl(
     assert out_pass, f"Output mismatch: PCC {out_pcc} < 0.99"
 
 
+def run_rope_impl(
+    device,
+    shape,
+    dtype,
+    mem_config,
+    max_seq_len,
+    rope_theta,
+):
+    # TODO: Only testing without scaling for now!
+
+    layout = ttnn.TILE_LAYOUT
+
+    _, bsz, nh, head_dim = shape
+
+    logger.info("Running rope with the following configurations:")
+    logger.info(f"Shape: {shape}, Dtype: {dtype}, Memory Config: {mem_config}")
+    logger.info(f"Max Seq Len: {max_seq_len}, Rope Theta: {rope_theta}")
+
+    #################
+    ### Torch
+    #################
+
+    position_ids = torch.randint(0, max_seq_len, (bsz,))
+    input_torch = torch.randn(shape).float()
+    freqs_cis = precompute_freqs_cis(cfg.args)[position_ids, :]
+    out_torch = apply_rotary_emb(input_torch, freqs_cis)
+
+    #################
+    ### TT-NN
+    #################
+    rope_setup = RotarySetup(
+        device=device,
+        batch_size=bsz,
+        head_dim=head_dim,
+        max_seq_len=max_seq_len,
+        rope_theta=rope_theta,
+        scale_factor=None,
+        orig_context_len=None,
+        datatype=dtype,
+    )
+
+    tt_cos, tt_sin = rope_setup.get_rot_mats(position_ids)
+    tt_trans_mat = rope_setup.get_both_trans_mats()["decode"]
+
+    tt_input = ttnn.from_torch(
+        input_torch,
+        device=device,
+        dtype=dtype,
+        memory_config=mem_config,
+        layout=layout,
+    )
+
+    tt_out = ttnn.experimental.rotary_embedding_llama(
+        tt_input,
+        tt_cos,
+        tt_sin,
+        tt_trans_mat,
+        is_decode_mode=True,
+    )
+
+    tt_out_torch = ttnn.to_torch(tt_out)
+
+    #################
+    ### Validation
+    #################
+
+    pcc_threshold = 0.99
+
+    out_pass, out_pcc = comp_pcc(tt_out_torch, out_torch, pcc_threshold)
+    logger.info(f"Output PCC: {out_pcc}")
+
+    assert out_pass, f"Output mismatch: PCC {out_pcc} < 0.99"
+
+
+#################
+### Tests
+#################
 @pytest.mark.parametrize(
     "shapes, dtypes, program_config, memory_configs",
     [
@@ -268,4 +391,48 @@ def test_matmuls(
         dtypes=dtypes,
         program_config=program_config,
         memory_configs=memory_configs,
+    )
+
+
+@pytest.mark.parametrize(
+    "shape, dtype, mem_config",
+    [
+        (  # q_rope
+            cfg.configs["QROPE_SHAPE"],
+            cfg.configs["QROPE_DTYPE"],
+            cfg.configs["QROPE_MEM_CFG"],
+        ),
+        (  # k_rope
+            cfg.configs["KROPE_SHAPE"],
+            cfg.configs["KROPE_DTYPE"],
+            cfg.configs["KROPE_MEM_CFG"],
+        ),
+    ],
+    ids=[
+        "q_rope",
+        "k_rope",
+    ],
+)
+@pytest.mark.parametrize(
+    "max_seq_len, rope_theta",
+    [(cfg.args.max_seq_len, cfg.args.rope_theta)],
+)
+def test_ropes(
+    device,
+    shape,
+    dtype,
+    mem_config,
+    max_seq_len,
+    rope_theta,
+    use_program_cache,
+    function_level_defaults,
+    reset_seeds,
+):
+    run_rope_impl(
+        device,
+        shape=shape,
+        dtype=dtype,
+        mem_config=mem_config,
+        max_seq_len=max_seq_len,
+        rope_theta=rope_theta,
     )
