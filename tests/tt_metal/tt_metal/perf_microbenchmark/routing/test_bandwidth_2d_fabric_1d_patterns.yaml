@@ -1,0 +1,81 @@
+# This YAML file demonstrates the various features of the fabric performance test framework.
+# It will be updated as new features are added.
+
+# ======================================================================================
+# Optional Top-Level Configuration: Allocation Policies
+# This block allows you to globally configure how sender and receiver worker cores
+# are allocated across all tests in this file.
+# ======================================================================================
+allocation_policies:
+  sender:
+    # Policy can be 'RoundRobin' or 'ExhaustFirst'.
+    # 'ExhaustFirst' will fill up one core with workers before moving to the next.
+    # 'RoundRobin' will distribute workers one by one across available cores.
+    policy: ExhaustFirst
+    max_workers_per_core: 2
+  receiver:
+    policy: RoundRobin
+    max_workers_per_core: 8
+    # You can also specify memory allocation parameters for workers on a core.
+    default_payload_chunk_size: 4096
+
+Tests:
+  # ======================================================================================
+  # Test 1: A simple, fully specified unicast test.
+  # This demonstrates the most basic configuration.
+  # ======================================================================================
+  - name: "NeighbourExchange_1D"
+    fabric_setup:
+      topology: Mesh
+
+    senders:
+      - device: 0 # Source is physical chip 0
+        patterns:
+          - ftype: unicast
+            ntype: unicast_write
+            size: [16, 2048, 4096]
+            num_packets: 200000
+            destination:
+              device: 1 # Destination is physical chip 1
+      - device: 1 # Source is physical chip 0
+        patterns:
+          - ftype: unicast
+            ntype: unicast_write
+            size: [16, 2048, 4096]
+            num_packets: 200000
+            destination:
+              device: 0 # Destination is physical chip 1
+
+  - name: "OneWayUnicast_1D"
+    fabric_setup:
+      topology: Mesh
+
+    # These parameters will be used to generate a cross-product of test configurations.
+    parametrization_params:
+      size: [16, 2048, 4096]
+      num_packets: 200000
+      ftype: unicast
+      ntype: unicast_write
+
+    senders:
+      - device: 0
+        patterns:
+          - destination:
+              device: 2 ## Include one forwarding hop
+
+  - name: "OneWayMulticast_1D"
+    fabric_setup:
+      topology: Mesh
+
+    # These parameters will be used to generate a cross-product of test configurations.
+    parametrization_params:
+      size: [16, 2048, 4096]
+      num_packets: 200000
+      ftype: Multicast
+      ntype: unicast_write
+
+    senders:
+      - device: 0
+        patterns:
+          - destination:
+              device: [1,2,3]
