@@ -17,6 +17,7 @@
 #include <string>
 #include <vector>
 
+#include "assert.hpp"
 #include "core_coord.hpp"
 #include "dispatch_core_common.hpp"  // For DispatchCoreConfig
 #include <umd/device/types/xy_pair.h>
@@ -405,7 +406,10 @@ public:
     inline void set_disable_dma_ops(bool disable) { disable_dma_ops = disable; }
 
     inline uint32_t get_max_runtime_args() const { return max_runtime_args; }
-    inline void set_max_runtime_args(uint32_t max_args) { max_runtime_args = max_args; }
+    inline void set_max_runtime_args(uint32_t max_args) {
+        TT_ASSERT(max_args <= 6144, "Maximum runtime arguments must be less than or equal to 6144");
+        max_runtime_args = max_args;
+    }
 
 private:
     // Helper functions to parse feature-specific environment vaiables.
