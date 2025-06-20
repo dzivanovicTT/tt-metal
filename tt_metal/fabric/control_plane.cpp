@@ -28,6 +28,7 @@
 #include "fabric_host_interface.h"
 #include "hal_types.hpp"
 #include "impl/context/metal_context.hpp"
+#include <tt-metalium/distributed_context.hpp>
 #include <tt-logger/tt-logger.hpp>
 #include "mesh_coord.hpp"
 #include "mesh_graph.hpp"
@@ -38,6 +39,7 @@
 #include <umd/device/types/cluster_descriptor_types.h>
 #include <umd/device/types/xy_pair.h>
 #include "tt_metal/fabric/fabric_context.hpp"
+#include "tt_metal/fabric/multi_mesh_utils.hpp"
 
 namespace tt::tt_fabric {
 
@@ -117,6 +119,8 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
     const auto& logical_mesh_chip_id_to_physical_chip_id_mapping =
         this->get_physical_chip_mapping_from_mesh_graph_desc_file(mesh_graph_desc_file);
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
+    this->generate_local_intermesh_descriptor();
+    this->exchange_intermesh_link_descriptors();
 }
 
 ControlPlane::ControlPlane(
@@ -148,6 +152,8 @@ ControlPlane::ControlPlane(
     this->routing_table_generator_->print_routing_tables();
     // Initialize the control plane routers based on mesh graph
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
+    this->generate_local_intermesh_descriptor();
+    this->exchange_intermesh_link_descriptors();
 }
 
 void ControlPlane::load_physical_chip_mapping(
@@ -1182,6 +1188,101 @@ FabricContext& ControlPlane::get_fabric_context() const {
 }
 
 void ControlPlane::clear_fabric_context() { this->fabric_context_.reset(nullptr); }
+
+void ControlPlane::generate_local_intermesh_descriptor() {
+    const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
+    intermesh_link_desc_.local_mesh_id = local_mesh_info_->mesh_id;
+    for (const auto& chip_id : cluster.user_exposed_chip_ids()) {
+        if (cluster.has_intermesh_links(chip_id)) {;
+            for (const auto& link : cluster.get_intermesh_eth_links(chip_id)) {
+                const auto& logical_eth_core = link.first;
+                tt_cxy_pair virtual_eth_core(
+                    chip_id, cluster.get_virtual_coordinate_from_logical_coordinates(chip_id, logical_eth_core, CoreType::ETH));
+                std::vector<uint32_t> read_vec = {};
+                constexpr uint32_t addr = 0x1124;
+                cluster.read_core(read_vec, sizeof(uint32_t), virtual_eth_core, addr);
+                uint32_t connected_noc_x = ((read_vec[0]) >> 4) & 0x3F;
+                uint32_t connected_noc_y = ((read_vec[0]) >> 10) & 0x3F;
+                uint32_t connected_chip_x = (read_vec[0] >> 16) & 0x3F;
+                uint32_t connected_chip_y = (read_vec[0] >> 22) & 0x3F;
+                auto eth_coord = cluster.get_user_chip_ethernet_coordinates().at(chip_id);
+                eth_coord_t connected_coord = {
+                    .cluster_id = 0,
+                    .x = connected_chip_x,
+                    .y = connected_chip_y,
+                    .rack = 0,
+                    .shelf = 0
+                };
+                auto connected_channel = cluster.get_soc_desc(chip_id).translate_coord_to(CoreCoord(connected_noc_x, connected_noc_y), CoordSystem::PHYSICAL, CoordSystem::LOGICAL);
+                tt_fabric::EthernetLinkDescriptor link_descriptor = {
+                    .local_chip_eth_coord = eth_coord,
+                    .remote_chip_eth_coord = connected_coord,
+                    .local_eth_core_coord = logical_eth_core,
+                    .remote_eth_core_coord = connected_channel,
+                };
+                intermesh_link_desc_.intermesh_links.push_back(link_descriptor);
+            }
+        }
+    }
+    // auto serialized_vec = tt::tt_fabric::serialize_to_bytes(intermesh_link_desc_);
+    // tt_fabric::IntermeshLinkDescriptor deserialized_desc = tt::tt_fabric::deserialize_from_bytes(serialized_vec);
+    // // Print all information in the descriptor
+    // std::cout << "Deserialized Intermesh Links" << std::endl;
+    // for (const auto& link : deserialized_desc.intermesh_links) {
+    //     std::cout << link.local_eth_core_coord.str() << " " << link.local_chip_eth_coord.rack << " "
+    //               << link.local_chip_eth_coord.shelf << " " << link.local_chip_eth_coord.x << " "
+    //               << link.local_chip_eth_coord.y << std::endl;
+    //     std::cout << link.remote_eth_core_coord.str() << " " << link.remote_chip_eth_coord.rack << " "
+    //                 << link.remote_chip_eth_coord.shelf << " " << link.remote_chip_eth_coord.x << " "
+    //                 << link.remote_chip_eth_coord.y << std::endl;
+    // }
+}
+
+void ControlPlane::exchange_intermesh_link_descriptors() {
+    const auto& distributed_context = tt_metal::distributed::multihost::DistributedContext::get_current_world();
+    auto serialized_vec = tt::tt_fabric::serialize_to_bytes(intermesh_link_desc_);
+    std::vector<uint8_t> serialized_remote_desc(serialized_vec.size());
+    auto my_rank = *(distributed_context->rank());
+    auto peer_rank = (my_rank == 0) ? tt::tt_metal::distributed::multihost::Rank{1} : tt::tt_metal::distributed::multihost::Rank{0};
+    
+    if (my_rank == 0) {
+        distributed_context->send(
+            tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
+            peer_rank,
+            tt::tt_metal::distributed::multihost::Tag{0}
+        );
+        distributed_context->recv(
+            tt::stl::as_writable_bytes(
+                tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
+            tt::tt_metal::distributed::multihost::Rank{peer_rank},
+            tt::tt_metal::distributed::multihost::Tag{0}
+        );
+    } else {
+        distributed_context->recv(
+            tt::stl::as_writable_bytes(
+                tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
+            tt::tt_metal::distributed::multihost::Rank{peer_rank},
+            tt::tt_metal::distributed::multihost::Tag{0}
+        );
+        distributed_context->send(
+            tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
+            peer_rank,
+            tt::tt_metal::distributed::multihost::Tag{0}
+        );
+    }
+
+    tt_fabric::IntermeshLinkDescriptor deserialized_remote_desc = tt::tt_fabric::deserialize_from_bytes(serialized_remote_desc);
+    
+    std::cout << "Deserialized Intermesh Links" << std::endl;
+    for (const auto& link : deserialized_remote_desc.intermesh_links) {
+        std::cout << link.local_eth_core_coord.str() << " " << link.local_chip_eth_coord.rack << " "
+                  << link.local_chip_eth_coord.shelf << " " << link.local_chip_eth_coord.x << " "
+                  << link.local_chip_eth_coord.y << std::endl;
+        std::cout << link.remote_eth_core_coord.str() << " " << link.remote_chip_eth_coord.rack << " "
+                    << link.remote_chip_eth_coord.shelf << " " << link.remote_chip_eth_coord.x << " "
+                    << link.remote_chip_eth_coord.y << std::endl;
+    }
+}
 
 ControlPlane::~ControlPlane() = default;
 

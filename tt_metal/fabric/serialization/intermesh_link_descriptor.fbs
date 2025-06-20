@@ -1,0 +1,32 @@
+namespace tt.tt_fabric.flatbuffer;
+
+table EthCoord {
+  cluster_id: int32;
+  x: int32;
+  y: int32;
+  rack: int32;
+  shelf: int32;
+}
+
+table CoreCoord {
+  x: uint64; 
+  y: uint64;
+}
+
+table MeshId {
+  value: uint32;
+}
+
+table EthernetLinkDescriptor {
+  local_chip_eth_coord: EthCoord;
+  remote_chip_eth_coord: EthCoord;
+  local_eth_core_coord: CoreCoord;
+  remote_eth_core_coord: CoreCoord;
+}
+
+table IntermeshLinkDescriptor {
+  local_mesh_id: MeshId;
+  intermesh_links: [EthernetLinkDescriptor];
+}
+
+root_type IntermeshLinkDescriptor;
