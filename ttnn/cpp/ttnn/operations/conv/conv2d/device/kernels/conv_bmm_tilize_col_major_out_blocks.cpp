@@ -163,11 +163,15 @@ void MAIN {
 #ifdef SFPU_OP_INIT_ACTIVATION
     SFPU_OP_INIT_ACTIVATION
 #endif
-    uint32_t start_cb_addr = get_local_cb_interface(in0_cb_id).fifo_rd_ptr;
+    uint32_t start_cb_addr_1 = get_local_cb_interface(in0_cb_id).fifo_rd_ptr;
+    uint32_t end_cb_addr_1 = start_cb_addr_1 + cb_size;
+    uint32_t rows_read_1 = 0;
 
-    uint32_t end_cb_addr = start_cb_addr + cb_size;
-    uint32_t rows_read = 0;
-
+#ifdef SPLIT_READER
+    uint32_t start_cb_addr_2 = get_local_cb_interface(in0_cb_second_reader_id).fifo_rd_ptr;
+    uint32_t end_cb_addr_2 = start_cb_addr_2 + cb_size;
+    uint32_t rows_read_2 = 0;
+#endif
     UNPACK(uint32_t partials_cb_read_ptr = get_local_cb_interface(matmul_partials_cb).fifo_rd_ptr;)
     PACK(uint32_t partials_cb_write_ptr = get_local_cb_interface(matmul_partials_cb).fifo_wr_ptr;)
     // in1 num blocks w is the outer loop. Output blocks are computed in col major order.
@@ -220,24 +224,29 @@ void MAIN {
 
                     reconfig_data_format_srca(in1_cb_id, in0_cb_id);
 
-                    rows_read = tilize_in(
+                    rows_read_1 = tilize_in(
                         in0_cb_id,
                         in0_subblock_h,
                         in0_block_w,
                         in0_num_subblocks_read,
                         tilized_in0_cb_id,
-                        rows_read,
+                        rows_read_1,
                         diff,
-                        start_cb_addr,
-                        end_cb_addr,
+                        start_cb_addr_1,
+                        end_cb_addr_1,
                         image_width_in_tiles);
 #ifdef SPLIT_READER
-                    tilize_in(
+                    rows_read_2 = tilize_in(
                         in0_cb_second_reader_id,
                         in0_subblock_h,
                         in0_block_w,
                         in0_num_subblocks_read_last,
-                        tilized_in0_cb_id);
+                        tilized_in0_cb_id,
+                        rows_read_2,
+                        diff,
+                        start_cb_addr_2,
+                        end_cb_addr_2,
+                        image_width_in_tiles);
 #endif
 
                     mm_block_init_short_with_dt(

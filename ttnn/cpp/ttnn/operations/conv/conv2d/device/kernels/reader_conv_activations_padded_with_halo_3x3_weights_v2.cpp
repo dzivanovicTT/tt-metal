@@ -113,7 +113,7 @@ void kernel_main() {
         }
 #ifdef SPLIT_READER
         // Increment reader index for the next number of segments (number of segments for other reader)
-        start_reader_idx += (static_cast<uint32_t>(packed_reader_indices_ptr[reader_idx] & 0xffff) + 1);
+        reader_idx += (static_cast<uint32_t>(packed_reader_indices_ptr[reader_idx] & 0xffff) + 1);
 #endif
     }
     noc_async_write_barrier();
