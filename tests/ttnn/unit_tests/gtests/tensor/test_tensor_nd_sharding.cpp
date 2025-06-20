@@ -808,4 +808,13 @@ INSTANTIATE_TEST_SUITE_P(
             .expected_num_pages = 112,
             .expected_num_dev_pages = 3 * 11 * 4,
             .expected_aligned_size_per_bank = 11 * 4 * 32 * 32,
+        },
+        NDShardingBufferSizeParams{
+            .shape = Shape({32 * 10, 32 * 10}),
+            .shard_shape = Shape({32 * 4, 32 * 3}),
+            .grid_size = CoreCoord{4, 3},
+            .expected_buffer_size = 100 * 32 * 32,
+            .expected_num_pages = 100,
+            .expected_num_dev_pages = 12 * 1 * 12,
+            .expected_aligned_size_per_bank = 1 * 12 * 32 * 32,
         }));
