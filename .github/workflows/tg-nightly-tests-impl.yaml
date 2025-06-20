@@ -35,13 +35,13 @@ jobs:
           #   timeout: 30,
           #   owner_id: U053W15B6JF
           # }, # Djordje Ivanovic
-          # {
-          #   name: "Llama Galaxy Long Stress Test",
-          #   arch: wormhole_b0,
-          #   cmd: "LLAMA_DIR=/mnt/MLPerf/tt_dnn-models/llama/Llama3.3-70B-Instruct/ FAKE_DEVICE=TG TT_METAL_ENABLE_ERISC_IRAM=1 pytest models/demos/llama3_subdevices/demo/demo_decode.py  -k 'stress-test and not mini-stress-test'",
-          #   timeout: 240,
-          #   owner_id: U053W15B6JF
-          # }, # Djordje Ivanovic
+          {
+            name: "Llama Galaxy Long Stress Test",
+            arch: wormhole_b0,
+            cmd: "LLAMA_DIR=/mnt/MLPerf/tt_dnn-models/llama/Llama3.3-70B-Instruct/ FAKE_DEVICE=TG TT_METAL_ENABLE_ERISC_IRAM=1 pytest models/demos/llama3_subdevices/demo/demo_decode.py  -k 'stress-test and not mini-stress-test'",
+            timeout: 240,
+            owner_id: U053W15B6JF
+          }, # Djordje Ivanovic
         ]
     name: ${{ matrix.test-group.name }}
     runs-on:
@@ -55,7 +55,7 @@ jobs:
         TT_METAL_HOME: /work
         PYTHONPATH: /work
         LD_LIBRARY_PATH: /work/build/lib
-        LOGURU_LEVEL: INFO
+        LOGURU_LEVEL: DEBUG
         ARCH_NAME: ${{ matrix.test-group.arch }}
       volumes:
         - ${{ github.workspace }}/docker-job:/work # Subdir to workaround https://github.com/actions/runner/issues/691
