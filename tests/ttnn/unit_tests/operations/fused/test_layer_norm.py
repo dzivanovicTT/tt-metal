@@ -210,3 +210,50 @@ def test_large_layer_norm_with_bias(device, h, w):
     output_tensor = ttnn.to_torch(output_tensor)
 
     assert_with_pcc(torch_output_tensor, output_tensor, 0.97)
+
+
+@pytest.mark.parametrize("input_shape, core_x, core_y", [((1, 4096, 640), 5, 8), ((1, 1024, 1280), 8, 8)])
+def test_sharded_layer_norm(device, input_shape, core_x, core_y, reset_seeds):
+    torch_input_tensor = torch.rand(input_shape, dtype=torch.bfloat16)
+    torch_weight = torch.rand((input_shape[-1],), dtype=torch.bfloat16)
+    torch_bias = torch.rand((input_shape[-1],), dtype=torch.bfloat16)
+
+    ln_eps = 1e-5
+    ln_compute_kernel_config = ttnn.WormholeComputeKernelConfig(
+        math_fidelity=ttnn.MathFidelity.HiFi2,
+        math_approx_mode=False,
+        fp32_dest_acc_en=True,
+        packer_l1_acc=True,
+    )
+
+    torch_output_tensor = torch.nn.functional.layer_norm(
+        torch_input_tensor, normalized_shape=[input_shape[-1]], weight=torch_weight, bias=torch_bias, eps=ln_eps
+    )
+
+    mem_config = ttnn.create_sharded_memory_config(
+        shape=(input_shape[-2] // core_y, input_shape[-1] // core_x),
+        core_grid=ttnn.CoreGrid(y=core_y, x=core_x),
+        strategy=ttnn.ShardStrategy.BLOCK,
+        use_height_and_width_as_shard_shape=True,
+        orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    )
+
+    ttnn_input_tensor = ttnn.from_torch(
+        torch_input_tensor, dtype=ttnn.bfloat16, device=device, layout=ttnn.TILE_LAYOUT, memory_config=mem_config
+    )
+    ttnn_weight = ttnn.from_torch(
+        torch_weight, dtype=ttnn.bfloat16, device=device, layout=ttnn.TILE_LAYOUT, memory_config=ttnn.DRAM_MEMORY_CONFIG
+    )
+    ttnn_bias = ttnn.from_torch(
+        torch_bias, dtype=ttnn.bfloat16, device=device, layout=ttnn.TILE_LAYOUT, memory_config=ttnn.DRAM_MEMORY_CONFIG
+    )
+
+    output_tensor = ttnn.layer_norm(
+        ttnn_input_tensor,
+        weight=ttnn_weight,
+        bias=ttnn_bias,
+        epsilon=ln_eps,
+        compute_kernel_config=ln_compute_kernel_config,
+    )
+
+    assert_with_pcc(torch_output_tensor, output_tensor, 0.97)
