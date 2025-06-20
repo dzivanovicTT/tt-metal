@@ -7,7 +7,6 @@
 #include "ttnn/common/queue_id.hpp"
 #include "device/unary_device_operation.hpp"
 #include "ttnn/run_operation.hpp"
-#include "ttnn/operations/pool/downsample/device/downsample_op.hpp"
 #include "ttnn/operations/core/core.hpp"
 #include "ttnn/operations/eltwise/complex/complex.hpp"
 #include "ttnn/operations/eltwise/binary/binary_composite.hpp"
@@ -80,6 +79,7 @@ template struct ExecuteUnary<UnaryOpType::ACOS>;
 template struct ExecuteUnary<UnaryOpType::ASIN>;
 template struct ExecuteUnary<UnaryOpType::ATAN>;
 template struct ExecuteUnary<UnaryOpType::COS>;
+template struct ExecuteUnary<UnaryOpType::ACOSH>;
 template struct ExecuteUnary<UnaryOpType::ERFINV>;
 template struct ExecuteUnary<UnaryOpType::EXP2>;
 template struct ExecuteUnary<UnaryOpType::EXPM1>;
