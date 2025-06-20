@@ -113,9 +113,9 @@ public:
         const std::map<FabricNodeId, chip_id_t>& logical_mesh_chip_id_to_physical_chip_id_mapping) {
         auto distributed_context = tt_metal::distributed::multihost::DistributedContext::get_current_world();
         if (*(distributed_context->rank()) == 1) {
-            std::cout << "Receiver host sleeping for 40 seconds" << std::endl;
-            std::this_thread::sleep_for(std::chrono::seconds(40));
-            std::cout << "Receiver host start" << std::endl;
+            // std::cout << "Receiver host sleeping for 40 seconds" << std::endl;
+            // std::this_thread::sleep_for(std::chrono::seconds(40));
+            // std::cout << "Receiver host start" << std::endl;
         }
         tt::tt_metal::MetalContext::instance().set_custom_control_plane_mesh_graph(
             mesh_graph_desc_file, logical_mesh_chip_id_to_physical_chip_id_mapping);

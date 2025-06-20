@@ -231,6 +231,10 @@ public:
     [[nodiscard]] virtual ContextPtr create_sub_context(tt::stl::Span<int> ranks) const = 0;
     virtual void translate_ranks_to_other_ctx(
         tt::stl::Span<int> ranks, const ContextPtr& other_ctx, tt::stl::Span<int> translated_ranks) const = 0;
+
+    //--- Message snooping -----------------------------------------------
+    virtual std::size_t snoop_incoming_msg_size(Rank source, Tag tag) const = 0;
+
     //--- Error handling -----------------------------------------------------
     virtual void abort(int error_code) const = 0;
 
