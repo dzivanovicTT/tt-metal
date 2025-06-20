@@ -503,6 +503,8 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
         auto fabric_node_id = control_plane.get_fabric_node_id_from_physical_chip_id(device->id());
         dest_mesh_id.push_back(*fabric_node_id.mesh_id);
         dest_chip_id.push_back((uint32_t)fabric_node_id.chip_id);
+        std::cout << " COORD: " << coord[0] << "," << coord[1] << " fab ID: " << (uint32_t)fabric_node_id.chip_id
+                  << std::endl;
     }
     log_info(tt::LogOp, "dest_chip_id: {}", detail::stringify_vector(dest_chip_id));
     log_info(tt::LogOp, "dest_mesh_id: {}", detail::stringify_vector(dest_mesh_id));
@@ -585,6 +587,12 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
             .compile_args = reader_compile_time_args,
             .defines = reader_defines});
 
+    std::cout << "DIRECTIONS: " << std::endl;
+    for (auto d : directions) {
+        std::cout << d << " ";
+    }
+    std::cout << std::endl;
+
     std::map<std::string, std::string> writer_defines = {
         {"DEST_CHIP_ID", detail::stringify_vector(dest_chip_id)},
         {"DEST_MESH_ID", detail::stringify_vector(dest_mesh_id)},
@@ -626,7 +634,7 @@ AllToAllDispatchDeviceOperation::AllToAllDispatchSparse::create_at(
     for (auto& neighbor : neighbors) {
         auto neighbor_coordinate = mesh_view.find_device(neighbor->id());
         uint32_t link_id = detail::select_link(mesh_view, mesh_coordinate, neighbor_coordinate, num_links, topology);
-        tt::log_info(
+        log_info(
             tt::LogAlways,
             "Connection between ({}, {}) and ({}, {}) will choose link_id: {}",
             mesh_coordinate[0],
