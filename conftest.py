@@ -412,16 +412,16 @@ def mesh_device(request, silicon_arch_name, device_params):
     request.node.pci_ids = [ttnn.GetPCIeDeviceID(i) for i in device_ids[:num_devices_requested]]
 
     updated_device_params = get_updated_device_params(device_params)
-    logger.debug("updated params")
+    print("updated params")
     fabric_config = updated_device_params.pop("fabric_config", None)
-    logger.debug("setting_reliability mode")
+    print("setting_reliability mode")
     reliability_mode = updated_device_params.pop("reliability_mode", None)
-    logger.debug("updated params")
+    print("updated params")
     set_fabric(fabric_config)
-    logger.debug("set fabric config")
+    print("set fabric config")
     mesh_device = ttnn.open_mesh_device(mesh_shape=mesh_shape, **updated_device_params)
-    logger.debug("opened mesh devices")
-    logger.debug(f"multidevice with {mesh_device.get_num_devices()} devices is created")
+    print("opened mesh devices")
+    logger.info(f"multidevice with {mesh_device.get_num_devices()} devices is created")
     yield mesh_device
 
     for submesh in mesh_device.get_submeshes():
