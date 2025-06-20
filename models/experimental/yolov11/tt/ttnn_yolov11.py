@@ -17,10 +17,10 @@ from models.experimental.yolov11.tt.ttnn_yolov11_c2psa import TtnnC2PSA
 from models.experimental.yolov11.tt.ttnn_yolov11_detect import TtnnDetect
 
 
-class TttnnYoloV11:
+class TtnnYoloV11:
     def __init__(self, device, parameters):
         self.device = device
-        self.conv1 = TtnnConv(device, parameters.conv_args[0], parameters.model[0])
+        self.conv1 = TtnnConv(device, parameters.conv_args[0], parameters.model[0], deallocate_activation=True)
         self.conv2 = TtnnConv(device, parameters.conv_args[1], parameters.model[1])
         self.c3k2_1 = TtnnC3k2(device, parameters.conv_args[2], parameters.model[2], is_bk_enabled=True)
         self.conv3 = TtnnConv(device, parameters.conv_args[3], parameters.model[3])

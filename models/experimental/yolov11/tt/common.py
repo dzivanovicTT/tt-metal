@@ -21,6 +21,7 @@ class Yolov11Conv2D:
         is_detect=False,
         is_dfl=False,
         config_override=None,
+        deallocate_activation=False,
     ):
         self.is_detect = is_detect
         self.activation = activation
@@ -34,7 +35,7 @@ class Yolov11Conv2D:
         self.stride = conv.stride
         self.groups = conv.groups
         self.reshard = reshard
-        self.deallocate_activation = False
+        self.deallocate_activation = deallocate_activation
         self.compute_config = ttnn.init_device_compute_kernel_config(
             device.arch(),
             math_fidelity=ttnn.MathFidelity.LoFi,
@@ -53,8 +54,13 @@ class Yolov11Conv2D:
             reshard_if_not_optimal=True if self.reshard else False,
             activation=self.activation,
         )
-        if config_override and "act_block_h" in config_override:
-            self.conv_config.act_block_h_override = config_override["act_block_h"]
+        # if config_override is None and conv.in_channels == 3:
+        #     config_override = {"act_block_h": 64}
+        # if config_override and "act_block_h" in config_override:
+        #     self.conv_config.act_block_h_override = config_override["act_block_h"]
+        # if conv.in_channels == 3:
+        #     self.act_blocks=32
+        #     self.conv_config.act_block_h_override = self.act_blocks
 
         if "bias" in conv_pth:
             bias = ttnn.from_device(conv_pth.bias)
@@ -193,12 +199,28 @@ def sharded_concat_2(
 
 
 class TtnnConv:
-    def __init__(self, device, parameter, conv_pt, enable_act=True, is_detect=False, reshard=False, activation=""):
+    def __init__(
+        self,
+        device,
+        parameter,
+        conv_pt,
+        enable_act=True,
+        is_detect=False,
+        reshard=False,
+        activation="",
+        deallocate_activation=False,
+    ):
         self.enable_act = enable_act
         if self.enable_act:
             activation = "silu"
         self.conv = Yolov11Conv2D(
-            parameter.conv, conv_pt.conv, device=device, is_detect=is_detect, reshard=reshard, activation=activation
+            parameter.conv,
+            conv_pt.conv,
+            device=device,
+            is_detect=is_detect,
+            reshard=reshard,
+            activation=activation,
+            deallocate_activation=deallocate_activation,
         )
 
     def __call__(self, device, x):

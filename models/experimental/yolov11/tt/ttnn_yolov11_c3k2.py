@@ -33,7 +33,6 @@ class TtnnC3k2:
             y3 = self.k(device, y2)
         else:
             y3 = self.c3k(device, y2)
-
         if y2.get_layout() != ttnn.ROW_MAJOR_LAYOUT:
             y2 = ttnn.to_layout(y2, ttnn.ROW_MAJOR_LAYOUT)
         if y3.get_layout() != ttnn.ROW_MAJOR_LAYOUT:
