@@ -215,6 +215,17 @@ RunTimeOptions::RunTimeOptions() {
             this->disable_dma_ops = true;
         }
     }
+
+    if (getenv("TT_METAL_MAX_RUNTIME_ARGS")) {
+        const char* max_runtime_args_str = std::getenv("TT_METAL_MAX_RUNTIME_ARGS");
+        if (max_runtime_args_str != nullptr) {
+            try {
+                this->max_runtime_args = std::stoi(max_runtime_args_str);
+            } catch (const std::invalid_argument& ia) {
+                TT_THROW("Invalid TT_METAL_MAX_RUNTIME_ARGS: {}", max_runtime_args_str);
+            }
+        }
+    }
 }
 
 const std::string& RunTimeOptions::get_root_dir() const {

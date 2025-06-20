@@ -175,6 +175,9 @@ class RunTimeOptions {
     // Force disables using DMA for reads and writes
     bool disable_dma_ops = false;
 
+    // Maximum number of runtime arguments that can be set for a kernel.
+    uint32_t max_runtime_args = 256;
+
 public:
     RunTimeOptions();
     RunTimeOptions(const RunTimeOptions&) = delete;
@@ -400,6 +403,9 @@ public:
 
     inline bool get_disable_dma_ops() const { return disable_dma_ops; }
     inline void set_disable_dma_ops(bool disable) { disable_dma_ops = disable; }
+
+    inline uint32_t get_max_runtime_args() const { return max_runtime_args; }
+    inline void set_max_runtime_args(uint32_t max_args) { max_runtime_args = max_args; }
 
 private:
     // Helper functions to parse feature-specific environment vaiables.
