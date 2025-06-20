@@ -53,8 +53,13 @@ class Yolov11Conv2D:
             reshard_if_not_optimal=True if self.reshard else False,
             activation=self.activation,
         )
-        if config_override and "act_block_h" in config_override:
-            self.conv_config.act_block_h_override = config_override["act_block_h"]
+        # if config_override is None and conv.in_channels == 3:
+        #     config_override = {"act_block_h": 64}
+        # if config_override and "act_block_h" in config_override:
+        #     self.conv_config.act_block_h_override = config_override["act_block_h"]
+        # if conv.in_channels == 3:
+        #     self.act_blocks=32
+        #     self.conv_config.act_block_h_override = self.act_blocks
 
         if "bias" in conv_pth:
             bias = ttnn.from_device(conv_pth.bias)

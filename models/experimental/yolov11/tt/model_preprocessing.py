@@ -11,15 +11,29 @@ from models.experimental.yolov11.reference.yolov11 import YoloV11, Conv
 
 def create_yolov11_input_tensors(device, batch=1, input_channels=3, input_height=224, input_width=224):
     torch_input_tensor = torch.randn(batch, input_channels, input_height, input_width)
-    ttnn_input_tensor = torch.permute(torch_input_tensor, (0, 2, 3, 1))
-    ttnn_input_tensor = ttnn_input_tensor.reshape(
-        1,
-        1,
-        ttnn_input_tensor.shape[0] * ttnn_input_tensor.shape[1] * ttnn_input_tensor.shape[2],
-        ttnn_input_tensor.shape[3],
+    core_grid = ttnn.CoreGrid(y=8, x=8)
+    n, c, h, w = torch_input_tensor.shape
+    # sharded mem config for fold input
+    num_cores = core_grid.x * core_grid.y
+    shard_h = (n * w * h + num_cores - 1) // num_cores
+    grid_size = core_grid
+    grid_coord = ttnn.CoreCoord(grid_size.x - 1, grid_size.y - 1)
+    shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), grid_coord)})
+    shard_spec = ttnn.ShardSpec(shard_grid, (shard_h, 16), ttnn.ShardOrientation.ROW_MAJOR)
+    input_mem_config = ttnn.MemoryConfig(
+        ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
     )
-    ttnn_input_tensor = ttnn.from_torch(ttnn_input_tensor, layout=ttnn.TILE_LAYOUT, dtype=ttnn.bfloat8_b)
-    return torch_input_tensor, ttnn_input_tensor
+    ttnn_input_tensor = torch.permute(torch_input_tensor, (0, 2, 3, 1))
+    ttnn_input_tensor = torch.nn.functional.pad(ttnn_input_tensor, (0, 13))
+    # ttnn_input_tensor = ttnn_input_tensor.reshape(
+    #     1,
+    #     1,
+    #     ttnn_input_tensor.shape[0] * ttnn_input_tensor.shape[1] * ttnn_input_tensor.shape[2],
+    #     ttnn_input_tensor.shape[3],
+    # )
+    ttnn_input_tensor = ttnn.from_torch(ttnn_input_tensor, layout=ttnn.ROW_MAJOR_LAYOUT, dtype=ttnn.bfloat16)
+    # ttnn_input_tensor = ttnn.pad(ttnn_input_tensor, [1, 1, n * h * w, 16], [0, 0, 0, 0], 0)
+    return torch_input_tensor, ttnn_input_tensor, input_mem_config
 
 
 def make_anchors(device, feats, strides, grid_cell_offset=0.5):

@@ -38,12 +38,22 @@ def test_yolov11(device, use_program_cache, reset_seeds, resolution, use_weights
     torch_model.eval()
     if use_weights_from_ultralytics:
         torch_model.load_state_dict(state_dict)
-    torch_input, ttnn_input = create_yolov11_input_tensors(
+    torch_input, ttnn_input, input_mem_config = create_yolov11_input_tensors(
         device, batch=resolution[0], input_channels=resolution[1], input_height=resolution[2], input_width=resolution[3]
     )
     torch_output = torch_model(torch_input)
     parameters = create_yolov11_model_parameters(torch_model, torch_input, device=device)
-    ttnn_model = ttnn_yolov11.TttnnYoloV11(device, parameters)
+    ttnn_model = ttnn_yolov11.TtnnYoloV11(device, parameters)
+    # input_mem_config = ttnn.create_sharded_memory_config(
+    #     (6400,32),#ttnn_input.shape,  # (6400,32),#[n, h, w,c],
+    #     core_grid=device.core_grid,
+    #     strategy=ttnn.ShardStrategy.HEIGHT,
+    #     orientation=ttnn.ShardOrientation.ROW_MAJOR,
+    #     use_height_and_width_as_shard_shape=True,
+    # )
+    # print("input_mem_config is",input_mem_config)
+    ttnn_input = ttnn_input.to(device, input_mem_config)
+    # ttnn_input = ttnn.to_memory_config(ttnn_input,input_mem_config)
     ttnn_output = ttnn_model(ttnn_input)
     ttnn_output = ttnn.to_torch(ttnn_output)
     assert_with_pcc(torch_output, ttnn_output, 0.99)
