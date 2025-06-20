@@ -111,8 +111,6 @@ public:
 
     size_t number_of_pci_devices() const { return this->driver_->get_target_mmio_device_ids().size(); }
 
-    int reset_cluster(int device_id) const { return this->driver_->arc_msg(device_id, 0xA3, true); }
-
     // TODO: UMD will eventually consolidate ethernet coordinates and unique ids, we can remove the ethernet coord
     // getter after that change is in
     const std::unordered_map<chip_id_t, uint64_t>& get_unique_chip_ids() const {
@@ -339,6 +337,14 @@ public:
     // return enum for connection type, Internal, QSFP, Other, Unknown
     bool is_external_cable(chip_id_t physical_chip_id, CoreCoord eth_core) const;
 
+#if TTNN_OPERATION_TIMEOUT_SECONDS > 0
+    // We are in an unrecoverable state, let's close the device and let the user handle the error.
+    // At this point everything is chaos with n chips running a program that is hanging.
+    // In order to let the user handle the error and hopefully recover information
+    // to reproduce / troubleshoot the issue, we need to give something similar to
+    // a gracefull shutdown.
+    void reset_cluster(int device_id) { this->driver_->close_device(); }
+#endif
 private:
     void detect_arch_and_target();
     void generate_cluster_descriptor();
