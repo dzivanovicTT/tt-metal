@@ -256,4 +256,6 @@ def test_sharded_layer_norm(device, input_shape, core_x, core_y, reset_seeds):
         compute_kernel_config=ln_compute_kernel_config,
     )
 
+    output_tensor = ttnn.to_torch(output_tensor)
+
     assert_with_pcc(torch_output_tensor, output_tensor, 0.97)
