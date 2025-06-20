@@ -58,13 +58,6 @@ Tensor _subalpha(
     return result;
 }
 
-// addalpha(input, other, alpha) = input + (alpha * other)
-Tensor _addalpha(
-    const Tensor& input_a, const Tensor& input_b, float alpha, const std::optional<MemoryConfig>& output_mem_config) {
-    return ttnn::add(
-        ttnn::multiply(input_b, alpha, std::nullopt, output_mem_config), input_a, std::nullopt, output_mem_config);
-}
-
 // nextafter
 Tensor _nextafter(const Tensor& input_a, const Tensor& input_b, const std::optional<MemoryConfig>& output_mem_config) {
     const float eps = tt::tt_metal::hal::get_eps();

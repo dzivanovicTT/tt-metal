@@ -8,6 +8,7 @@ namespace ttnn::operations::binary {
 
 enum class BinaryOpType {
     ADD,
+    ADDALPHA,
     SUB,
     MUL,
     GT,
