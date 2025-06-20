@@ -3661,15 +3661,15 @@ def test_conv2d_with_fold(
 
 @pytest.mark.parametrize("device_params", [{"l1_small_size": 16384}], indirect=True)
 @pytest.mark.parametrize(
-    "batch_size, input_channels, output_channels, input_height, input_width, filter_height, filter_width, stride_h, stride_w, pad_h, pad_w, groups, use_1d_systolic_array, config_override, use_shallow_conv_variant, shard_layout, activation",
+    "batch_size, input_channels, output_channels, input_height, input_width, filter_height, filter_width, stride_h, stride_w, pad_h, pad_w, groups, config_override, shard_layout, activation, act_db, weights_db",
     (
-        (1, 320, 320, 20, 20, 3, 3, 1, 1, 1, 1, 320, True, None, False, BS, ""),
-        (1, 320, 320, 40, 40, 3, 3, 1, 1, 1, 1, 320, True, None, False, HS, "silu"),
-        (1, 320, 320, 80, 80, 3, 3, 2, 2, 1, 1, 320, True, None, False, HS, "silu"),
-        (1, 640, 640, 20, 20, 3, 3, 1, 1, 1, 1, 640, True, None, False, BS, "silu"),
-        (1, 640, 640, 40, 40, 3, 3, 1, 1, 1, 1, 640, True, None, False, BS, "silu"),
-        (1, 640, 640, 40, 40, 3, 3, 2, 2, 1, 1, 640, True, None, False, BS, ""),
-        (1, 640, 640, 80, 80, 3, 3, 2, 2, 1, 1, 640, True, None, False, None, ""),
+        (1, 320, 320, 20, 20, 3, 3, 1, 1, 1, 1, 320, None, BS, "",     True, True),
+        (1, 320, 320, 40, 40, 3, 3, 1, 1, 1, 1, 320, None, BS, "silu", True, True),
+        (1, 320, 320, 80, 80, 3, 3, 2, 2, 1, 1, 320, None, BS, "silu", True, True),
+        (1, 640, 640, 20, 20, 3, 3, 1, 1, 1, 1, 640, None, BS, "silu", True, True),
+        (1, 640, 640, 40, 40, 3, 3, 1, 1, 1, 1, 640, None, BS, "silu", True, True),
+        (1, 640, 640, 40, 40, 3, 3, 2, 2, 1, 1, 640, None, BS, "",     True, True),
+        (1, 640, 640, 80, 80, 3, 3, 2, 2, 1, 1, 640, None, BS, "",     True, False),
     ),
 )
 @pytest.mark.parametrize(
@@ -3701,14 +3701,14 @@ def test_conv_yolov10x(
     stride_w,
     pad_h,
     pad_w,
-    use_1d_systolic_array,
     config_override,
-    use_shallow_conv_variant,
     groups,
     output_layout,
     memory_config,
     shard_layout,
     activation,
+    act_db,
+    weights_db
 ):
     run_conv(
     device=device,
@@ -3737,4 +3737,6 @@ def test_conv_yolov10x(
     shard_layout = shard_layout,
     activation = activation,
     math_approx_mode = False,
+    enable_act_double_buffer=act_db,
+    enable_weights_double_buffer=weights_db
 )
