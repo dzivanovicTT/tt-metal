@@ -89,7 +89,7 @@ def test_vit_embeddings(device, model_name, batch_size, image_size, image_channe
     config = ttnn_optimized_sharded_vit.update_model_config(config, batch_size)
     model = transformers.ViTForImageClassification.from_pretrained("google/vit-base-patch16-224")
 
-    dataset = load_dataset("huggingface/cats-image")
+    dataset = load_dataset("huggingface/cats-image", revision="4613f5f1d3642cc2d56ffdf1b58c9d0f912cdc1f")
     image = dataset["train"]["image"][0]
     image_processor = AutoImageProcessor.from_pretrained("google/vit-base-patch16-224")
     torch_pixel_values = image_processor(image, return_tensors="pt").pixel_values
