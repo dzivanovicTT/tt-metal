@@ -1243,52 +1243,37 @@ void ControlPlane::exchange_intermesh_link_descriptors() {
     auto serialized_vec = tt::tt_fabric::serialize_to_bytes(intermesh_link_desc_);
     std::vector<uint8_t> serialized_remote_desc;;
     auto my_rank = *(distributed_context->rank());
-    auto peer_rank = (my_rank == 0) ? tt::tt_metal::distributed::multihost::Rank{1} : tt::tt_metal::distributed::multihost::Rank{0};
-    
-    if (my_rank == 0) {
-        distributed_context->send(
-            tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
-            peer_rank,
-            tt::tt_metal::distributed::multihost::Tag{0}
-        );
-        auto descriptor_size_bytes = distributed_context->snoop_incoming_msg_size(peer_rank, tt::tt_metal::distributed::multihost::Tag{0});
-        // std::cout << "Rank 0 reading: " <<  descriptor_size_bytes << " bytes" << std::endl;
-        serialized_remote_desc.resize(descriptor_size_bytes);
-        distributed_context->recv(
-            tt::stl::as_writable_bytes(
-                tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
-            peer_rank,
-            tt::tt_metal::distributed::multihost::Tag{0}
-        );
-    } else {
-        auto descriptor_size_bytes = distributed_context->snoop_incoming_msg_size(peer_rank, tt::tt_metal::distributed::multihost::Tag{0});
-        serialized_remote_desc.resize(descriptor_size_bytes);
-        // std::cout << "Rank 1 reading: " <<  descriptor_size_bytes << " bytes" << std::endl;
-        distributed_context->recv(
-            tt::stl::as_writable_bytes(
-                tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
-            peer_rank,
-            tt::tt_metal::distributed::multihost::Tag{0}
-        );
-        distributed_context->send(
-            tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
-            peer_rank,
-            tt::tt_metal::distributed::multihost::Tag{0}
-        );
+    for (std::size_t bcast_root = 0; bcast_root < *(distributed_context->size()); ++bcast_root) {
+        if (my_rank == bcast_root) {
+            // Issue the broadcast from the current process to all other processes in the world
+            int local_descriptor_size_bytes = serialized_vec.size(); // Send txn size first
+            distributed_context->broadcast(
+                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&local_descriptor_size_bytes), sizeof(local_descriptor_size_bytes)),
+                distributed_context->rank()
+            );
+           
+            distributed_context->broadcast(
+                tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
+                distributed_context->rank()
+            );
+        } else {
+            // Acknowledge the broadcast issued by the root
+            int remote_descriptor_size_bytes = 0; // Receive the size of the serialized descriptor
+            distributed_context->broadcast(
+                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&remote_descriptor_size_bytes), sizeof(remote_descriptor_size_bytes)),
+                tt::tt_metal::distributed::multihost::Rank{bcast_root}
+            );
+            serialized_remote_desc.clear();
+            serialized_remote_desc.resize(remote_descriptor_size_bytes);
+            distributed_context->broadcast(
+                tt::stl::as_writable_bytes(
+                    tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
+                    tt::tt_metal::distributed::multihost::Rank{bcast_root}
+            );
+            tt_fabric::IntermeshLinkDescriptor deserialized_remote_desc = tt::tt_fabric::deserialize_from_bytes(serialized_remote_desc);
+            peer_intermesh_link_descs_[deserialized_remote_desc.local_mesh_id] = std::move(deserialized_remote_desc.intermesh_links);
+        }
     }
-
-    tt_fabric::IntermeshLinkDescriptor deserialized_remote_desc = tt::tt_fabric::deserialize_from_bytes(serialized_remote_desc);
-    peer_intermesh_link_descs_[deserialized_remote_desc.local_mesh_id] = std::move(deserialized_remote_desc.intermesh_links);
-    
-    // std::cout << "Deserialized Intermesh Links: " << my_rank << std::endl;
-    // for (const auto& link : deserialized_remote_desc.intermesh_links) {
-    //     std::cout << link.local_eth_core_coord.str() << " " << link.local_chip_eth_coord.rack << " "
-    //               << link.local_chip_eth_coord.shelf << " " << link.local_chip_eth_coord.x << " "
-    //               << link.local_chip_eth_coord.y << std::endl;
-    //     std::cout << link.remote_eth_core_coord.str() << " " << link.remote_chip_eth_coord.rack << " "
-    //                 << link.remote_chip_eth_coord.shelf << " " << link.remote_chip_eth_coord.x << " "
-    //                 << link.remote_chip_eth_coord.y << std::endl;
-    // }
 }
 
 ControlPlane::~ControlPlane() = default;
