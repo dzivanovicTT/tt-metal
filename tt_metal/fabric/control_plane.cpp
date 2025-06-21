@@ -120,7 +120,6 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
         this->get_physical_chip_mapping_from_mesh_graph_desc_file(mesh_graph_desc_file);
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
     this->generate_local_intermesh_descriptor();
-    this->exchange_intermesh_link_descriptors();
 }
 
 ControlPlane::ControlPlane(
@@ -153,7 +152,6 @@ ControlPlane::ControlPlane(
     // Initialize the control plane routers based on mesh graph
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
     this->generate_local_intermesh_descriptor();
-    this->exchange_intermesh_link_descriptors();
 }
 
 void ControlPlane::load_physical_chip_mapping(
@@ -667,6 +665,7 @@ void ControlPlane::order_ethernet_channels() {
 void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
     this->intra_mesh_routing_tables_.clear();
     this->inter_mesh_routing_tables_.clear();
+    this->exchange_intermesh_link_descriptors();
     this->router_port_directions_to_physical_eth_chan_map_.clear();
     const auto& intra_mesh_connectivity = this->routing_table_generator_->mesh_graph->get_intra_mesh_connectivity();
     const auto& inter_mesh_connectivity = this->routing_table_generator_->mesh_graph->get_inter_mesh_connectivity();
@@ -735,18 +734,31 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
             auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(physical_chip_id);
-            for (const auto& [eth_coord, eth_chan] : intermesh_links) {
-                tt::umd::CoreCoord eth_core = tt::tt_metal::MetalContext::instance().get_cluster().get_soc_desc(physical_chip_id).get_eth_core_for_channel(eth_chan, CoordSystem::LOGICAL);
+            // TT_FATAL(intermesh_links.size(), "Expected InterMesh Links to be configured on Exit Node Mesh {} Chip {}", mesh_id, chip_id);
+
+            eth_coord_t remote_chip_eth_coord;
+            CoreCoord remote_eth_core;
+            auto curr_chip_eth_coord = tt::tt_metal::MetalContext::instance().get_cluster().get_user_chip_ethernet_coordinates().at(physical_chip_id);
+            for (const auto& [eth_core, eth_chan] : intermesh_links) {
                 RoutingDirection intermesh_routing_direction = RoutingDirection::NONE;
-                // This is hardocoded to 2 2x2 meshes, where mesh 0 and mesh 1 are horizontally adjacent.
-                // TODO: Use an MPI handshake here to exchange mesh IDs and intermesh routing tables.
-                if (mesh_id == 0) {
-                    intermesh_routing_direction = RoutingDirection::E;  // For mesh 0, all inter-mesh links are east
-                } else if (mesh_id == 1) {
-                    intermesh_routing_direction = RoutingDirection::W;  // For mesh 1, all inter-mesh links are west
-                } else {
-                    TT_FATAL(false, "Expected mesh_id to be 0 or 1 for inter-mesh links, got {}", mesh_id);
+                for (const auto& link : intermesh_link_desc_.intermesh_links) {
+                    if (curr_chip_eth_coord == link.local_chip_eth_coord && eth_core == link.local_eth_core_coord) {
+                        remote_chip_eth_coord = link.remote_chip_eth_coord;
+                        remote_eth_core = link.remote_eth_core_coord;
+                        break;  // Found the matching intermesh link
+                    }
                 }
+                for (const auto& [connected_mesh_id, edge] : inter_mesh_connectivity[mesh_id][chip_id]) {
+                    for (const auto& link : peer_intermesh_link_descs_[connected_mesh_id]) {
+                        if (link.local_chip_eth_coord == remote_chip_eth_coord && link.local_eth_core_coord == remote_eth_core
+                            && link.remote_chip_eth_coord == curr_chip_eth_coord && link.remote_eth_core_coord == eth_core) {
+                            // Found the matching intermesh link
+                            intermesh_routing_direction = edge.port_direction;
+                            break;
+                        }
+                    }
+                }
+                std::cout << "Mesh ID: " << mesh_id << " Routing Direction: " << static_cast<uint32_t>(intermesh_routing_direction) << std::endl;
                 FabricNodeId fabric_node_id{MeshId{mesh_id}, chip_id};
                 this->router_port_directions_to_physical_eth_chan_map_.at(fabric_node_id)[intermesh_routing_direction].push_back(eth_chan);        
             }
@@ -1240,7 +1252,6 @@ void ControlPlane::exchange_intermesh_link_descriptors() {
             tt::tt_metal::distributed::multihost::Tag{0}
         );
         auto descriptor_size_bytes = distributed_context->snoop_incoming_msg_size(peer_rank, tt::tt_metal::distributed::multihost::Tag{0});
-        std::cout << "Rank 0 reading: " <<  descriptor_size_bytes << " bytes" << std::endl;
         serialized_remote_desc.resize(descriptor_size_bytes);
         distributed_context->recv(
             tt::stl::as_writable_bytes(
@@ -1251,7 +1262,6 @@ void ControlPlane::exchange_intermesh_link_descriptors() {
     } else {
         auto descriptor_size_bytes = distributed_context->snoop_incoming_msg_size(peer_rank, tt::tt_metal::distributed::multihost::Tag{0});
         serialized_remote_desc.resize(descriptor_size_bytes);
-        std::cout << "Rank 1 reading: " <<  descriptor_size_bytes << " bytes" << std::endl;
         distributed_context->recv(
             tt::stl::as_writable_bytes(
                 tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
@@ -1266,16 +1276,7 @@ void ControlPlane::exchange_intermesh_link_descriptors() {
     }
 
     tt_fabric::IntermeshLinkDescriptor deserialized_remote_desc = tt::tt_fabric::deserialize_from_bytes(serialized_remote_desc);
-    
-    std::cout << "Deserialized Intermesh Links: " << my_rank << std::endl;
-    for (const auto& link : deserialized_remote_desc.intermesh_links) {
-        std::cout << link.local_eth_core_coord.str() << " " << link.local_chip_eth_coord.rack << " "
-                  << link.local_chip_eth_coord.shelf << " " << link.local_chip_eth_coord.x << " "
-                  << link.local_chip_eth_coord.y << std::endl;
-        std::cout << link.remote_eth_core_coord.str() << " " << link.remote_chip_eth_coord.rack << " "
-                    << link.remote_chip_eth_coord.shelf << " " << link.remote_chip_eth_coord.x << " "
-                    << link.remote_chip_eth_coord.y << std::endl;
-    }
+    peer_intermesh_link_descs_[deserialized_remote_desc.local_mesh_id] = std::move(deserialized_remote_desc.intermesh_links);
 }
 
 ControlPlane::~ControlPlane() = default;
