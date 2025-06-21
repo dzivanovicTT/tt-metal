@@ -2384,7 +2384,7 @@ static std::vector<IDevice*> generate_default_line_fabric_under_test(
         }
     } else {
         // Choosing pcie devices so that more links are supported. More links == more (likelihood of) congestion.
-        if (line_size == 2) {
+        if (line_size == 2 && view.num_devices() == 2) {
             devices_ = {view.get_device(MeshCoordinate(0, 0)), view.get_device(MeshCoordinate(0, 1))};
         } else if (line_size <= 4) {
             devices_ = {
