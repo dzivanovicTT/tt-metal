@@ -119,7 +119,7 @@ ControlPlane::ControlPlane(const std::string& mesh_graph_desc_file) {
     const auto& logical_mesh_chip_id_to_physical_chip_id_mapping =
         this->get_physical_chip_mapping_from_mesh_graph_desc_file(mesh_graph_desc_file);
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
-    this->generate_local_intermesh_descriptor();
+    this->generate_local_intermesh_link_table();
 }
 
 ControlPlane::ControlPlane(
@@ -151,7 +151,7 @@ ControlPlane::ControlPlane(
     this->routing_table_generator_->print_routing_tables();
     // Initialize the control plane routers based on mesh graph
     this->load_physical_chip_mapping(logical_mesh_chip_id_to_physical_chip_id_mapping);
-    this->generate_local_intermesh_descriptor();
+    this->generate_local_intermesh_link_table();
 }
 
 void ControlPlane::load_physical_chip_mapping(
@@ -665,7 +665,7 @@ void ControlPlane::order_ethernet_channels() {
 void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
     this->intra_mesh_routing_tables_.clear();
     this->inter_mesh_routing_tables_.clear();
-    this->exchange_intermesh_link_descriptors();
+    this->exchange_intermesh_link_tables();
     this->router_port_directions_to_physical_eth_chan_map_.clear();
     const auto& intra_mesh_connectivity = this->routing_table_generator_->mesh_graph->get_intra_mesh_connectivity();
     const auto& inter_mesh_connectivity = this->routing_table_generator_->mesh_graph->get_inter_mesh_connectivity();
@@ -733,25 +733,19 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
         for (std::uint32_t chip_id = 0; chip_id < inter_mesh_connectivity[mesh_id].size(); chip_id++) {
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
+            auto board_id = exit_node_phys_id_to_board_id_.at(physical_chip_id);
             auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(physical_chip_id);
-            // TT_FATAL(intermesh_links.size(), "Expected InterMesh Links to be configured on Exit Node Mesh {} Chip {}", mesh_id, chip_id);
-
-            eth_coord_t remote_chip_eth_coord;
-            CoreCoord remote_eth_core;
-            auto curr_chip_eth_coord = tt::tt_metal::MetalContext::instance().get_cluster().get_user_chip_ethernet_coordinates().at(physical_chip_id);
             for (const auto& [eth_core, eth_chan] : intermesh_links) {
-                RoutingDirection intermesh_routing_direction = RoutingDirection::NONE;
-                for (const auto& link : intermesh_link_desc_.intermesh_links) {
-                    if (curr_chip_eth_coord == link.local_chip_eth_coord && eth_core == link.local_eth_core_coord) {
-                        remote_chip_eth_coord = link.remote_chip_eth_coord;
-                        remote_eth_core = link.remote_eth_core_coord;
-                        break;  // Found the matching intermesh link
-                    }
-                }
+                auto intermesh_routing_direction = RoutingDirection::NONE;
+                auto curr_eth_chan_desc = EthChanDescriptor {
+                    .board_id = board_id,
+                    .chan_id = eth_chan
+                };
+
+                const auto& remote_eth_chan_desc = intermesh_link_table_.intermesh_links.at(curr_eth_chan_desc);                
                 for (const auto& [connected_mesh_id, edge] : inter_mesh_connectivity[mesh_id][chip_id]) {
-                    for (const auto& link : peer_intermesh_link_descs_[connected_mesh_id]) {
-                        if (link.local_chip_eth_coord == remote_chip_eth_coord && link.local_eth_core_coord == remote_eth_core
-                            && link.remote_chip_eth_coord == curr_chip_eth_coord && link.remote_eth_core_coord == eth_core) {
+                    for (const auto& [candidate_desc, candidate_peer_desc] : peer_intermesh_link_tables_[connected_mesh_id]) {
+                        if (candidate_desc == remote_eth_chan_desc && candidate_peer_desc == curr_eth_chan_desc) {
                             // Found the matching intermesh link
                             intermesh_routing_direction = edge.port_direction;
                             break;
@@ -1201,77 +1195,73 @@ FabricContext& ControlPlane::get_fabric_context() const {
 
 void ControlPlane::clear_fabric_context() { this->fabric_context_.reset(nullptr); }
 
-void ControlPlane::generate_local_intermesh_descriptor() {
+void ControlPlane::generate_local_intermesh_link_table() {
     const auto& cluster = tt::tt_metal::MetalContext::instance().get_cluster();
-    intermesh_link_desc_.local_mesh_id = local_mesh_info_->mesh_id;
+    intermesh_link_table_.local_mesh_id = local_mesh_info_->mesh_id;
+    const uint32_t base_addr = 0x1ec0;
     for (const auto& chip_id : cluster.user_exposed_chip_ids()) {
-        if (cluster.has_intermesh_links(chip_id)) {;
-            for (const auto& link : cluster.get_intermesh_eth_links(chip_id)) {
-                const auto& logical_eth_core = link.first;
-                tt_cxy_pair virtual_eth_core(
-                    chip_id, cluster.get_virtual_coordinate_from_logical_coordinates(chip_id, logical_eth_core, CoreType::ETH));
-                std::vector<uint32_t> read_vec = {};
-                constexpr uint32_t addr = 0x1124;
-                cluster.read_core(read_vec, sizeof(uint32_t), virtual_eth_core, addr);
-                uint32_t connected_noc_x = ((read_vec[0]) >> 4) & 0x3F;
-                uint32_t connected_noc_y = ((read_vec[0]) >> 10) & 0x3F;
-                uint32_t connected_chip_x = (read_vec[0] >> 16) & 0x3F;
-                uint32_t connected_chip_y = (read_vec[0] >> 22) & 0x3F;
-                auto eth_coord = cluster.get_user_chip_ethernet_coordinates().at(chip_id);
-                eth_coord_t connected_coord = {
-                    .cluster_id = 0,
-                    .x = connected_chip_x,
-                    .y = connected_chip_y,
-                    .rack = 0,
-                    .shelf = 0
+        if (cluster.has_intermesh_links(chip_id)) {
+            std::cout << "Reading Ethernet Connections for " << chip_id << std::endl;
+            for (const auto& [eth_core, chan_id] : cluster.get_intermesh_eth_links(chip_id)) {
+                if (not cluster.is_intermesh_eth_link_trained(chip_id, eth_core)) {
+                    continue;
+                }
+                tt_cxy_pair virtual_eth_core(chip_id, cluster.get_virtual_coordinate_from_logical_coordinates(chip_id, eth_core, CoreType::ETH));
+                uint64_t local_board_id = 0;
+                uint64_t remote_board_id = 0;
+                uint32_t remote_chan_id = 0;
+                cluster.read_core(&local_board_id, sizeof(uint64_t), virtual_eth_core, base_addr + (64 * 4));
+                cluster.read_core(&remote_board_id, sizeof(uint64_t), virtual_eth_core, base_addr + (72 * 4));
+                cluster.read_core(&remote_chan_id, sizeof(uint32_t), virtual_eth_core, base_addr + (76 * 4));
+                auto local_eth_chan_desc = EthChanDescriptor {
+                    .board_id = local_board_id,
+                    .chan_id = chan_id,
                 };
-                auto connected_channel = cluster.get_soc_desc(chip_id).translate_coord_to(CoreCoord(connected_noc_x, connected_noc_y), CoordSystem::PHYSICAL, CoordSystem::LOGICAL);
-                tt_fabric::EthernetLinkDescriptor link_descriptor = {
-                    .local_chip_eth_coord = eth_coord,
-                    .remote_chip_eth_coord = connected_coord,
-                    .local_eth_core_coord = logical_eth_core,
-                    .remote_eth_core_coord = connected_channel,
+                auto remote_eth_chan_desc = EthChanDescriptor {
+                    .board_id = remote_board_id,
+                    .chan_id = remote_chan_id,
                 };
-                intermesh_link_desc_.intermesh_links.push_back(link_descriptor);
+                intermesh_link_table_.intermesh_links[local_eth_chan_desc] = remote_eth_chan_desc;
+                exit_node_phys_id_to_board_id_[chip_id] = local_board_id;
             }
         }
-    }
+    } 
 }
 
-void ControlPlane::exchange_intermesh_link_descriptors() {
+void ControlPlane::exchange_intermesh_link_tables() {
     const auto& distributed_context = tt_metal::distributed::multihost::DistributedContext::get_current_world();
-    auto serialized_vec = tt::tt_fabric::serialize_to_bytes(intermesh_link_desc_);
-    std::vector<uint8_t> serialized_remote_desc;;
+    auto serialized_table = tt::tt_fabric::serialize_to_bytes(intermesh_link_table_);
+    std::vector<uint8_t> serialized_remote_table;
     auto my_rank = *(distributed_context->rank());
     for (std::size_t bcast_root = 0; bcast_root < *(distributed_context->size()); ++bcast_root) {
         if (my_rank == bcast_root) {
             // Issue the broadcast from the current process to all other processes in the world
-            int local_descriptor_size_bytes = serialized_vec.size(); // Send txn size first
+            int local_table_size_bytes = serialized_table.size(); // Send txn size first
             distributed_context->broadcast(
-                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&local_descriptor_size_bytes), sizeof(local_descriptor_size_bytes)),
+                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&local_table_size_bytes), sizeof(local_table_size_bytes)),
                 distributed_context->rank()
             );
            
             distributed_context->broadcast(
-                tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_vec.data(), serialized_vec.size())),
+                tt::stl::as_writable_bytes(tt::stl::Span<uint8_t>(serialized_table.data(), serialized_table.size())),
                 distributed_context->rank()
             );
         } else {
             // Acknowledge the broadcast issued by the root
-            int remote_descriptor_size_bytes = 0; // Receive the size of the serialized descriptor
+            int remote_table_size_bytes = 0; // Receive the size of the serialized descriptor
             distributed_context->broadcast(
-                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&remote_descriptor_size_bytes), sizeof(remote_descriptor_size_bytes)),
+                tt::stl::Span<std::byte>(reinterpret_cast<std::byte*>(&remote_table_size_bytes), sizeof(remote_table_size_bytes)),
                 tt::tt_metal::distributed::multihost::Rank{bcast_root}
             );
-            serialized_remote_desc.clear();
-            serialized_remote_desc.resize(remote_descriptor_size_bytes);
+            serialized_remote_table.clear();
+            serialized_remote_table.resize(remote_table_size_bytes);
             distributed_context->broadcast(
                 tt::stl::as_writable_bytes(
-                    tt::stl::Span<uint8_t>(serialized_remote_desc.data(), serialized_remote_desc.size())),
+                    tt::stl::Span<uint8_t>(serialized_remote_table.data(), serialized_remote_table.size())),
                     tt::tt_metal::distributed::multihost::Rank{bcast_root}
             );
-            tt_fabric::IntermeshLinkDescriptor deserialized_remote_desc = tt::tt_fabric::deserialize_from_bytes(serialized_remote_desc);
-            peer_intermesh_link_descs_[deserialized_remote_desc.local_mesh_id] = std::move(deserialized_remote_desc.intermesh_links);
+            tt_fabric::IntermeshLinkTable deserialized_remote_table = tt::tt_fabric::deserialize_from_bytes(serialized_remote_table);
+            peer_intermesh_link_tables_[deserialized_remote_table.local_mesh_id] = std::move(deserialized_remote_table.intermesh_links);
         }
     }
 }

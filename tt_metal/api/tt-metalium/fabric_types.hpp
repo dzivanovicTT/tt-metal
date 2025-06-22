@@ -5,6 +5,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
 
 #include <tt_stl/strong_type.hpp>
 #include <umd/device/types/cluster_descriptor_types.h>
@@ -28,16 +29,36 @@ namespace tt::tt_fabric {
 using MeshId = tt::stl::StrongType<uint32_t, struct MeshIdTag>;
 using HostRankId = tt::stl::StrongType<uint32_t, struct HostRankTag>;
 
-struct EthernetLinkDescriptor { // RemoteEthLinkDescriptor
-    eth_coord_t local_chip_eth_coord;  // 
-    eth_coord_t remote_chip_eth_coord; // chip x y
-    CoreCoord local_eth_core_coord;
-    CoreCoord remote_eth_core_coord;
+struct EthChanDescriptor {
+    uint64_t board_id = 0;  // Unique board identifier
+    uint32_t chan_id = 0;   // Eth Channel ID
+
+    bool operator==(const EthChanDescriptor& other) const {
+        return board_id == other.board_id && chan_id == other.chan_id;
+    }
 };
 
-struct IntermeshLinkDescriptor {
+}  // namespace tt::tt_fabric
+
+namespace std {
+
+template<>
+struct hash<tt::tt_fabric::EthChanDescriptor> {
+    std::size_t operator()(const tt::tt_fabric::EthChanDescriptor& desc) const {
+        return std::hash<uint64_t>{}(desc.board_id) ^ 
+               (std::hash<uint32_t>{}(desc.chan_id) << 1);
+    }
+};
+
+}  // namespace std
+
+namespace tt::tt_fabric {
+
+struct IntermeshLinkTable {
+    // Local mesh ID
     MeshId local_mesh_id = MeshId{0};
-    std::vector<EthernetLinkDescriptor> intermesh_links;
+    // Maps local eth channel to remote eth channel
+    std::unordered_map<EthChanDescriptor, EthChanDescriptor> intermesh_links;
 };
 
 }  // namespace tt::tt_fabric

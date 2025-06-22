@@ -47,7 +47,7 @@ target_sources(
 # Include helper functions and generate headers from flatbuffer schemas
 include(flatbuffers)
 set(FLATBUFFER_SCHEMAS
-    ${CMAKE_CURRENT_SOURCE_DIR}/serialization/intermesh_link_descriptor.fbs
+    ${CMAKE_CURRENT_SOURCE_DIR}/serialization/intermesh_link_table.fbs
 )
 
 # Collect all generated headers
