@@ -733,7 +733,7 @@ void ControlPlane::configure_routing_tables_for_fabric_ethernet_channels() {
         for (std::uint32_t chip_id = 0; chip_id < inter_mesh_connectivity[mesh_id].size(); chip_id++) {
             auto physical_chip_id =
                 this->logical_mesh_chip_id_to_physical_chip_id_mapping_.at(FabricNodeId(MeshId{mesh_id}, chip_id));
-            auto board_id = exit_node_phys_id_to_board_id_.at(physical_chip_id);
+            auto board_id =  tt::tt_metal::MetalContext::instance().get_cluster().has_intermesh_links(physical_chip_id) ? exit_node_phys_id_to_board_id_.at(physical_chip_id) : 0;
             auto intermesh_links = tt::tt_metal::MetalContext::instance().get_cluster().get_intermesh_eth_links(physical_chip_id);
             for (const auto& [eth_core, eth_chan] : intermesh_links) {
                 auto intermesh_routing_direction = RoutingDirection::NONE;
@@ -1229,6 +1229,7 @@ void ControlPlane::generate_local_intermesh_link_table() {
 }
 
 void ControlPlane::exchange_intermesh_link_tables() {
+    std::cout << "Exhchanging tables" << std::endl;
     const auto& distributed_context = tt_metal::distributed::multihost::DistributedContext::get_current_world();
     auto serialized_table = tt::tt_fabric::serialize_to_bytes(intermesh_link_table_);
     std::vector<uint8_t> serialized_remote_table;
@@ -1264,6 +1265,7 @@ void ControlPlane::exchange_intermesh_link_tables() {
             peer_intermesh_link_tables_[deserialized_remote_table.local_mesh_id] = std::move(deserialized_remote_table.intermesh_links);
         }
     }
+    std::cout << "Done exchanging tables" << std::endl;
 }
 
 ControlPlane::~ControlPlane() = default;

@@ -4,9 +4,6 @@
 
 #pragma once
 
-#include <vector>
-#include <unordered_map>
-
 #include <tt_stl/strong_type.hpp>
 #include <umd/device/types/cluster_descriptor_types.h>
 #include <tt-metalium/core_coord.hpp>
@@ -36,29 +33,20 @@ struct EthChanDescriptor {
     bool operator==(const EthChanDescriptor& other) const {
         return board_id == other.board_id && chan_id == other.chan_id;
     }
-};
 
-}  // namespace tt::tt_fabric
-
-namespace std {
-
-template<>
-struct hash<tt::tt_fabric::EthChanDescriptor> {
-    std::size_t operator()(const tt::tt_fabric::EthChanDescriptor& desc) const {
-        return std::hash<uint64_t>{}(desc.board_id) ^ 
-               (std::hash<uint32_t>{}(desc.chan_id) << 1);
+    bool operator<(const EthChanDescriptor& other) const {
+        if (board_id != other.board_id) {
+            return board_id < other.board_id;
+        }
+        return chan_id < other.chan_id;
     }
 };
-
-}  // namespace std
-
-namespace tt::tt_fabric {
 
 struct IntermeshLinkTable {
     // Local mesh ID
     MeshId local_mesh_id = MeshId{0};
     // Maps local eth channel to remote eth channel
-    std::unordered_map<EthChanDescriptor, EthChanDescriptor> intermesh_links;
+    std::map<EthChanDescriptor, EthChanDescriptor> intermesh_links;
 };
 
 }  // namespace tt::tt_fabric

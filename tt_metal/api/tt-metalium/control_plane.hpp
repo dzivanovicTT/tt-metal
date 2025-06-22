@@ -111,8 +111,8 @@ private:
         intra_mesh_routing_tables_;  // table that will be written to each ethernet core
     std::map<FabricNodeId, std::vector<std::vector<chan_id_t>>>
         inter_mesh_routing_tables_;  // table that will be written to each ethernet core
-        IntermeshLinkTable intermesh_link_table_;
-    std::unordered_map<MeshId, std::unordered_map<EthChanDescriptor, EthChanDescriptor>> peer_intermesh_link_tables_;
+    IntermeshLinkTable intermesh_link_table_;
+    std::unordered_map<MeshId, std::map<EthChanDescriptor, EthChanDescriptor>> peer_intermesh_link_tables_;
     std::unordered_map<chip_id_t, uint64_t> exit_node_phys_id_to_board_id_;
     // custom logic to order eth channels
     void order_ethernet_channels();
