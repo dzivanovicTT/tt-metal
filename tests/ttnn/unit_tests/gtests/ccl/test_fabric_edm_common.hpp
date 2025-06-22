@@ -2387,11 +2387,15 @@ static std::vector<IDevice*> generate_default_line_fabric_under_test(
         if (line_size == 2 && view.num_devices() == 2) {
             devices_ = {view.get_device(MeshCoordinate(0, 0)), view.get_device(MeshCoordinate(0, 1))};
         } else if (line_size <= 4) {
-            devices_ = {
-                view.get_device(MeshCoordinate(0, 1)),
-                view.get_device(MeshCoordinate(0, 2)),
-                view.get_device(MeshCoordinate(1, 2)),
-                view.get_device(MeshCoordinate(1, 1))};
+            if (view.num_devices() == 4) {
+                devices_ = view.get_line_devices();
+            } else {
+                devices_ = {
+                    view.get_device(MeshCoordinate(0, 1)),
+                    view.get_device(MeshCoordinate(0, 2)),
+                    view.get_device(MeshCoordinate(1, 2)),
+                    view.get_device(MeshCoordinate(1, 1))};
+            }
         } else {
             devices_ = {
                 view.get_device(MeshCoordinate(0, 0)),
