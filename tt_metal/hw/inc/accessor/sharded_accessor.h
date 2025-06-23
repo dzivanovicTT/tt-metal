@@ -76,33 +76,55 @@ public:
     };
 
     PageMapping get_bank_and_offset(uint32_t page_id) const {
-        ASSERT(page_id < dspec().tensor_volume());
-
+        const auto& d = dspec();
+        const auto& shape = d.tensor_shape();
+        const uint32_t rank = d.rank();
+        ASSERT(page_id < d.tensor_volume());
         typename DSpec::Shape page_coord;
         if constexpr (!DSpec::has_static_rank) {
-            page_coord = typename DSpec::Shape(_page_coord.value, dspec().rank());
+            page_coord = typename DSpec::Shape(_page_coord.value, rank);
         }
-        for (int i = dspec().rank() - 1; i >= 0; --i) {
-            page_coord[i] = page_id % dspec().tensor_shape()[i];
-            page_id /= dspec().tensor_shape()[i];
+        for (int i = rank - 1; i >= 0; --i) {
+            const uint32_t dim = shape[i];
+            page_coord[i] = page_id % dim;
+            page_id /= dim;
         }
         return get_bank_and_offset(page_coord);
     }
 
     template <typename ArrType, std::enable_if_t<detail::has_subscript_operator_v<ArrType>, int> = 0>
-    PageMapping get_bank_and_offset(const ArrType page_coord) const {
+    PageMapping get_bank_and_offset(const ArrType& page_coord) const {
+        const auto& d = dspec();
+
+        const auto& tensor_shape = d.tensor_shape();
+        const auto& shard_shape = d.shard_shape();
+        const auto& shard_grid_strides = d.shard_grid_strides();
+        const auto& shard_strides = d.shard_strides();
+        const size_t rank = d.rank();
+
         size_t flattened_shard_id = 0;
         size_t page_offset_within_shard = 0;
-        for (size_t i = 0; i < dspec().rank(); ++i) {
-            ASSERT(page_coord[i] < dspec().tensor_shape()[i]);
-            flattened_shard_id += (page_coord[i] / dspec().shard_shape()[i]) * dspec().shard_grid_strides()[i];
-            page_offset_within_shard += (page_coord[i] % dspec().shard_shape()[i]) * dspec().shard_strides()[i];
+
+        for (size_t i = 0; i < rank; ++i) {
+            const uint32_t coord = page_coord[i];
+            const uint32_t shape = tensor_shape[i];
+            ASSERT(coord < shape);
+
+            const uint32_t shard_dim = shard_shape[i];
+            const uint32_t stride_grid = shard_grid_strides[i];
+            const uint32_t stride_local = shard_strides[i];
+
+            const uint32_t q = coord / shard_dim;
+            const uint32_t r = coord % shard_dim;
+
+            flattened_shard_id += static_cast<size_t>(q) * stride_grid;
+            page_offset_within_shard += static_cast<size_t>(r) * stride_local;
         }
 
-        size_t bank_id = flattened_shard_id % dspec().num_banks();
-        size_t bank_shard_id = flattened_shard_id / dspec().num_banks();
-
-        size_t bank_page_offset = bank_shard_id * dspec().shard_volume() + page_offset_within_shard;
+        const size_t num_banks = d.num_banks();
+        const size_t bank_id = flattened_shard_id % num_banks;
+        const size_t bank_shard_id = flattened_shard_id / num_banks;
+        const size_t bank_page_offset = bank_shard_id * d.shard_volume() + page_offset_within_shard;
 
         return {bank_id, bank_page_offset};
     }
