@@ -87,18 +87,18 @@ public:
     constexpr uint32_t num_banks_crta_offset() const { return crta_offset() + rank_is_crta; }
 
     constexpr uint32_t get_rank() const {
-        if constexpr (!rank_is_crta) {
-            return RankCT;
-        } else {
+        if constexpr (rank_is_crta) {
             return get_common_arg_val<uint32_t>(rank_crta_offset());
+        } else {
+            return RankCT;
         }
     }
 
     constexpr uint32_t get_num_banks() const {
-        if constexpr (!num_banks_is_crta) {
-            return NumBanksCT;
-        } else {
+        if constexpr (num_banks_is_crta) {
             return get_common_arg_val<uint32_t>(num_banks_crta_offset());
+        } else {
+            return NumBanksCT;
         }
     }
 
