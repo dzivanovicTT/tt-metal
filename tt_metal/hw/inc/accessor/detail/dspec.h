@@ -76,7 +76,7 @@ struct DistributionSpec {
         return val_rt;                           \
     }
 
-    FORCE_INLINE constexpr uint32_t rank() const { getter_helper(has_static_rank, rank_ct, rank_rt); }
+    FORCE_INLINE constexpr uint32_t rank() const {getter_helper(has_static_rank, rank_ct, rank_rt)}
 
     FORCE_INLINE constexpr uint32_t num_banks() const {getter_helper(has_static_num_banks, num_banks_ct, num_banks_rt)}
 
@@ -112,12 +112,11 @@ struct DistributionSpec {
 private:
     static constexpr ShapeStatic precompute_shard_grid_ct(
         const ShapeStatic& tensor_shape, const ShapeStatic& shard_shape) {
-        if (!shapes_static) {
-            return {};
-        }
         ShapeStatic shard_grid = {};
-        for (int i = rank_ct - 1; i >= 0; --i) {
-            shard_grid[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;
+        if constexpr (shapes_static) {
+            for (uint32_t i = 0; i < rank_ct; ++i) {
+                shard_grid[i] = (tensor_shape[i] + shard_shape[i] - 1) / shard_shape[i];
+            }
         }
         return shard_grid;
     }
@@ -125,26 +124,30 @@ private:
     static constexpr ShapeStatic precompute_shard_grid_strides_ct(
         const ShapeStatic& tensor_shape, const ShapeStatic& shard_shape) {
         ShapeStatic shard_grid_strides = {};
-        uint32_t stride = 1;
-        for (int i = rank_ct - 1; i >= 0; --i) {
-            shard_grid_strides[i] = stride;
-            stride *= (tensor_shape[i] - 1) / shard_shape[i] + 1;
+        if constexpr (shapes_static) {
+            uint32_t stride = 1;
+            for (int i = static_cast<int>(rank_ct) - 1; i >= 0; --i) {
+                shard_grid_strides[i] = stride;
+                stride *= (tensor_shape[i] + shard_shape[i] - 1) / shard_shape[i];
+            }
         }
         return shard_grid_strides;
     }
 
     static constexpr size_t precompute_volume_ct(const ShapeStatic& shape) {
         size_t volume = 1;
-        for (size_t i = 0; i < shape.size(); ++i) {
-            volume *= shape[i];
+        if constexpr (shapes_static) {
+            for (uint32_t dim : shape) {
+                volume *= dim;
+            }
         }
         return volume;
     }
 
     static constexpr ShapeStatic precompute_strides_ct(const ShapeStatic& shape) {
-        ShapeStatic strides = {};
+        ShapeStatic strides{};
         uint32_t stride = 1;
-        for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        for (size_t i = shape.size(); i-- > 0;) {
             strides[i] = stride;
             stride *= shape[i];
         }
@@ -153,9 +156,9 @@ private:
 
     template <typename TensorShape, typename ShardShape>
     void compute_strides_volume_rt(const TensorShape& shape, ShardShape& strides, size_t& volume) const {
-        uint32_t stride = 1;
         volume = 1;
-        for (int i = static_cast<int>(shape.size()) - 1; i >= 0; --i) {
+        uint32_t stride = 1;
+        for (size_t i = shape.size(); i-- > 0;) {
             strides[i] = stride;
             stride *= shape[i];
             volume *= shape[i];
@@ -165,10 +168,12 @@ private:
     template <typename TensorShape, typename ShardShape>
     void compute_shard_grid_and_strides_rt(const TensorShape& tensor_shape, const ShardShape& shard_shape) {
         uint32_t stride = 1;
-        for (int i = rank() - 1; i >= 0; --i) {
-            shard_grid_rt[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;
+        const auto r = rank();
+        for (size_t i = r; i-- > 0;) {
+            const uint32_t dim = (tensor_shape[i] - 1) / shard_shape[i] + 1;
+            shard_grid_rt[i] = dim;
             shard_grid_strides_rt[i] = stride;
-            stride *= shard_grid_rt[i];
+            stride *= dim;
         }
 
         ASSERT(shard_grid_rt[0] * shard_grid_strides_rt[0] >= num_banks());
