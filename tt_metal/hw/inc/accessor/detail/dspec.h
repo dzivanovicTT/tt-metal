@@ -13,14 +13,10 @@ namespace detail {
 template <
     uint32_t RankCT = 0,
     uint32_t NumBanksCT = 0,
-    typename TensorShapeWrapper_ = ArrayDynamicWrapper,
-    typename ShardShapeWrapper_ = ArrayDynamicWrapper,
-    typename BankCoordsWrapper_ = ArrayDynamicWrapper>
+    typename TensorShapeWrapper = ArrayDynamicWrapper,
+    typename ShardShapeWrapper = ArrayDynamicWrapper,
+    typename BankCoordsWrapper = ArrayDynamicWrapper>
 struct DistributionSpec {
-    using TensorShapeWrapper = TensorShapeWrapper_;
-    using ShardShapeWrapper = ShardShapeWrapper_;
-    using BankCoordsWrapper = BankCoordsWrapper_;
-
     static constexpr bool has_static_rank = RankCT != 0;
     static constexpr bool has_static_num_banks = NumBanksCT != 0;
     static constexpr bool tensor_shape_static = has_static_rank && TensorShapeWrapper::is_static;
@@ -212,21 +208,21 @@ private:
 template <
     uint32_t RankCT = 0,
     uint32_t NumBanksCT = 0,
-    typename TensorShapeWrapper_ = ArrayDynamicWrapper,
-    typename ShardShapeWrapper_ = ArrayDynamicWrapper,
-    typename BankCoordsWrapper_ = ArrayDynamicWrapper>
+    typename TensorShapeWrapper = ArrayDynamicWrapper,
+    typename ShardShapeWrapper = ArrayDynamicWrapper,
+    typename BankCoordsWrapper = ArrayDynamicWrapper>
 auto make_dspec(
     uint32_t rank_rt = 0,
     uint32_t num_banks_rt = 0,
     uint32_t* tensor_shape_ptr = nullptr,
     uint32_t* shard_shape_ptr = nullptr,
     uint16_t* bank_coords_ptr = nullptr) {
-    using DSpec = DistributionSpec<RankCT, NumBanksCT, TensorShapeWrapper_, ShardShapeWrapper_, BankCoordsWrapper_>;
+    using DSpec = DistributionSpec<RankCT, NumBanksCT, TensorShapeWrapper, ShardShapeWrapper, BankCoordsWrapper>;
     constexpr bool RankStatic = RankCT != 0;
     constexpr bool NumBanksStatic = NumBanksCT != 0;
-    constexpr bool TensorShapeDynamic = !TensorShapeWrapper_::is_static;
-    constexpr bool ShardShapeDynamic = !ShardShapeWrapper_::is_static;
-    constexpr bool BankCoordsDynamic = !BankCoordsWrapper_::is_static;
+    constexpr bool TensorShapeDynamic = !TensorShapeWrapper::is_static;
+    constexpr bool ShardShapeDynamic = !ShardShapeWrapper::is_static;
+    constexpr bool BankCoordsDynamic = !BankCoordsWrapper::is_static;
 
     uint32_t rank = RankStatic ? RankCT : rank_rt;
     uint32_t num_banks = NumBanksStatic ? NumBanksCT : num_banks_rt;
