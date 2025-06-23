@@ -56,5 +56,6 @@ pytest --disable-warnings models/demos/ufld_v2/demo/demo.py
 
 To run the demo on your data:
 
-- Add your images to the 'images' directory and list their filenames in 'input_images.txt' under demo folder
+- Add your images to the 'images' directory under demo folder.
 - Annotate the corresponding ground truth labels in 'ground_truth_labels.json' using the required format.
+- The Demo outputs are saved inside this directories: `models/demos/ufld_v2/demo/reference_model_results` and `models/demos/ufld_v2/demo/ttnn_model_results`
