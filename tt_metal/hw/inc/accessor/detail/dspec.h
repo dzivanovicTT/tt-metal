@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
-//
-// SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 #include <cstdint>
@@ -14,19 +10,6 @@
 namespace nd_sharding {
 namespace detail {
 
-/**
- * @brief Holds all the distribution specification information for a tensor: rank, number of banks, tensor shape, shard
- * shape, bank coordinates. Each of these can be static or dynamic.
- *
- * @tparam RankCT         Compile-time rank of the tensor. If 0, the rank is dynamic.
- * @tparam NumBanksCT     Compile-time number of banks. If 0, the number of banks is dynamic.
- * @tparam TensorShapeWrapper_  Wrapper for the tensor shape. Can be detail::ArrayStaticWrapperU32<...> for static
- * shapes or detail::ArrayDynamicWrapper for dynamic shapes.
- * @tparam ShardShapeWrapper_   Wrapper for the shard shape. Can be detail::ArrayStaticWrapperU32<...> for static shapes
- *                              or detail::ArrayDynamicWrapper for dynamic shapes.
- * @tparam BankCoordsWrapper_   Wrapper for the bank coordinates. Can be detail::ArrayStaticWrapperU16<...> for static
- * shapes or detail::ArrayDynamicWrapper for dynamic shapes.
- */
 template <
     uint32_t RankCT = 0,
     uint32_t NumBanksCT = 0,
@@ -57,7 +40,6 @@ struct DistributionSpec {
     using Shape = std::conditional_t<has_static_rank, ShapeStatic, ShapeDynamic>;
     using BankCoords = std::conditional_t<has_static_num_banks, BankCoordsStatic, BankCoordsDynamic>;
 
-    // This constructor is only used for completely static DistributionSpec
     template <typename T = void, typename = std::enable_if_t<is_static, T>>
     constexpr DistributionSpec() {}
 
@@ -68,11 +50,9 @@ struct DistributionSpec {
         shard_shape_rt(std::forward<ShardShape>(shard_shape_arr)),
         bank_coords_rt(std::forward<BankCoords>(bank_coords_arr)) {
         if constexpr (!has_static_rank) {
-            // Rank is not known at compile time, use runtime rank
             rank_rt = tensor_shape_rt.size();
         }
         if constexpr (!has_static_num_banks) {
-            // Number of banks is not known at compile time, use runtime number of banks
             num_banks_rt = bank_coords_rt.size();
         }
         if constexpr (!has_static_rank) {
@@ -83,11 +63,9 @@ struct DistributionSpec {
             shard_strides_rt = Shape(shard_strides_rt_buf.value, rank());
         }
         if constexpr (!tensor_shape_static) {
-            // If tensor shape is not static, we need to compute strides and volume at runtime
             compute_strides_volume_rt(tensor_shape(), tensor_strides_rt, tensor_volume_rt);
         }
         if constexpr (!shard_shape_static) {
-            // If shard shape is not static, we need to compute strides and volume at runtime
             compute_strides_volume_rt(shard_shape(), shard_strides_rt, shard_volume_rt);
         }
         if constexpr (!shapes_static) {
@@ -95,7 +73,6 @@ struct DistributionSpec {
         }
     }
 
-// Helper macro to avoid code duplication in getters
 #define getter_helper(is_static, val_ct, val_rt) \
     if constexpr (is_static) {                   \
         return val_ct;                           \
@@ -103,7 +80,6 @@ struct DistributionSpec {
         return val_rt;                           \
     }
 
-    // === Shape and Dimension Queries ===
     FORCE_INLINE constexpr uint32_t rank() const { getter_helper(has_static_rank, rank_ct, rank_rt); }
 
     FORCE_INLINE constexpr uint32_t num_banks() const {getter_helper(has_static_num_banks, num_banks_ct, num_banks_rt)}
@@ -114,7 +90,6 @@ struct DistributionSpec {
     FORCE_INLINE constexpr const
         auto& shard_shape() const {getter_helper(shard_shape_static, ShardShapeWrapper::elements, shard_shape_rt)}
 
-    // === Computed Properties ===
     FORCE_INLINE constexpr const
         auto& tensor_strides() const {getter_helper(tensor_shape_static, tensor_strides_ct, tensor_strides_rt)}
 
@@ -127,7 +102,6 @@ struct DistributionSpec {
     FORCE_INLINE constexpr size_t
         shard_volume() const {getter_helper(shard_shape_static, shard_volume_ct, shard_volume_rt)}
 
-    // === Sharding Layout ===
     FORCE_INLINE constexpr const auto& shard_grid() const {getter_helper(shapes_static, shard_grid_ct, shard_grid_rt)}
 
     FORCE_INLINE constexpr const
@@ -142,13 +116,12 @@ struct DistributionSpec {
 private:
     static constexpr ShapeStatic precompute_shard_grid_ct(
         const ShapeStatic& tensor_shape, const ShapeStatic& shard_shape) {
-        // If shapes are dynamic, we cannot compute shard grid at compile time
         if (!shapes_static) {
             return {};
         }
         ShapeStatic shard_grid = {};
         for (int i = rank_ct - 1; i >= 0; --i) {
-            shard_grid[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;  // div_up
+            shard_grid[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;
         }
         return shard_grid;
     }
@@ -159,7 +132,7 @@ private:
         uint32_t stride = 1;
         for (int i = rank_ct - 1; i >= 0; --i) {
             shard_grid_strides[i] = stride;
-            stride *= (tensor_shape[i] - 1) / shard_shape[i] + 1;  // div_up
+            stride *= (tensor_shape[i] - 1) / shard_shape[i] + 1;
         }
         return shard_grid_strides;
     }
@@ -197,11 +170,11 @@ private:
     void compute_shard_grid_and_strides_rt(const TensorShape& tensor_shape, const ShardShape& shard_shape) {
         uint32_t stride = 1;
         for (int i = rank() - 1; i >= 0; --i) {
-            shard_grid_rt[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;  // div_up
+            shard_grid_rt[i] = (tensor_shape[i] - 1) / shard_shape[i] + 1;
             shard_grid_strides_rt[i] = stride;
             stride *= shard_grid_rt[i];
         }
-        // Check that the number of shards is greater than or equal to the number of banks
+
         ASSERT(shard_grid_rt[0] * shard_grid_strides_rt[0] >= num_banks());
     }
 
@@ -215,7 +188,6 @@ private:
     std::conditional_t<shapes_static, std::monostate, Shape> shard_grid_rt{};
     std::conditional_t<shapes_static, std::monostate, Shape> shard_grid_strides_rt{};
 
-    // Buffers to wrap around span in case of dynamic rank
     mutable detail::ConditionalField<!has_static_rank, uint32_t[MAX_RANK]> shard_grid_rt_buf;
     mutable detail::ConditionalField<!has_static_rank, uint32_t[MAX_RANK]> shard_grid_strides_rt_buf;
 
@@ -224,7 +196,6 @@ private:
     static constexpr ShapeStatic shard_grid_strides_ct =
         precompute_shard_grid_strides_ct(TensorShapeWrapper::elements, ShardShapeWrapper::elements);
 
-    // Buffers to wrap around span in case of dynamic rank
     mutable detail::ConditionalField<!has_static_rank, uint32_t[MAX_RANK]> tensor_strides_rt_buf;
     mutable detail::ConditionalField<!has_static_rank, uint32_t[MAX_RANK]> shard_strides_rt_buf;
     Shape tensor_strides_rt = {};
@@ -238,22 +209,6 @@ private:
     static constexpr size_t shard_volume_ct = precompute_volume_ct(ShardShapeWrapper::elements);
 };
 
-/**
- * @brief Build a DistributionSpec from the provided arguments. This function allows for both static and dynamic rank,
- * number of banks, tensor shape, shard shape, and bank coordinates.
- *
- * @tparam RankCT               Compile-time rank of the tensor. If 0, the rank is dynamic.
- * @tparam NumBanksCT           Compile-time number of banks. If 0, the number of banks is dynamic.
- * @tparam TensorShapeWrapper_  ArrayDynamicWrapper or ArrayStaticWrapperU32 for the tensor shape.
- * @tparam ShardShapeWrapper_   ArrayDynamicWrapper or ArrayStaticWrapperU32 for the shard shape.
- * @tparam BankCoordsWrapper_   ArrayDynamicWrapper or ArrayStaticWrapperU16 for the bank coordinates.
- * @param rank_rt               Runtime rank of the tensor. Used if RankCT is 0.
- * @param num_banks_rt          Runtime number of banks. Used if NumBanksCT is 0.
- * @param tensor_shape_ptr      Pointer to the tensor shape array. Used if TensorShapeWrapper_ is dynamic.
- * @param shard_shape_ptr       Pointer to the shard shape array. Used if ShardShapeWrapper_ is dynamic.
- * @param bank_coords_ptr       Pointer to the bank coordinates array. Used if BankCoordsWrapper_ is dynamic.
- * @return auto                 DistributionSpec instance built from the provided arguments.
- */
 template <
     uint32_t RankCT = 0,
     uint32_t NumBanksCT = 0,
@@ -275,10 +230,10 @@ auto make_dspec(
 
     uint32_t rank = RankStatic ? RankCT : rank_rt;
     uint32_t num_banks = NumBanksStatic ? NumBanksCT : num_banks_rt;
-    // Shape = std::array<uint32_t, RankCT> if static, otherwise Span<uint32_t>
+
     typename DSpec::Shape tensor_shape_array;
     typename DSpec::Shape shard_shape_array;
-    // BankCoords = std::array<uint32_t, NumBanksCT> if static, otherwise Span<uint32_t>
+
     typename DSpec::BankCoords bank_coord_array;
 
     auto span_from_pointer = []<typename T>(auto& arr, T* ptr, size_t size) { arr = Span<T>(ptr, size); };
@@ -317,7 +272,6 @@ auto make_dspec(
         }
     }
 
-    // Verify that shapes are non-zero
     for (size_t i = 0; i < rank; ++i) {
         if constexpr (TensorShapeDynamic) {
             ASSERT(tensor_shape_array[i] > 0);
@@ -329,16 +283,8 @@ auto make_dspec(
     return DSpec(std::move(tensor_shape_array), std::move(shard_shape_array), std::move(bank_coord_array));
 }
 
-/**
- * @brief Helper function to build a DistributionSpec from CTA and CRTA. Parses tensor shape, shard shape,
- * bank coordinates if needed, and passes to DSpec constructor.
- *
- * @tparam ArgsOffsets Structure containing offsets for CTA/CRTA.
- * @return auto DistributionSpec instance built from provided argumnets.
- */
 template <typename ArgsOffsets>
 auto make_dspec_from_args(const ArgsOffsets& args_offsets) {
-    // Dispatch to the appropriate ShapeWrapper and BankCoordsWrapper types based on the "staticness"
     using TensorShapeType = typename ArrayWrapperTypeSelectorU32<
         !ArgsOffsets::tensor_shape_is_crta,
         ArgsOffsets::TensorShapeCTAOffset,
