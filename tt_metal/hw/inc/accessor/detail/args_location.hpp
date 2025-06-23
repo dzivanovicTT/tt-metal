@@ -35,7 +35,7 @@ struct ArgsOffsets {
         rank_is_crta ? 0 : get_compile_time_arg_val(rank_is_crta ? CTA_OFFSET : RankCTAOffset);
     static constexpr uint32_t NumBanksCT =
         num_banks_is_crta ? 0 : get_compile_time_arg_val(num_banks_is_crta ? CTA_OFFSET : NumBanksCTAOffset);
-    static constexpr uint32_t PhysicalNumBanksCT = (NumBanksCT - 1) / 2 + 1;
+    static constexpr uint32_t PhysicalNumBanksCT = (NumBanksCT + 1) / 2;
 
     static_assert(rank_is_crta || RankCT > 0, "Rank must be greater than 0!");
     static_assert(num_banks_is_crta || NumBanksCT > 0, "Number of banks must be greater than 0!");
@@ -82,10 +82,7 @@ struct ArgsOffsets {
         }
     }
 
-    constexpr uint32_t get_physical_num_banks() const {
-
-        return (get_num_banks() - 1) / 2 + 1;
-    }
+    constexpr uint32_t get_physical_num_banks() const { return (get_num_banks() + 1) / 2; }
 
     constexpr uint32_t tensor_shape_crta_offset() const { return num_banks_crta_offset() + num_banks_is_crta; }
 
