@@ -54,8 +54,13 @@ struct ArgsOffsets {
     static constexpr uint32_t ShardShapeCTAOffset = TensorShapeCTAOffset + (tensor_shape_is_crta ? 0 : RankCT);
     static constexpr uint32_t BankCoordsCTAOffset = ShardShapeCTAOffset + (shard_shape_is_crta ? 0 : RankCT);
 
-    static constexpr uint32_t NumArgsCT =
-        BankCoordsCTAOffset + (bank_coords_is_crta ? 0 : PhysicalNumBanksCT) - CTA_OFFSET;
+    static constexpr uint32_t NumArgsCT = [] {
+        if constexpr (bank_coords_is_crta) {
+            return BankCoordsCTAOffset - CTA_OFFSET;
+        } else {
+            return BankCoordsCTAOffset + PhysicalNumBanksCT - CTA_OFFSET;
+        }
+    }();
 
     uint32_t crta_offset_rt = CRTA_OFFSET;
 
