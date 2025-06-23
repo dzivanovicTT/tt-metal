@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
-//
-// SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 #include <cstddef>
@@ -14,10 +10,6 @@ namespace nd_sharding {
 namespace detail {
 using std::size_t;
 
-/**
- * @brief Keeps which DSpec arguments are compile-time and which are common runtime.
- *
- */
 template <
     bool RankCRTA_ = false,
     bool NumBanksCRTA_ = false,
@@ -25,7 +17,6 @@ template <
     bool ShardShapeCRTA_ = false,
     bool BankCoordsCRTA_ = false>
 struct ArgsLocation {
-    // Fetch locations of the arguments
     static constexpr bool RankCRTA = RankCRTA_;
     static constexpr bool NumBanksCRTA = NumBanksCRTA_;
     static constexpr bool TensorShapeCRTA = TensorShapeCRTA_;
@@ -39,14 +30,6 @@ struct ArgsLocation {
     static constexpr bool BankCoordsStatic = !BankCoordsCRTA;
 };
 
-/**
- * @brief Holds offsets for compile-time and common runtime arguments used for creation of DistributionSpec.
- * The order of arguments in the args array is: [rank, num_banks, tensor_shape, shard_shape, bank_coords].
- *
- * @tparam CTA_OFFSET_  base index of compile-time arguments in the args array
- * @tparam CRTA_OFFSET_ base index of common runtime arguments in the args array, if set to UNKNOWN, it will be set in
- * constructor
- */
 template <size_t CTA_OFFSET_, size_t CRTA_OFFSET_ = UNKNOWN>
 struct ArgsOffsets {
     static constexpr size_t CTA_OFFSET = CTA_OFFSET_;
@@ -62,8 +45,6 @@ struct ArgsOffsets {
         args_config.test(ArgConfig::ShardShapeCRTA),
         args_config.test(ArgConfig::BankCoordsCRTA)>;
 
-    // Impossible to have runtime rank without runtime tensor and shard shapes since then impossible to calculate CTA
-    // offsets in compile time
     static_assert(
         !ArgsLoc::RankCRTA or (ArgsLoc::RankCRTA and ArgsLoc::TensorShapeCRTA and ArgsLoc::ShardShapeCRTA),
         "If rank is runtime, tensor_shape and shard_shape must also be runtime");
@@ -71,7 +52,6 @@ struct ArgsOffsets {
         !ArgsLoc::NumBanksCRTA or (ArgsLoc::NumBanksCRTA and ArgsLoc::BankCoordsCRTA),
         "If num_banks is runtime, bank_coords must also be runtime");
 
-    // Calculate offsets for compile-time arguments
     static constexpr uint32_t ArgsConfigCTAOFfset = CTA_OFFSET;
     static constexpr uint32_t RankCTAOffset = ArgsConfigCTAOFfset + 1;
     static constexpr uint32_t NumBanksCTAOffset = RankCTAOffset + (ArgsLoc::RankCRTA ? 0 : 1);
@@ -80,30 +60,26 @@ struct ArgsOffsets {
         ArgsLoc::RankCRTA ? 0 : get_compile_time_arg_val(ArgsLoc::RankCRTA ? CTA_OFFSET : RankCTAOffset);
     static constexpr uint32_t NumBanksCT =
         ArgsLoc::NumBanksCRTA ? 0 : get_compile_time_arg_val(ArgsLoc::NumBanksCRTA ? CTA_OFFSET : NumBanksCTAOffset);
-    static constexpr uint32_t PhysicalNumBanksCT = (NumBanksCT - 1) / 2 + 1;  // Size of bank copordinates array (2
-                                                                              // coordinates packed in one uint32_t)
+    static constexpr uint32_t PhysicalNumBanksCT = (NumBanksCT - 1) / 2 + 1;
 
     static_assert(!ArgsLoc::RankStatic or RankCT > 0, "Rank must be greater than 0!");
-    static_assert(
-        !ArgsLoc::NumBanksStatic or NumBanksCT > 0,
-        "Number of banks must be greater than 0!");  // Number of banks must be > 0
+    static_assert(!ArgsLoc::NumBanksStatic or NumBanksCT > 0, "Number of banks must be greater than 0!");
 
     static constexpr uint32_t TensorShapeCTAOffset = NumBanksCTAOffset + (ArgsLoc::NumBanksCRTA ? 0 : 1);
     static constexpr uint32_t ShardShapeCTAOffset = TensorShapeCTAOffset + (ArgsLoc::TensorShapeCRTA ? 0 : RankCT);
     static constexpr uint32_t BankCoordsCTAOffset = ShardShapeCTAOffset + (ArgsLoc::ShardShapeCRTA ? 0 : RankCT);
 
-    static constexpr uint32_t NumArgsCT = BankCoordsCTAOffset + (ArgsLoc::BankCoordsCRTA ? 0 : PhysicalNumBanksCT) -
-                                          CTA_OFFSET;  // Number of compile-time arguments
+    static constexpr uint32_t NumArgsCT =
+        BankCoordsCTAOffset + (ArgsLoc::BankCoordsCRTA ? 0 : PhysicalNumBanksCT) - CTA_OFFSET;
 
-    uint32_t crta_offset_rt = CRTA_OFFSET;  // Default CRTA offset
+    uint32_t crta_offset_rt = CRTA_OFFSET;
 
     template <typename ArgsOffsets_ = ArgsOffsets, std::enable_if_t<ArgsOffsets_::CRTA_OFFSET == UNKNOWN, int> = 0>
-    ArgsOffsets(size_t crta_offset = CRTA_OFFSET) : crta_offset_rt(crta_offset) {}  // Constructor to set CRTA offset
+    ArgsOffsets(size_t crta_offset = CRTA_OFFSET) : crta_offset_rt(crta_offset) {}
 
     template <typename ArgsOffsets_ = ArgsOffsets, std::enable_if_t<ArgsOffsets_::CRTA_OFFSET != UNKNOWN, int> = 0>
     ArgsOffsets() {}
 
-    // Functions to calculate offsets for common runtime arguments
     constexpr uint32_t crta_offset() const {
         if constexpr (CRTA_OFFSET != UNKNOWN) {
             return CRTA_OFFSET;
@@ -132,7 +108,7 @@ struct ArgsOffsets {
     }
 
     constexpr uint32_t get_physical_num_banks() const {
-        // 2 coordinates are packed in one uint32_t
+
         return (get_num_banks() - 1) / 2 + 1;
     }
 
@@ -146,20 +122,7 @@ struct ArgsOffsets {
         return shard_shape_crta_offset() + (ArgsLoc::ShardShapeCRTA ? get_rank() : 0);
     }
 
-    /**
-     * @brief Calculates the number of compile-time arguments used when building a DistributionSpec. Note that
-     * compile_time_args_skip is required to be constexpr since cta argument index must be constexpr
-     *
-     * @return constexpr size_t     Number of compile-time arguments used by the DistributionSpec.
-     */
     static constexpr uint32_t compile_time_args_skip() { return NumArgsCT; }
-
-    /**
-     * @brief Calculates the number of common runtime arguments used when building a DistributionSpec.
-     * Evaluated at compile time if rank and num_banks are compile-time.
-     *
-     * @return constexpr size_t     Number of common runtime arguments used by the DistributionSpec.
-     */
     constexpr uint32_t runtime_args_skip() const {
         return bank_coords_crta_offset() + (ArgsLoc::BankCoordsCRTA ? get_physical_num_banks() : 0) - crta_offset();
     }
