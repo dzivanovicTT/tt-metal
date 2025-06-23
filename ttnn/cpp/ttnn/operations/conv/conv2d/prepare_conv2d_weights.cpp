@@ -945,7 +945,7 @@ static ttnn::Tensor prepare_conv_weights_internal(
 }
 
 template <typename T>
-static std::optional<ttnn::Tensor> prepare_conv_bias_internal(
+std::optional<ttnn::Tensor> prepare_conv_bias_internal(
     const std::optional<const ttnn::Tensor>& bias_tensor,
     uint32_t out_channels,
     const Conv2dWeightsBiasPrepConfig& params,
@@ -1166,6 +1166,20 @@ prepare_conv_weights_biases_and_move_to_device<MeshDevice>(
     const ttnn::Tensor& weight_tensor,
     const std::optional<const ttnn::Tensor>& bias_tensor,
     Conv2dWeightsBiasPrepConfig& params,
+    MeshDevice* device);
+
+template std::optional<ttnn::Tensor> prepare_conv_bias_internal<IDevice>(
+    const std::optional<const ttnn::Tensor>& bias_tensor,
+    uint32_t out_channels,
+    const Conv2dWeightsBiasPrepConfig& params,
+    DataType weight_dtype,
+    IDevice* device);
+
+template std::optional<ttnn::Tensor> prepare_conv_bias_internal<MeshDevice>(
+    const std::optional<const ttnn::Tensor>& bias_tensor,
+    uint32_t out_channels,
+    const Conv2dWeightsBiasPrepConfig& params,
+    DataType weight_dtype,
     MeshDevice* device);
 
 template ttnn::Tensor prepare_conv_bias<IDevice>(
