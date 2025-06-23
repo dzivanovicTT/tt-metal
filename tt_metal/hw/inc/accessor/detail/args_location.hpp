@@ -62,19 +62,24 @@ struct ArgsOffsets {
         }
     }();
 
-    uint32_t crta_offset_rt = CRTA_OFFSET;
+private:
+    [[no_unique_address]] uint32_t crta_offset_rt_;
 
-    template <size_t C = CRTA_OFFSET, std::enable_if_t<C == UNKNOWN, int> = 0>
-    ArgsOffsets(size_t crta_offset = CRTA_OFFSET) : crta_offset_rt(crta_offset) {}
-
-    template <size_t C = CRTA_OFFSET, std::enable_if_t<C != UNKNOWN, int> = 0>
-    ArgsOffsets() {}
-
+public:
+    constexpr ArgsOffsets() {
+        if constexpr (CRTA_OFFSET == UNKNOWN) {
+            crta_offset_rt_ = 0;
+        }
+    }
+    constexpr explicit ArgsOffsets(uint32_t crta_offset) {
+        static_assert(CRTA_OFFSET == UNKNOWN, "Do not pass crta_offset when CRTA_OFFSET is known");
+        crta_offset_rt_ = crta_offset;
+    }
     constexpr uint32_t crta_offset() const {
         if constexpr (CRTA_OFFSET != UNKNOWN) {
             return CRTA_OFFSET;
         } else {
-            return crta_offset_rt;
+            return crta_offset_rt_;
         }
     }
 
