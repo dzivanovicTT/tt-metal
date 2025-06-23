@@ -61,8 +61,6 @@ static Tensor pool2d_invoke(
          input_tensor_shape[2],
          tt::round_up(input_tensor_shape[3], tt::constants::TILE_WIDTH)});
     auto input_padded_tensor = input_tensor;
-    // input_padded_tensor = input_padded_tensor.pad(input_tensor_shape, input_padded_shape,
-    // get_bf16_pool_init_value(pool_type));
     input_padded_tensor = input_padded_tensor.reshape(input_tensor_shape, input_padded_shape);
     auto input_tensor_sharded = input_padded_tensor;
     // pool output is row major
@@ -157,7 +155,6 @@ static Tensor pool2d_invoke(
         .ceil_mode = ceil_mode,
         .is_avg_pool = pool_type == Pool2DType::AVG_POOL2D,
     };
-    auto input_nesto = input_tensor.logical_shape();
 
     // Call the halo uop
     auto haloed_tensor = ttnn::halo(
@@ -170,7 +167,6 @@ static Tensor pool2d_invoke(
         input_tensor_sharded.memory_config(),
         is_out_tiled,
         in_place_halo);
-    input_nesto = input_tensor.logical_shape();
 
     auto output_tensor = ttnn::prim::pool2d(
         queue_id,
@@ -181,7 +177,6 @@ static Tensor pool2d_invoke(
         out_memory_config,
         count_include_pad,
         divisor_override);
-    input_nesto = haloed_tensor.logical_shape();
 
     if (memory_config.has_value() && memory_config.value() != out_memory_config) {
         output_tensor = ttnn::to_memory_config(output_tensor, memory_config.value(), std::nullopt);
