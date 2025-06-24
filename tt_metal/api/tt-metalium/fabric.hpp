@@ -72,8 +72,8 @@ void initialize_edm_fabric(
     Topology topology = Topology::Linear);
 
 void teardown_edm_fabric(
-    tt::tt_metal::distributed::MeshDevice* mesh_device, 
-    bool wrap_fabric_around_mesh = false, 
+    tt::tt_metal::distributed::MeshDevice* mesh_device,
+    bool wrap_fabric_around_mesh = false,
     Topology topology = Topology::Linear);
 
 }  // namespace tt::tt_fabric

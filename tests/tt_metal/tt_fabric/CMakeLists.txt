@@ -88,7 +88,11 @@ target_link_libraries(
         fabric
         test_common_libs
 )
-target_sources(unit_tests_1d_fabric_latency PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fabric_data_movement/test_1d_fabric_loopback_latency.cpp)
+target_sources(
+    unit_tests_1d_fabric_latency
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/fabric_data_movement/test_1d_fabric_loopback_latency.cpp
+)
 
 add_executable(test_fabric_1d_bw)
 target_include_directories(

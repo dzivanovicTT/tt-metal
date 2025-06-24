@@ -103,8 +103,6 @@ add_executable(unit_tests_ttnn_ccl_ops)
 target_sources(unit_tests_ttnn_ccl_ops PRIVATE ccl/test_persistent_fabric_ccl_ops.cpp)
 setup_ttnn_test_target(unit_tests_ttnn_ccl_ops)
 
-
-
 # unit_tests_ttnn_ccl_multi_tensor
 
 add_executable(unit_tests_ttnn_ccl_multi_tensor)
