@@ -4,8 +4,6 @@
 
 #include "rmsnorm_bw.hpp"
 
-#include <iostream>
-
 #include "core/compute_kernel_config.hpp"
 #include "device/rmsnorm_bw_device_operation.hpp"  // if needed
 
@@ -16,20 +14,15 @@ std::vector<std::optional<ttnn::Tensor>> RMSNormBackwardOperation::invoke(
     const ttnn::Tensor& gamma_tensor,
     const ttnn::Tensor& rms_tensor,
     const ttnn::Tensor& dL_dout_tensor) {
-    // std::cerr << "Within RMSNormBackwardOperation::invoke" << std::endl;
-    // dL_dout_tensor.print();
     auto result = ttnn::prim::ttml_rmsnorm_bw(
         input_tensor,   // [B,1,S,C]
         gamma_tensor,   // [1,1,1,C]
         rms_tensor,     //[B,1,S,1]
         dL_dout_tensor  //[B,1,S,C]
     );
-    // std::cerr << "RMSNormBackwardOperation done" << std::endl;
 
-    // Always return both gradients over input and gamma. Consider parameterizing this in the future and nullopt?
-    // dL_dgamma requires sum over batches so we canno
-    result[0].print();  // dL_da
-    result[1].print();  // dL_dgamma
+    // dL_dgamma requires sum over batches so we cannot perform this sum in the kernel. Instead we return the
+    // dL_dgamma_components and reduce it here.
     return {
         result[0],
         ttnn::sum(

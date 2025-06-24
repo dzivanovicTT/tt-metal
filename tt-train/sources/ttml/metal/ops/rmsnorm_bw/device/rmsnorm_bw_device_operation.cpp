@@ -147,8 +147,6 @@ RMSNormBackwardDeviceOperation::invoke(
     float epsilon,
     const std::optional<ttnn::Tensor>& preallocated_dx,
     const std::optional<ttnn::Tensor>& preallocated_dgamma) {
-    // std::cerr << "Within RMSNormBackwardDeviceOperation::invoke" << std::endl;
-    // dL_dout_tensor.print();
     return {
         operation_attributes_t{
             .epsilon = epsilon,

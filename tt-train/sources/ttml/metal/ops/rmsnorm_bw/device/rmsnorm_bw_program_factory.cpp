@@ -124,17 +124,6 @@ tt::tt_metal::KernelHandle create_compute_kernel(
             .defines = defines});
 }
 
-void print_buffer_elements(const tt::tt_metal::Buffer* buffer) {
-    std::vector<bfloat16> host_data;
-    tt::tt_metal::detail::ReadFromBuffer(const_cast<tt::tt_metal::Buffer&>(*buffer), host_data);
-
-    std::cout << "Buffer contents: ";
-    for (const auto& value : host_data) {
-        std::cout << value.to_float() << " ";
-    }
-    std::cout << std::endl;
-}
-
 void assign_per_core_runtime_args(
     tt::tt_metal::Program& program,
     const RMSNormBackwardKernels& kernels,
@@ -150,9 +139,6 @@ void assign_per_core_runtime_args(
     uint32_t num_rows_per_core_group_2,
     const tt::tt_metal::CoreRangeSet& core_group_1,
     const tt::tt_metal::CoreRangeSet& core_group_2) {
-    // std::cerr << "rms_buffer address: " << rms_buffer->address() << std::endl;
-    // print_buffer_elements(rms_buffer);
-
     for (uint32_t i = 0, num_rows_written = 0; i < num_cores; i++) {
         CoreCoord core = {i / num_cores_y, i % num_cores_y};
 
@@ -199,10 +185,6 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     const auto& rms = tensor_args.rms;
     const auto& dLdout = tensor_args.dL_dout;
 
-    // std::cerr << "Within RMSNormBackwardProgramFactory::create" << std::endl;
-    // dLdout.print();
-    // input.print();
-
     auto* device = input.device();
     tt::tt_metal::Program program{};
 
@@ -220,17 +202,12 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     uint32_t Ht = padded_tensor_shape[-2] / tt::constants::TILE_HEIGHT;
     uint32_t NC = padded_tensor_shape[0] * padded_tensor_shape[1];
     uint32_t total_rows_to_process = NC * Ht;
-    std::cerr << "Wt: " << Wt << std::endl;
-    std::cerr << "Ht: " << Ht << std::endl;
-    std::cerr << "NC: " << NC << std::endl;
-    std::cerr << "Total rows to process: " << total_rows_to_process << std::endl;
 
     // get the number of inner dimension
     uint32_t num_inner = input.logical_shape()[-1];
 
     // mask_w - this mask used to avoid calculation of extra data
     uint32_t mask_w = num_inner % tt::constants::TILE_WIDTH;
-    // std::cerr << "mask_w: " << mask_w << std::endl;
 
     // get number of free cores
     auto compute_with_storage_grid_size = device->compute_with_storage_grid_size();
@@ -244,11 +221,7 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         tt::tt_metal::split_work_to_cores(compute_with_storage_grid_size, total_rows_to_process);
 
     // compile arguments
-    std::cerr << "num_inner: " << num_inner << std::endl;
-    auto a = static_cast<float>(1.F / num_inner);
-    std::cerr << "a: " << a << std::endl;
     uint32_t packed_scaler = pack_two_bfloat16_to_uint32(static_cast<float>(1.F / num_inner));
-    std::cerr << "packed_scaler: " << packed_scaler << std::endl;
 
     // -------------------------------------------------------------------------
     // 2) Create and configure circular buffers
@@ -350,7 +323,6 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         "dL_dgamma buffer must be in DRAM. dL_dgamma buffer of type {}",
         magic_enum::enum_name(dL_dgamma_components_buffer->buffer_type()));
 
-    std::cerr << "everything_fits_in_l1: " << everything_fits_in_l1 << std::endl;
     std::map<std::string, std::string> defines;  // Add defines as needed
     if (mask_w != 0) {
         defines[kMaskWDefineKey] = "1";

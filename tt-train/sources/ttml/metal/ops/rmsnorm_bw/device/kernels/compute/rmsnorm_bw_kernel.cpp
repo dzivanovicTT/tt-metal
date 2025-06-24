@@ -412,6 +412,12 @@ inline void pack_and_push_block(uint32_t cb_output) {
 // TODO: Ask about bfloat16 vs float32 for regs, cbs and computations on LLK channel
 
 // NOTE: whenever add any debug things mark it with a comment to find it later easliy.
+
+// NOTE: run nano-Llama to check the performance
+// Run baseline first and then improvemnt.
+// What to look at: score (how loss is different) and performance boost.
+// Training for 5mil params, should take 20min
+// Main file for Llama is also nano-gpt example and we need to adjust config
 inline void MAIN {
     if constexpr (do_mask_w) {
         cb_wait_front(cb_mask_w_idx, onetile);

@@ -70,8 +70,6 @@ void kernel_main() {
     constexpr uint32_t block_size = get_compile_time_arg_val(0);
     constexpr uint32_t Wt = get_compile_time_arg_val(1);
 
-    DPRINT << "Block size: " << block_size << ENDL();
-
     // single-tile ublocks
     constexpr uint32_t onetile = 1;
     const uint32_t tile_bytes = get_tile_size(cb_dL_da_idx);
@@ -85,59 +83,7 @@ void kernel_main() {
 
     // NOTE: it is better to copy data to another CB and do not reuse CB between writer and kernel
 
-    DPRINT << "Wt: " << Wt << ENDL();
-
-    // cb_wait_front(cb_gamma_idx, Wt);
-    // DPRINT << "cb_gamma_idx: " << ENDL();
-    // print_full_tile(cb_gamma_idx, 0, true);
-
-    // cb_wait_front(cb_dL_out_idx, Wt);
-    // DPRINT << "cb_dL_out_idx: " << ENDL();
-    // print_full_tile(cb_dL_out_idx, 0, true);
-
-    // cb_wait_front(cb_recip_rms_a_bcasted_idx, onetile);
-    // DPRINT << "cb_recip_rms_a_bcasted_idx: " << ENDL();
-    // print_full_tile(cb_recip_rms_a_bcasted_idx, 0, true);
-
-    // // cb_wait_front(cb_rms_a_idx, onetile);
-    // DPRINT << "cb_rms_a_idx: " << ENDL();
-    // print_full_tile(cb_rms_a_idx, 0, true);
-
-    // // cb_wait_front(cb_input_idx, Wt);
-    // DPRINT << "cb_input_idx: " << ENDL();
-    // print_full_tile(cb_input_idx, 0, true);
-    // print_full_tile(cb_input_idx, 1, true);
-
-    // print_full_tile(cb_input_idx, 1, true);
-
-    // cb_wait_front(cb_scale_idx, Wt);
-    // DPRINT << "cb_scale_idx: " << ENDL();
-    // print_full_tile(cb_scale_idx, 0, true);
-    // print_full_tile(cb_scale_idx, 1, true);
-
-    // cb_wait_front(cb_scale_bcasted, onetile);
-    // DPRINT << "bcasted_scale" << cb_scale_bcasted << ENDL();
-    // print_full_tile(cb_scale_bcasted, 0, true);
-
-    // DPRINT << "cb_scaler_idx: " << cb_scaler_idx << ENDL();
-    // cb_wait_front(cb_scaler_idx, onetile);
-    // DPRINT << "cb_scaler_idx ready" << ENDL();
-    // print_full_tile(cb_scaler_idx, 0, true);
-
-    // DPRINT << "Waiting for cb_dL_da_idx" << ENDL();
-    // cb_wait_front(cb_dL_da_idx, onetile);
-    // DPRINT << "cb_dL_da_idx ready" << ENDL();
-    // // DPRINT << "thi is rhs in fact" << ENDL();
-    // print_full_tile(cb_dL_da_idx, 0, true);
-
-    // DPRINT << "Waiting for cb_dL_dgamma_components" << ENDL();
-    // cb_wait_front(cb_dL_dgamma_components, Wt);
-    // DPRINT << "cb_dL_dgamma_components ready" << ENDL();
-    // print_full_tile(cb_dL_dgamma_components, 0, true);
-    // print_full_tile(cb_dL_dgamma_components, 1, true);
-
     uint32_t end_row = start_row + num_rows_to_process;
-    // DPRINT << "Writing dx and dgamma for rows from " << start_row << " to " << end_row << ENDL();
     for (uint32_t r = start_row; r < end_row; ++r) {
         // Write dx (grad w.r.t. input)
         write_cb_to_dram(cb_dL_da_idx, dx_output_addr_generator, r * Wt, Wt, block_size, tile_bytes);
