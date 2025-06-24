@@ -85,7 +85,7 @@ TEST_F(RMSNormOpTest, RMSNorm_Small_Backward) {
     using namespace ttml;
     float eps = 0.0078125F;  // default in PyTorch for bf16
 
-    uint32_t N = 1, C = 1, H = 1, W = 8;  // make 32 or even better create a new test with this W
+    uint32_t N = 1, C = 1, H = 1, W = 8;
 
     xt::xarray<float> example_xtensor = {{{{1.F, 2.F, 3.F, 4.F, 1.F, 2.F, 3.F, 4.F}}}};
     auto example_tensor = autograd::create_tensor(core::from_xtensor(example_xtensor, &autograd::ctx().get_device()));
@@ -181,6 +181,8 @@ TEST_F(RMSNormOpTest, RMSNorm_Backward_Batch) {
 
     auto gamma_grad = core::to_xtensor(gamma->get_grad());
     xt::xarray<float> expected_gamma_grad = {{{{0.36111F, 0.37644F, 0.39589F, 0.41945F, 0.44712F}}}};
+    std::cout << "expected_gamma_grad: " << expected_gamma_grad << std::endl;
+    std::cout << "gamma_grad: " << gamma_grad << std::endl;
     EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 5e-2F));
 }
 
@@ -233,14 +235,16 @@ TEST_F(RMSNormOpTest, CompositeRMSNorm_Small_Backward) {
     auto gamma_grad = core::to_xtensor(gamma->get_grad());
     auto expected_gamma_grad =
         xt::xarray<float>({{{{0.0334F, 0.1338F, 0.2988F, 0.5352F, 0.0334F, 0.1338F, 0.2988F, 0.5352F}}}});
-    EXPECT_FALSE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
+    std::cout << "expected_gamma_grad: " << expected_gamma_grad << std::endl;
+    std::cout << "gamma_grad: " << gamma_grad << std::endl;
+    EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-3F, 1e-2F));
 }
 
 TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_Compare) {
     using namespace ttml;
 
     // Split it into seperates tests for each width.
-    std::vector<uint32_t> widths = {32};  // had troubles with small like 10 or 12
+    std::vector<uint32_t> widths = {10, 20, 42};  // had troubles with small like 10 or 12
     for (uint32_t W : widths) {
         // NOTE: Remove this when ready to land.
         // if (W != 32) {
@@ -252,7 +256,7 @@ TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_Compare) {
         std::vector<std::size_t> shape = {1, 1, 1, static_cast<std::size_t>(W)};
         xt::xarray<float> example_xtensor = xt::zeros<float>(shape);
         for (uint32_t i = 0; i < W; ++i) {
-            example_xtensor(0, 0, 0, i) = static_cast<float>(i + 1) / 10.F;
+            example_xtensor(0, 0, 0, i) = static_cast<float>(i + 1) / 100.F;
         }
         auto* device = &autograd::ctx().get_device();
         auto example_tensor = autograd::create_tensor(core::from_xtensor(example_xtensor, device));
@@ -287,6 +291,7 @@ TEST_F(RMSNormOpTest, RMSNorm_Small_Backward_Compare) {
         auto expected_gamma_grad = core::to_xtensor(gamma2->get_grad());
         std::cerr << "RMSNorm composite gamma grad: " << expected_gamma_grad << std::endl;
 
+        // TODO: Adjust the tolerance once we implement support for float32.
         EXPECT_TRUE(xt::allclose(example_tensor_grad, expected_example_tensor_grad, 1.0e-1F, 1e-1F));
         EXPECT_TRUE(xt::allclose(gamma_grad, expected_gamma_grad, 1.0e-1F, 1e-1F));
     }

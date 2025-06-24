@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <dataflow_api.h>
 #include <debug/dprint.h>
 
 // constexpr uint32_t num_rows_per_core = get_compile_time_arg_val(0);
@@ -12,24 +13,20 @@
 // Think about move this to compile args to ainline void mess while adjusting indicies
 //  CBs with input data
 constexpr uint32_t cb_input_idx = tt::CBIndex::c_0;
-constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;  // Unused atm
-constexpr uint32_t cb_scaler_idx = tt::CBIndex::c_2;
-constexpr uint32_t cb_gamma_idx = tt::CBIndex::c_3;  // Number of activations, i.e. c in the paper
+constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;
+constexpr uint32_t cb_scaler_idx = tt::CBIndex::c_2;  // 1/c - used for scaling
+constexpr uint32_t cb_gamma_idx = tt::CBIndex::c_3;
 constexpr uint32_t cb_rms_a_idx = tt::CBIndex::c_4;
 constexpr uint32_t cb_dL_out_idx = tt::CBIndex::c_5;
+constexpr uint32_t cb_one_idx = tt::CBIndex::c_6;  // Used to reduce scale to a single value
 // CBs with output data
 // Create more intermedaite-output CBs that will be used exclusively by the writer. Do not compute anything on them
-constexpr uint32_t cb_dL_da_idx = tt::CBIndex::c_6;
-constexpr uint32_t cb_dL_dgamma_idx = tt::CBIndex::c_7;
+constexpr uint32_t cb_dL_da_idx = tt::CBIndex::c_7;
+constexpr uint32_t cb_dL_dgamma_components = tt::CBIndex::c_8;
 // CBs with intermediate computations
-constexpr uint32_t cb_scaled_gain = tt::CBIndex::c_8;
-constexpr uint32_t cb_gained_dL_dout = tt::CBIndex::c_9;
-constexpr uint32_t cb_scale = tt::CBIndex::c_10;
-constexpr uint32_t cb_ms_a = tt::CBIndex::c_11;
-constexpr uint32_t cb_c_by_ms_a = tt::CBIndex::c_12;
-constexpr uint32_t cb_rhs = tt::CBIndex::c_13;
-constexpr uint32_t cb_a_over_rms_a = tt::CBIndex::c_14;
-constexpr uint32_t cb_dL_dgamma_components = tt::CBIndex::c_15;
+constexpr uint32_t cb_recip_rms_a_bcasted_idx = tt::CBIndex::c_9;
+constexpr uint32_t cb_scale_idx = tt::CBIndex::c_10;
+constexpr uint32_t cb_scale_bcasted = tt::CBIndex::c_11;
 
 constexpr uint32_t onetile = 1;
 
@@ -39,7 +36,7 @@ inline void print_full_tile(uint32_t cb_id, uint32_t tile_id = 0, bool untilize 
         SliceRange sr_right = SliceRange{.h0 = r, .h1 = (uint8_t)(r + 1), .hs = 1, .w0 = 16, .w1 = 32, .ws = 1};
         DPRINT << (uint)r << ": " << TileSlice(cb_id, tile_id, sr_left, false, untilize) << " "
                << TileSlice(cb_id, tile_id, sr_right, true, untilize) << ENDL();
-        break;
+        // break;
     }
 }
 
@@ -88,64 +85,56 @@ void kernel_main() {
 
     // NOTE: it is better to copy data to another CB and do not reuse CB between writer and kernel
 
-    // cb_wait_front(cb_gained_dL_dout, 1);
-    // DPRINT << "cb_gained_dL_dout" << ENDL();
-    // print_full_tile(cb_gained_dL_dout, 0);
+    DPRINT << "Wt: " << Wt << ENDL();
 
-    // cb_wait_front(cb_scale, 1);
-    // DPRINT << "cb_scale" << ENDL();
-    // print_full_tile(cb_scale, 0);
+    // cb_wait_front(cb_gamma_idx, Wt);
+    // DPRINT << "cb_gamma_idx: " << ENDL();
+    // print_full_tile(cb_gamma_idx, 0, true);
 
-    // cb_wait_front(cb_c_by_ms_a, 1);
-    // DPRINT << "cb_c_by_ms_a" << ENDL();
-    // print_full_tile(cb_c_by_ms_a, 0);
+    // cb_wait_front(cb_dL_out_idx, Wt);
+    // DPRINT << "cb_dL_out_idx: " << ENDL();
+    // print_full_tile(cb_dL_out_idx, 0, true);
 
-    // cb_wait_front(cb_rhs, 1);
-    // DPRINT << "cb_rhs" << ENDL();
-    // print_full_tile(cb_rhs, 0);
+    // cb_wait_front(cb_recip_rms_a_bcasted_idx, onetile);
+    // DPRINT << "cb_recip_rms_a_bcasted_idx: " << ENDL();
+    // print_full_tile(cb_recip_rms_a_bcasted_idx, 0, true);
 
-    /// SECTION: dL_da
+    // // cb_wait_front(cb_rms_a_idx, onetile);
+    // DPRINT << "cb_rms_a_idx: " << ENDL();
+    // print_full_tile(cb_rms_a_idx, 0, true);
 
+    // // cb_wait_front(cb_input_idx, Wt);
+    // DPRINT << "cb_input_idx: " << ENDL();
+    // print_full_tile(cb_input_idx, 0, true);
+    // print_full_tile(cb_input_idx, 1, true);
+
+    // print_full_tile(cb_input_idx, 1, true);
+
+    // cb_wait_front(cb_scale_idx, Wt);
+    // DPRINT << "cb_scale_idx: " << ENDL();
+    // print_full_tile(cb_scale_idx, 0, true);
+    // print_full_tile(cb_scale_idx, 1, true);
+
+    // cb_wait_front(cb_scale_bcasted, onetile);
+    // DPRINT << "bcasted_scale" << cb_scale_bcasted << ENDL();
+    // print_full_tile(cb_scale_bcasted, 0, true);
+
+    // DPRINT << "cb_scaler_idx: " << cb_scaler_idx << ENDL();
+    // cb_wait_front(cb_scaler_idx, onetile);
+    // DPRINT << "cb_scaler_idx ready" << ENDL();
+    // print_full_tile(cb_scaler_idx, 0, true);
+
+    // DPRINT << "Waiting for cb_dL_da_idx" << ENDL();
     // cb_wait_front(cb_dL_da_idx, onetile);
-    // DPRINT << "cb_dL_da_idx" << ENDL();
-    // print_full_tile(cb_dL_da_idx, 0);
+    // DPRINT << "cb_dL_da_idx ready" << ENDL();
+    // // DPRINT << "thi is rhs in fact" << ENDL();
+    // print_full_tile(cb_dL_da_idx, 0, true);
 
-    // DPRINT << "cb_gained_dL_dout" << ENDL();
-    // print_full_tile(cb_gained_dL_dout, 0);
-
-    // DPRINT << "cb_scale" << ENDL();
-    // print_full_tile(cb_scale, 0);
-
-    // DPRINT << "cb_c_by_ms_a" << ENDL();
-    // print_full_tile(cb_c_by_ms_a, 0);
-
-    // DPRINT << "cb_rhs" << ENDL();
-    // print_full_tile(cb_rhs, 0);
-
-    // DPRINT << "cb_input_idx" << ENDL();
-    // print_full_tile(cb_input_idx, 0);
-
-    // DPRINT << "cb_rms_a_idx" << ENDL();
-    // print_full_tile(cb_rms_a_idx, 0);
-
-    // DPRINT << "cb_dL_out_idx" << ENDL();
-    // print_full_tile(cb_dL_out_idx, 0);
-
-    /// SECTION: dL_dgamma_components
-
-    // cb_wait_front(cb_dL_dgamma_components, onetile);
-    // DPRINT << "cb_dL_dgamma_components" << ENDL();
-    // print_full_tile(cb_dL_dgamma_components, 0);
-
-    // DPRINT << "cb_input_idx" << ENDL();
-    // print_full_tile(cb_input_idx, 0);
-    // DPRINT << "cb_rms_a_idx" << ENDL();
-    // print_full_tile(cb_rms_a_idx, 0);
-    // DPRINT << "cb_a_over_rms_a" << ENDL();
-    // print_full_tile(cb_a_over_rms_a, 0);
-
-    // DPRINT << "cb_dL_out_idx" << ENDL();
-    // print_full_tile(cb_dL_out_idx, 0);
+    // DPRINT << "Waiting for cb_dL_dgamma_components" << ENDL();
+    // cb_wait_front(cb_dL_dgamma_components, Wt);
+    // DPRINT << "cb_dL_dgamma_components ready" << ENDL();
+    // print_full_tile(cb_dL_dgamma_components, 0, true);
+    // print_full_tile(cb_dL_dgamma_components, 1, true);
 
     uint32_t end_row = start_row + num_rows_to_process;
     // DPRINT << "Writing dx and dgamma for rows from " << start_row << " to " << end_row << ENDL();

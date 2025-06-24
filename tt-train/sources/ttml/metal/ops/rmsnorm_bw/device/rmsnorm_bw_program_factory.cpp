@@ -4,6 +4,7 @@
 
 #include "rmsnorm_bw_program_factory.hpp"
 
+#include <cstdint>
 #include <tt-metalium/host_api.hpp>
 
 #include "tt-train/sources/ttml/metal/ops/common/program_utils.hpp"
@@ -31,27 +32,29 @@ constexpr uint32_t kDgammaBufferIdx = 1U;
 
 // CBs with input data
 constexpr auto kInputCbIndex = tt::CBIndex::c_0;
-constexpr auto kMaskWCbIndex = tt::CBIndex::c_1;  // Unused atm
+constexpr auto kMaskWCbIndex = tt::CBIndex::c_1;
 constexpr auto kScalerCbIndex = tt::CBIndex::c_2;
-constexpr auto kGammaCbIndex = tt::CBIndex::c_3;  // Number of activations, i.e. c in the paper
+constexpr auto kGammaCbIndex = tt::CBIndex::c_3;
 constexpr auto kRmsACbIndex = tt::CBIndex::c_4;
 constexpr auto kDLoutCbIndex = tt::CBIndex::c_5;
+constexpr auto kOneCbIndex = tt::CBIndex::c_6;
 // CBs with output data
-constexpr auto kDLdaCbIndex = tt::CBIndex::c_6;
-constexpr auto kDLdgammaCbIndex = tt::CBIndex::c_7;
+constexpr auto kDLdaCbIndex = tt::CBIndex::c_7;
+constexpr auto kDLdgammaComponentsCbIndex = tt::CBIndex::c_8;
 // CBs with intermediate computations
-constexpr auto kScaledGainCbIndex = tt::CBIndex::c_8;
-constexpr auto kGainedDLdoutCbIndex = tt::CBIndex::c_9;
+constexpr auto kRecipRmsACbIndex = tt::CBIndex::c_9;
 constexpr auto kScaleCbIndex = tt::CBIndex::c_10;
-constexpr auto kMsACbIndex = tt::CBIndex::c_11;
-constexpr auto kCByMsACbIndex = tt::CBIndex::c_12;
-constexpr auto kRhsCbIndex = tt::CBIndex::c_13;
-constexpr auto kAOverRmsACbIndex = tt::CBIndex::c_14;
-constexpr auto kDLdgammaComponentsCbIndex = tt::CBIndex::c_15;
-// CBs with masked data (they should have max size of 1 tile)
-constexpr uint32_t cb_masked_input_idx = tt::CBIndex::c_16;
-constexpr uint32_t cb_masked_gamma_idx = tt::CBIndex::c_17;
+constexpr auto kScaleBcastedCbIndex = tt::CBIndex::c_11;
 constexpr uint32_t cb_masked_dL_out_idx = tt::CBIndex::c_18;
+
+// Q: should some of these be 2U?
+constexpr uint32_t kNumMaskTiles = 1U;
+constexpr uint32_t kNumScalerTiles = 1U;
+constexpr uint32_t kNumRmsATiles = 2U;
+constexpr uint32_t kNumOneTiles = 1U;
+constexpr uint32_t kNumRecipRmsATiles = 1U;
+constexpr uint32_t kNumScaleTiles = 2U;
+constexpr uint32_t kNumScaleBcastedTiles = 1U;
 
 const std::string kMaskWDefineKey = "DO_MASK_W";
 const std::string kEverythingFitsInL1DefineKey = "EVERYTHING_FITS_IN_L1";
@@ -188,7 +191,9 @@ void assign_per_core_runtime_args(
 
 RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::create(
     const operation_attributes_t& args, const tensor_args_t& tensor_args, tensor_return_value_t& output) {
+    // -------------------------------------------------------------------------
     // 1) Setup device, data formats, tile sizes, and compute split
+    // -------------------------------------------------------------------------
     const auto& input = tensor_args.input;
     const auto& gamma = tensor_args.gamma;
     const auto& rms = tensor_args.rms;
@@ -215,6 +220,10 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     uint32_t Ht = padded_tensor_shape[-2] / tt::constants::TILE_HEIGHT;
     uint32_t NC = padded_tensor_shape[0] * padded_tensor_shape[1];
     uint32_t total_rows_to_process = NC * Ht;
+    std::cerr << "Wt: " << Wt << std::endl;
+    std::cerr << "Ht: " << Ht << std::endl;
+    std::cerr << "NC: " << NC << std::endl;
+    std::cerr << "Total rows to process: " << total_rows_to_process << std::endl;
 
     // get the number of inner dimension
     uint32_t num_inner = input.logical_shape()[-1];
@@ -235,63 +244,119 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         tt::tt_metal::split_work_to_cores(compute_with_storage_grid_size, total_rows_to_process);
 
     // compile arguments
-    uint32_t packed_scaler = pack_two_bfloat16_to_uint32(static_cast<float>(1 / num_inner));
+    std::cerr << "num_inner: " << num_inner << std::endl;
+    auto a = static_cast<float>(1.F / num_inner);
+    std::cerr << "a: " << a << std::endl;
+    uint32_t packed_scaler = pack_two_bfloat16_to_uint32(static_cast<float>(1.F / num_inner));
+    std::cerr << "packed_scaler: " << packed_scaler << std::endl;
 
+    // -------------------------------------------------------------------------
     // 2) Create and configure circular buffers
-    // std::cerr << "Wt: " << Wt << std::endl;
+    // -------------------------------------------------------------------------
+    const uint32_t twice_block_size = 2U * block_size;
+
+    // Move the memory check to a separate function. And just return boolean whether it fits in L1 or not.
+    const uint32_t available_L1_in_bytes =
+        device->l1_size_per_core() - device->allocator()->get_base_allocator_addr(tt::tt_metal::HalMemType::L1);
+
+    const uint64_t input_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t mask_memory = kNumMaskTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scaler_memory = kNumScalerTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t gamma_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t rms_a_memory = kNumRmsATiles * bfloat16_single_tile_size_bytes;
+    const uint64_t dL_dout_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t one_memory = kNumOneTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t dL_da_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t dL_dgamma_components_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t recip_rms_a_bcasted_memory = kNumRecipRmsATiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scale_memory = kNumScaleTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scale_bcasted_memory = kNumScaleBcastedTiles * bfloat16_single_tile_size_bytes;
+
+    // Total L1 memory required
+    // TODO: Add memory for intermediate computations
+    const uint64_t required_L1_in_bytes = input_memory + mask_memory + scaler_memory + gamma_memory + rms_a_memory +
+                                          dL_dout_memory + one_memory + dL_da_memory + dL_dgamma_components_memory +
+                                          recip_rms_a_bcasted_memory + scale_memory + scale_bcasted_memory;
+
+    const bool everything_fits_in_l1 = required_L1_in_bytes <= available_L1_in_bytes;
+
+    const uint32_t num_input_tiles =
+        (everything_fits_in_l1) ? Wt : twice_block_size;  // If everything fits in L1, read Wt tiles, else read 2x block
+
+    // TODO: For now let's assume that everything is in bfloat16 format. Reduction should be in float32 format.
     auto data_format = input_data_format;  // tt::DataFormat::Float16_b
 
-    auto cb_input =
-        create_circular_buffer(program, all_cores, kInputCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_mask_w =
-        create_circular_buffer(program, all_cores, kMaskWCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_scaler =
-        create_circular_buffer(program, all_cores, kScalerCbIndex, data_format, bfloat16_single_tile_size_bytes, 1);
-    auto cb_gamma =
-        create_circular_buffer(program, all_cores, kGammaCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
+    auto cb_input = create_circular_buffer(
+        program, all_cores, kInputCbIndex, data_format, bfloat16_single_tile_size_bytes, num_input_tiles);
+    auto cb_mask_w = create_circular_buffer(
+        program, all_cores, kMaskWCbIndex, data_format, bfloat16_single_tile_size_bytes, kNumMaskTiles);
+    auto cb_scaler = create_circular_buffer(
+        program, all_cores, kScalerCbIndex, data_format, bfloat16_single_tile_size_bytes, kNumScalerTiles);
+    auto cb_gamma = create_circular_buffer(
+        program, all_cores, kGammaCbIndex, data_format, bfloat16_single_tile_size_bytes, num_input_tiles);
     auto cb_rms_a = create_circular_buffer(
-        program, all_cores, kRmsACbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);  // 2
-    auto cb_dLdout =
-        create_circular_buffer(program, all_cores, kDLoutCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_dL_da =
-        create_circular_buffer(program, all_cores, kDLdaCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_dL_dgamma =
-        create_circular_buffer(program, all_cores, kDLdgammaCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_scaled_gain = create_circular_buffer(
-        program, all_cores, kScaledGainCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_gained_dL_dout = create_circular_buffer(
-        program, all_cores, kGainedDLdoutCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_scale =
-        create_circular_buffer(program, all_cores, kScaleCbIndex, data_format, bfloat16_single_tile_size_bytes, 1);
-    auto cb_ms_a =
-        create_circular_buffer(program, all_cores, kMsACbIndex, data_format, bfloat16_single_tile_size_bytes, 1);
-    auto cb_c_by_ms_a = create_circular_buffer(
-        program, all_cores, kCByMsACbIndex, data_format, bfloat16_single_tile_size_bytes, 1);  // 1?
-    auto cb_rhs =
-        create_circular_buffer(program, all_cores, kRhsCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);  // 2
-    auto cb_a_over_rms_a = create_circular_buffer(
-        program, all_cores, kAOverRmsACbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);  // 1?
+        program, all_cores, kRmsACbIndex, data_format, bfloat16_single_tile_size_bytes, kNumRmsATiles);
+    auto cb_dLdout = create_circular_buffer(
+        program, all_cores, kDLoutCbIndex, data_format, bfloat16_single_tile_size_bytes, num_input_tiles);
+    auto cb_one = create_circular_buffer(
+        program, all_cores, kOneCbIndex, data_format, bfloat16_single_tile_size_bytes, kNumOneTiles);
+    auto cb_dL_da = create_circular_buffer(
+        program, all_cores, kDLdaCbIndex, data_format, bfloat16_single_tile_size_bytes, num_input_tiles);
     auto cb_dL_dgamma_components = create_circular_buffer(
-        program, all_cores, kDLdgammaComponentsCbIndex, data_format, bfloat16_single_tile_size_bytes, Wt);
-    auto cb_masked_input = create_circular_buffer(
-        program, all_cores, cb_masked_input_idx, data_format, bfloat16_single_tile_size_bytes, Wt);  // 1
-    auto cb_masked_gamma = create_circular_buffer(
-        program, all_cores, cb_masked_gamma_idx, data_format, bfloat16_single_tile_size_bytes, Wt);  // 1
-    auto cb_masked_dL_out = create_circular_buffer(
-        program, all_cores, cb_masked_dL_out_idx, data_format, bfloat16_single_tile_size_bytes, Wt);  // 1
+        program, all_cores, kDLdgammaComponentsCbIndex, data_format, bfloat16_single_tile_size_bytes, num_input_tiles);
+    auto cb_recip_rms_a_bcasted = create_circular_buffer(
+        program, all_cores, kRecipRmsACbIndex, data_format, bfloat16_single_tile_size_bytes, kNumRecipRmsATiles);
+    auto cb_scale = create_circular_buffer(
+        program, all_cores, kScaleCbIndex, data_format, bfloat16_single_tile_size_bytes, kNumScaleTiles);
+    auto cb_scale_bcasted = create_circular_buffer(
+        program, all_cores, kScaleBcastedCbIndex, data_format, bfloat16_single_tile_size_bytes, kNumScaleBcastedTiles);
 
-    // 3) Create reader/writer/compute kernels
+    // -------------------------------------------------------------------------
+    // 3) Create reader/writer kernels
+    // -------------------------------------------------------------------------
     auto* input_buffer = input.buffer();
-    auto* gamma_buffer = gamma.buffer();
-    auto* rms_buffer = rms.buffer();
-    auto* dLdout_buffer = dLdout.buffer();
-    auto* da_buffer = output[0].buffer();
-    auto* dgamma_buffer = output[1].buffer();
+    TT_FATAL(
+        input_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "Input buffer must be in DRAM. Input buffer of type {}",
+        magic_enum::enum_name(input_buffer->buffer_type()));
 
-    // TODO: Configue defines like masking and fits in L1 etc.
+    auto* gamma_buffer = gamma.buffer();
+    TT_FATAL(
+        gamma_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "Gamma buffer must be in DRAM. Gamma buffer of type {}",
+        magic_enum::enum_name(gamma_buffer->buffer_type()));
+
+    auto* rms_buffer = rms.buffer();
+    TT_FATAL(
+        rms_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "RMS buffer must be in DRAM. RMS buffer of type {}",
+        magic_enum::enum_name(rms_buffer->buffer_type()));
+
+    auto* dLdout_buffer = dLdout.buffer();
+    TT_FATAL(
+        dLdout_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "dL_dout buffer must be in DRAM. dL_dout buffer of type {}",
+        magic_enum::enum_name(dLdout_buffer->buffer_type()));
+
+    auto* dL_da_buffer = output[0].buffer();
+    TT_FATAL(
+        dL_da_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "dL_da buffer must be in DRAM. dL_da buffer of type {}",
+        magic_enum::enum_name(dL_da_buffer->buffer_type()));
+
+    auto* dL_dgamma_components_buffer = output[1].buffer();
+    TT_FATAL(
+        dL_dgamma_components_buffer->buffer_type() == tt::tt_metal::BufferType::DRAM,
+        "dL_dgamma buffer must be in DRAM. dL_dgamma buffer of type {}",
+        magic_enum::enum_name(dL_dgamma_components_buffer->buffer_type()));
+
+    std::cerr << "everything_fits_in_l1: " << everything_fits_in_l1 << std::endl;
     std::map<std::string, std::string> defines;  // Add defines as needed
     if (mask_w != 0) {
         defines[kMaskWDefineKey] = "1";
+    }
+    if (everything_fits_in_l1) {
+        defines[kEverythingFitsInL1DefineKey] = "1";
     }
 
     // Setup defines for reduce.
@@ -313,7 +378,11 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         },
         defines,
         kWriterKernelPath);
-    // 4) Create compute kernels for RMSNorm backward
+
+    // -------------------------------------------------------------------------
+    // 4) Create compute kernels for cross_entropy_bw
+    // -------------------------------------------------------------------------
+
     // Group 1 compile-time arguments
     std::vector<uint32_t> compute_group_1_args = {
         num_rows_per_core_group_1,  // per_core_block_cnt
@@ -326,17 +395,20 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         create_compute_kernel(program, core_group_1, compute_group_1_args, defines, kComputeKernelPath);
 
     // Group 2 (if present) compile-time arguments
-    std::vector<uint32_t> compute_group_2_args = {
-        num_rows_per_core_group_2,  // per_core_block_cnt
-        block_size,                 // per_core_block_size
-        mask_w,                     // mask_w
-        Wt                          // num_inner / TILE_W
-    };
+    if (!core_group_2.ranges().empty()) {
+        std::vector<uint32_t> compute_group_2_args = {
+            num_rows_per_core_group_2,  // per_core_block_cnt
+            block_size,                 // per_core_block_size
+            mask_w,                     // mask_w
+            Wt                          // num_inner / TILE_W
+        };
 
-    kernels.compute_group_2 =
-        create_compute_kernel(program, core_group_2, compute_group_2_args, defines, kComputeKernelPath);
-
-    // 4) Assign runtime args for each core
+        kernels.compute_group_2 =
+            create_compute_kernel(program, core_group_2, compute_group_2_args, defines, kComputeKernelPath);
+    }
+    // -------------------------------------------------------------------------
+    // 5) Assign runtime args for each core
+    // -------------------------------------------------------------------------
     assign_per_core_runtime_args(
         program,
         kernels,
@@ -344,8 +416,8 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         gamma_buffer,
         rms_buffer,
         dLdout_buffer,
-        da_buffer,
-        dgamma_buffer,
+        dL_da_buffer,
+        dL_dgamma_components_buffer,
         num_cores,
         num_cores_y,
         num_rows_per_core_group_1,
@@ -353,7 +425,9 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         core_group_1,
         core_group_2);
 
-    // 5) Return the fully configured program & relevant shared variables
+    // -------------------------------------------------------------------------
+    // 6) Return the fully configured program & relevant shared variables
+    // -------------------------------------------------------------------------
     return cached_program_t{std::move(program), {/* Add any shared variables needed for your backward op here */}};
 }
 

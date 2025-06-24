@@ -94,9 +94,10 @@ spec_return_value_t RMSNormBackwardDeviceOperation::compute_output_specs(
     if (tensor_args.preallocated_dgamma.has_value()) {
         output_specs.push_back(tensor_args.preallocated_dgamma->tensor_spec());
     } else {
-        // dGamma shape matches gamma
+        // dGamma shape matches gamma - NO IT MATCHES THE INPUT SHAPE, because we sum over the batch dimension outside
+        // the kernel!
         output_specs.emplace_back(
-            tensor_args.gamma.logical_shape(),
+            tensor_args.input.logical_shape(),
             tt::tt_metal::TensorLayout(
                 tensor_args.gamma.dtype(), tt::tt_metal::Layout::TILE, tensor_args.gamma.memory_config()));
     }

@@ -210,6 +210,19 @@ autograd::TensorPtr rmsnorm_composite(
         // scale = (a^T · gained_dL_dout) : [B,1,S,C] x [B,1,S,C] -> [1]
         // scaled_outer = scale *. a : [1] x [B,1,S,C] -> [B,1,S,C]
 
+        // auto scale_components = ttnn::multiply(
+        //     a,
+        //     gained_dL_dout,
+        //     std::nullopt,
+        //     std::nullopt,
+        //     std::nullopt,
+        //     none,
+        //     none,
+        //     none,
+        //     false);  // [B,1,S,C] x [B,1,S,C] -> [B,1,S,C]
+        // std::cout << "scale_components: " << std::endl;
+        // scale_components.print();
+
         auto scale = ttml::ttnn_fixed::sum_over_dim(
             ttnn::multiply(a, gained_dL_dout, std::nullopt, std::nullopt, std::nullopt, none, none, none, false),
             3);  // [B,1,S,C] x [B,1,S,C] -> [B,1,S,C] -> [B,1,S,1]
