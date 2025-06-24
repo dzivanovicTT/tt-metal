@@ -462,13 +462,15 @@ void HWCommandQueue::enqueue_program(Program& program, bool blocking) {
     }
 
     // Expected number of workers from the previous run. Used to generate the wait command in the EnqueueProgramCommand
-    const auto expected_workers_completed = program_dispatch::update_expected_num_workers_completed(
+    const auto updated_worker_counts = program_dispatch::get_expected_num_workers_completed_updates(
         device_,
         sub_device_id,
         get_config_buffer_mgr(sub_device_index),
         expected_num_workers_completed_[sub_device_index],
         num_additional_workers,
         id_);
+    uint32_t expected_workers_completed = updated_worker_counts.previous;
+    expected_num_workers_completed_[sub_device_index] = updated_worker_counts.current;
 
 #ifdef DEBUG
     if (tt::tt_metal::MetalContext::instance().rtoptions().get_validate_kernel_binaries()) {

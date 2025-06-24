@@ -241,13 +241,15 @@ void FDMeshCommandQueue::enqueue_mesh_workload(MeshWorkload& mesh_workload, bool
         // Update the expected number of workers dispatch must wait on
         trace_ctx_->descriptors[sub_device_id].num_completion_worker_cores += num_workers;
     } else {
-        expected_num_workers_completed = program_dispatch::update_expected_num_workers_completed(
+        const auto updated_worker_counts = program_dispatch::get_expected_num_workers_completed_updates(
             mesh_device_,
             sub_device_id,
             get_config_buffer_mgr(*sub_device_id),
             expected_num_workers_completed_[*sub_device_id],
             num_workers,
             id_);
+        expected_num_workers_completed = updated_worker_counts.previous;
+        expected_num_workers_completed_[*sub_device_id] = updated_worker_counts.current;
     }
 
     // Reserve space in the L1 Kernel Config Ring Buffer for this workload.
