@@ -63,12 +63,15 @@ tt::tt_metal::KernelHandle generate_edm_kernel(
     const CoreCoord& eth_core,
     const tt::tt_metal::DataMovementProcessor risc_id,
     tt::tt_metal::NOC noc_id) {
-    static const std::string erisc_kernel_path =
-        "ttnn/cpp/ttnn/operations/ccl/kernels/edm_fabric/fabric_edm_packet_header_generator.cpp";
-
-    const auto opt_level = tt::tt_metal::KernelBuildOptLevel::O2;
     return generate_edm_kernel_impl(
-        program, device, edm_builder, erisc_kernel_path, eth_core, risc_id, noc_id, opt_level);
+        program,
+        device,
+        edm_builder,
+        "tt_metal/fabric/impl/kernels/edm_fabric/fabric_erisc_datamover.cpp",
+        eth_core,
+        risc_id,
+        noc_id,
+        tt::tt_metal::KernelBuildOptLevel::O3);
 }
 
 }  // namespace tt::tt_fabric
