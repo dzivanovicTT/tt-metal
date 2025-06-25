@@ -19,8 +19,8 @@ struct tensor_args_t {
     ttnn::Tensor gamma;
     ttnn::Tensor rms;
     ttnn::Tensor dL_dout;
-    std::optional<ttnn::Tensor> preallocated_dx = std::nullopt;
-    std::optional<ttnn::Tensor> preallocated_dgamma = std::nullopt;
+    std::optional<ttnn::Tensor> preallocated_da = std::nullopt;
+    std::optional<ttnn::Tensor> preallocated_dgamma_components = std::nullopt;
 };
 
 // Output tensor specs and tensors

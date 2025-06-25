@@ -3,25 +3,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // TODO: Do it in everyfile! (company name has been changed)
 
-#include <compute_kernel_api/cb_api.h>
-// #include <compute_kernel_api/common_globals.h>
-#include <compute_kernel_api/eltwise_unary/recip.h>
-#include <compute_kernel_api/pack.h>
-#include <compute_kernel_api/reg_api.h>
-#include <debug/dprint.h>
-
-#include <cstdint>
-
-// TODO REMOVE UNNECESSARY INCLUDES
-#include "compute_kernel_api.h"
 #include "compute_kernel_api/bcast.h"
-#include "compute_kernel_api/common.h"
-#include "compute_kernel_api/copy_dest_values.h"
+#include "compute_kernel_api/cb_api.h"
 #include "compute_kernel_api/eltwise_binary.h"
 #include "compute_kernel_api/eltwise_binary_sfpu.h"
 #include "compute_kernel_api/eltwise_unary/eltwise_unary.h"
+#include "compute_kernel_api/eltwise_unary/recip.h"
 #include "compute_kernel_api/mask.h"
+#include "compute_kernel_api/pack.h"
 #include "compute_kernel_api/reduce.h"
+#include "compute_kernel_api/reg_api.h"
 #include "compute_kernel_api/tile_move_copy.h"
 
 namespace NAMESPACE {
@@ -31,8 +22,7 @@ constexpr uint32_t block_size = get_compile_time_arg_val(1);
 constexpr uint32_t mask_w = get_compile_time_arg_val(2);
 constexpr uint32_t Wt = get_compile_time_arg_val(3);
 
-// Think about move this to compile args to ainline void mess while adjusting indicies
-//  CBs with input data
+// TODO: Consider moving these constants to compile-time arguments to avoid index-mismatch issues while developing.
 constexpr uint32_t cb_input_idx = tt::CBIndex::c_0;
 constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;
 constexpr uint32_t cb_scaler_idx = tt::CBIndex::c_2;  // 1/c - used for scaling
@@ -41,7 +31,6 @@ constexpr uint32_t cb_rms_a_idx = tt::CBIndex::c_4;
 constexpr uint32_t cb_dL_out_idx = tt::CBIndex::c_5;
 constexpr uint32_t cb_one_idx = tt::CBIndex::c_6;  // Used to reduce scale to a single value
 // CBs with output data
-// Create more intermedaite-output CBs that will be used exclusively by the writer. Do not compute anything on them
 constexpr uint32_t cb_dL_da_idx = tt::CBIndex::c_7;
 constexpr uint32_t cb_dL_dgamma_components = tt::CBIndex::c_8;
 // CBs with intermediate computations
@@ -67,7 +56,6 @@ inline void pack_and_push(uint32_t reg, uint32_t cb) {
     // and then packing can start (wait), so commit first and then wait is preferred.
     cb_reserve_back(cb, onetile);
     tile_regs_wait();
-    // Q: is this pack_reconfig_data_format necessary? It seems like it is not, but it is better to be sure.
     pack_reconfig_data_format(cb);
     pack_tile(reg, cb);
     tile_regs_release();
@@ -100,7 +88,12 @@ inline void compute_gained_dL_dout(uint32_t col, uint32_t working_register, uint
     mul_binary_tile(working_register, tile_register);
 }
 
-// TODO: move compute_scale to a separate file. And based on a flag debug, include one or another version of the code.
+// TODO: There was an idea to move compute_scale to separate files and include here only one based on the
+// EVERYTHING_FITS_IN_L1 compile-time argument. However, I don't find it nice because both implementations reuse
+// compute_gained_dL_dout, so either we would have a circular dependency or we would have to duplicate the code moving
+// this function to those new files. So I vote to keep it here. Maybe there is an alternative of merging both
+// implementations into one, but I don't see it right now, mostly due to cb_wait_front and cb_pop_front calls. Using a
+// lot of #ifdefs is not nice, and I guess it can only make the code more complex and less readable.
 #ifdef EVERYTHING_FITS_IN_L1
 inline void compute_scale() {
     // Compute:
@@ -153,9 +146,8 @@ inline void compute_scale() {
         // Mask the tile if needed
         if constexpr (do_mask_w) {
             if (col + 1 == Wt) {
-                // This is limitation of the function mask_tile
-                // Mask tile currently does not work for mask register that is not next to data register
-                const uint32_t mask_register = working_register + 1U;  // mask register should be next to data register
+                // Limitation: mask_tile only works when the mask register is immediately next to the data register.
+                const uint32_t mask_register = working_register + 1U;
 
                 copy_tile_init(cb_mask_w_idx);
                 copy_tile(cb_mask_w_idx, /* tile_idx */ 0, /* register idx */ mask_register);
@@ -243,8 +235,7 @@ inline void compute_scale() {
             // Mask the tile if needed
             if constexpr (do_mask_w) {
                 if (col + 1 == Wt) {
-                    // This is limitation of the function mask_tile
-                    // Mask tile currently does not work for mask register that is not next to data register
+                    // Limitation: mask_tile only works when the mask register is immediately next to the data register.
                     const uint32_t mask_register =
                         working_register + 1U;  // mask register should be next to data register
 
@@ -394,8 +385,7 @@ inline void compute_dL_dgamma_components(
     //     /*compute_kernel_config */ core::ComputeKernelConfig::precise());  // [B,1,S,C] ->
     //     [1,1,1,C]
     // NOTE: To compute dL_dg, we need to process all batches. Therefore, we will compute here only
-    // dL_dg_components for each tile, and then store them in CB. The reduction will be done in a
-    // separate program.
+    // dL_dg_components, and then store them in CB. The reduction will be done outside the kernel.
 }
 
 // TODO: this could be probably unified/merged with pack_and_push.
@@ -411,13 +401,7 @@ inline void pack_and_push_block(uint32_t cb_output) {
 
 // TODO: Ask about bfloat16 vs float32 for regs, cbs and computations on LLK channel
 
-// NOTE: whenever add any debug things mark it with a comment to find it later easliy.
-
-// NOTE: run nano-Llama to check the performance
-// Run baseline first and then improvemnt.
-// What to look at: score (how loss is different) and performance boost.
-// Training for 5mil params, should take 20min
-// Main file for Llama is also nano-gpt example and we need to adjust config
+// TASK: see how to prepare PR - have a look at Slava's past PRs
 inline void MAIN {
     if constexpr (do_mask_w) {
         cb_wait_front(cb_mask_w_idx, onetile);
@@ -428,13 +412,10 @@ inline void MAIN {
     init_sfpu(cb_input_idx, cb_dL_da_idx);
     binary_op_init_common(cb_input_idx, cb_gamma_idx, cb_dL_da_idx);
 
-    // //-----DEBUG-----
-    // return;
-    // //-----DEBUG-----
-
-    // TODO: perform reduction on float32, not bfloat16. This might require utilization of
-    // reconfig_data_format and pack_reconfig_data_format.
-    MATH(DPRINT << "num_rows_per_core: " << num_rows_per_core << ENDL());
+    // TODO: Reduction should be done on float32, not bfloat16. Currently reduce_tile suffers from precision issues. One
+    // option is to use matmul with onehot vector instead of reduce_tile, or wait for the fix of reduce_tile to be
+    // merged. Then one need to remember to call reconfig_data_format and pack_reconfig_data_format in appropriate
+    // places.
     for (uint32_t row = 0; row < num_rows_per_core; ++row) {
         cb_wait_front(cb_rms_a_idx, onetile);
         // This value is constant for the whole row, so we can compute it once per row.
@@ -446,10 +427,6 @@ inline void MAIN {
         cb_wait_front(cb_scale_idx, onetile);
         bcast_scale();
         cb_wait_front(cb_scale_bcasted_idx, onetile);
-
-        // //-----DEBUG-----
-        // return;
-        // //-----DEBUG-----
 
         for (uint32_t col = 0; col < Wt; col += block_size) {
             cb_reserve_back(cb_dL_da_idx, block_size);
@@ -497,11 +474,6 @@ inline void MAIN {
                     const uint32_t input_tile_idx = block_idx;
 #endif
                     dL_dg_components_register = block_idx;  // 0 or 1 depending on the block_idx.
-                    // -----DEBUG-----
-                    MATH(DPRINT << "input_tile_idx: " << input_tile_idx << ENDL());
-                    MATH(DPRINT << "dL_dg_components_register: " << dL_dg_components_register << ENDL());
-                    MATH(DPRINT << "tile_register: " << tile_register << ENDL());
-                    // -----DEBUG-----
                     compute_dL_dgamma_components(
                         input_tile_idx,
                         dL_dg_components_register,

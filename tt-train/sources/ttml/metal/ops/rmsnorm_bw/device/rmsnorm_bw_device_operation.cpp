@@ -62,18 +62,18 @@ void RMSNormBackwardDeviceOperation::validate_on_program_cache_miss(
     const auto& gamma_tensor = tensor_args.gamma;
     const auto& rms_tensor = tensor_args.rms;
     const auto& dL_dout_tensor = tensor_args.dL_dout;
-    const auto& preallocated_dx_tensor = tensor_args.preallocated_dx;
-    const auto& preallocated_dgamma_tensor = tensor_args.preallocated_dgamma;
+    const auto& preallocated_da_tensor = tensor_args.preallocated_da;
+    const auto& preallocated_dgamma_components_tensor = tensor_args.preallocated_dgamma_components;
 
     check_tensor(input_tensor, "Input");
     check_tensor(gamma_tensor, "Gamma");
     check_tensor(rms_tensor, "RMS");
     check_tensor(dL_dout_tensor, "dL_dout");
-    if (preallocated_dx_tensor.has_value()) {
-        check_tensor(preallocated_dx_tensor.value(), "Preallocated dX");
+    if (preallocated_da_tensor.has_value()) {
+        check_tensor(preallocated_da_tensor.value(), "Preallocated dX");
     }
-    if (preallocated_dgamma_tensor.has_value()) {
-        check_tensor(preallocated_dgamma_tensor.value(), "Preallocated dGamma");
+    if (preallocated_dgamma_components_tensor.has_value()) {
+        check_tensor(preallocated_dgamma_components_tensor.value(), "Preallocated dGamma");
     }
 }
 
@@ -82,8 +82,8 @@ spec_return_value_t RMSNormBackwardDeviceOperation::compute_output_specs(
     spec_return_value_t output_specs;
     output_specs.reserve(2U);
 
-    if (tensor_args.preallocated_dx.has_value()) {
-        output_specs.push_back(tensor_args.preallocated_dx->tensor_spec());
+    if (tensor_args.preallocated_da.has_value()) {
+        output_specs.push_back(tensor_args.preallocated_da->tensor_spec());
     } else {
         output_specs.emplace_back(
             tensor_args.input.logical_shape(),
@@ -91,11 +91,11 @@ spec_return_value_t RMSNormBackwardDeviceOperation::compute_output_specs(
                 tensor_args.input.dtype(), tt::tt_metal::Layout::TILE, tensor_args.input.memory_config()));
     }
 
-    if (tensor_args.preallocated_dgamma.has_value()) {
-        output_specs.push_back(tensor_args.preallocated_dgamma->tensor_spec());
+    if (tensor_args.preallocated_dgamma_components.has_value()) {
+        output_specs.push_back(tensor_args.preallocated_dgamma_components->tensor_spec());
     } else {
-        // dGamma shape matches gamma - NO IT MATCHES THE INPUT SHAPE, because we sum over the batch dimension outside
-        // the kernel!
+        // Since we cannot compute dL_dgamma in the kernel, we need to return dgamma_components, which will be reduced
+        // outside the kernel. The shape of dgamma_components is the same as the input shape.
         output_specs.emplace_back(
             tensor_args.input.logical_shape(),
             tt::tt_metal::TensorLayout(
@@ -112,14 +112,14 @@ tensor_return_value_t RMSNormBackwardDeviceOperation::create_output_tensors(
 
     spec_return_value_t output_specs = compute_output_specs(args, tensor_args);
 
-    if (tensor_args.preallocated_dx.has_value()) {
-        output_tensors.push_back(tensor_args.preallocated_dx.value());
+    if (tensor_args.preallocated_da.has_value()) {
+        output_tensors.push_back(tensor_args.preallocated_da.value());
     } else {
         output_tensors.push_back(create_device_tensor(output_specs[0], tensor_args.input.device()));
     }
 
-    if (tensor_args.preallocated_dgamma.has_value()) {
-        output_tensors.push_back(tensor_args.preallocated_dgamma.value());
+    if (tensor_args.preallocated_dgamma_components.has_value()) {
+        output_tensors.push_back(tensor_args.preallocated_dgamma_components.value());
     } else {
         output_tensors.push_back(create_device_tensor(output_specs[1], tensor_args.gamma.device()));
     }
@@ -145,8 +145,8 @@ RMSNormBackwardDeviceOperation::invoke(
     const ttnn::Tensor& rms_tensor,
     const ttnn::Tensor& dL_dout_tensor,
     float epsilon,
-    const std::optional<ttnn::Tensor>& preallocated_dx,
-    const std::optional<ttnn::Tensor>& preallocated_dgamma) {
+    const std::optional<ttnn::Tensor>& preallocated_da,
+    const std::optional<ttnn::Tensor>& preallocated_dgamma_components) {
     return {
         operation_attributes_t{
             .epsilon = epsilon,
@@ -156,8 +156,8 @@ RMSNormBackwardDeviceOperation::invoke(
             .gamma = gamma_tensor,
             .rms = rms_tensor,
             .dL_dout = dL_dout_tensor,
-            .preallocated_dx = preallocated_dx,
-            .preallocated_dgamma = preallocated_dgamma,
+            .preallocated_da = preallocated_da,
+            .preallocated_dgamma_components = preallocated_dgamma_components,
         }};
 }
 

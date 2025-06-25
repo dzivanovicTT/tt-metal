@@ -5,7 +5,7 @@
 #include "rmsnorm_bw.hpp"
 
 #include "core/compute_kernel_config.hpp"
-#include "device/rmsnorm_bw_device_operation.hpp"  // if needed
+#include "device/rmsnorm_bw_device_operation.hpp"
 
 namespace ttml::metal::ops::rmsnorm_bw {
 

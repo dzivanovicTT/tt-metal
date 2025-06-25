@@ -36,8 +36,8 @@ struct RMSNormBackwardDeviceOperation {
         const ttnn::Tensor& rms_tensor,
         const ttnn::Tensor& dL_dout_tensor,
         float epsilon = 1e-6F,
-        const std::optional<ttnn::Tensor>& preallocated_dx = std::nullopt,
-        const std::optional<ttnn::Tensor>& preallocated_dgamma = std::nullopt);
+        const std::optional<ttnn::Tensor>& preallocated_da = std::nullopt,
+        const std::optional<ttnn::Tensor>& preallocated_dgamma_components = std::nullopt);
 };
 
 }  // namespace ttml::metal::ops::rmsnorm_bw::device

@@ -2,22 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-#include <compile_time_args.h>
-
-#include <cstdint>
-
-#include "debug/dprint.h"
+#include "dataflow_api.h"
 #include "tt-train/sources/ttml/metal/ops/common/dataflow_utils.hpp"
-
-inline void print_full_tile(uint32_t cb_id, uint32_t tile_id = 0, bool untilize = false) {
-    for (uint8_t r = 0; r < 32; ++r) {
-        SliceRange sr_left = SliceRange{.h0 = r, .h1 = (uint8_t)(r + 1), .hs = 1, .w0 = 0, .w1 = 16, .ws = 1};
-        SliceRange sr_right = SliceRange{.h0 = r, .h1 = (uint8_t)(r + 1), .hs = 1, .w0 = 17, .w1 = 32, .ws = 1};
-        DPRINT << (uint)r << ": " << TileSlice(cb_id, tile_id, sr_left, false, untilize) << " "
-               << TileSlice(cb_id, tile_id, sr_right, true, untilize) << ENDL();
-        break;
-    }
-}
 
 inline void read_tiles(
     const uint32_t cb_idx,
@@ -70,8 +56,8 @@ void kernel_main() {
     uint32_t num_rows_to_process = get_arg_val<uint32_t>(runtime_args_counter++);
     uint32_t start_row = get_arg_val<uint32_t>(runtime_args_counter++);
 
-    // Think about move this to compile args to ainline void mess while adjusting indicies
-    //  CBs with input data
+    // TODO: Consider moving these constants to compile-time arguments to avoid index-mismatch issues while developing.
+    // CBs with input data
     constexpr uint32_t cb_input_idx = tt::CBIndex::c_0;
     constexpr uint32_t cb_mask_w_idx = tt::CBIndex::c_1;
     constexpr uint32_t cb_scaler_idx = tt::CBIndex::c_2;  // 1/c - used for scaling
@@ -100,22 +86,20 @@ void kernel_main() {
 #else
     constexpr bool do_mask_w = false;
 #endif
-    // generate scaler and mask tile
+    // Generate scaler and mask tile.
     constexpr uint16_t one = 0x00003F80;  // (bfloat16)1.0 -> uint16_t
     constexpr uint32_t packed_one = one | (one << 16U);
     constexpr uint16_t zero = 0x0;
     constexpr uint16_t minus_inf = 0xFF80;  // (bfloat16)-inf -> uint16_t
 
-    // generate mask tile
+    // Generate mask tile.
     if constexpr (do_mask_w) {
-        // DPRINT << "Generating mask tile with value: " << mask_w << ENDL();
         generate_mask_tile(cb_mask_w_idx, one, zero, mask_w);
-        // DPRINT << "Generated mask tile done" << ENDL();
     }
 
-    // generate tile with scalar
+    // Generate tile with scalar.
     generate_tile_with_packed_bfloat16_value(cb_scaler_idx, packed_scaler);
-    // generate tile with one
+    // Generate tile with one.
     generate_tile_with_packed_bfloat16_value(cb_one_idx, packed_one);
 
     const uint32_t tile_bytes = get_tile_size(cb_input_idx);

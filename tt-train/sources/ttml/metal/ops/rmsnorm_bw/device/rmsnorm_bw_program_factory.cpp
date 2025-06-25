@@ -20,7 +20,7 @@ constexpr auto kReaderKernelPath =
 constexpr auto kComputeKernelPath =
     "tt-train/sources/ttml/metal/ops/rmsnorm_bw/device/kernels/compute/rmsnorm_bw_kernel.cpp";
 
-// Buffer indices (adjust as needed)
+// Buffer indices
 constexpr uint32_t kInputBufferIdx = 0;
 constexpr uint32_t kGammaBufferIdx = 1U;
 constexpr uint32_t kRmsBufferIdx = 2U;
@@ -45,9 +45,8 @@ constexpr auto kDLdgammaComponentsCbIndex = tt::CBIndex::c_8;
 constexpr auto kRecipRmsACbIndex = tt::CBIndex::c_9;
 constexpr auto kScaleCbIndex = tt::CBIndex::c_10;
 constexpr auto kScaleBcastedCbIndex = tt::CBIndex::c_11;
-constexpr uint32_t cb_masked_dL_out_idx = tt::CBIndex::c_18;
 
-// Q: should some of these be 2U?
+// Some of the below constants are set to 2U because we might need to push a new value before poping the old one.
 constexpr uint32_t kNumMaskTiles = 1U;
 constexpr uint32_t kNumScalerTiles = 1U;
 constexpr uint32_t kNumRmsATiles = 2U;
@@ -175,6 +174,39 @@ void assign_per_core_runtime_args(
     }
 }
 
+bool fits_in_l1_check(
+    const uint32_t Wt,
+    const uint32_t block_size,
+    const uint32_t bfloat16_single_tile_size_bytes,
+    ttnn::IDevice* device) {
+    // Move the memory check to a separate function. And just return boolean whether it fits in L1 or not.
+    const uint32_t available_L1_in_bytes =
+        device->l1_size_per_core() - device->allocator()->get_base_allocator_addr(tt::tt_metal::HalMemType::L1);
+
+    // Memory of input tensors
+    const uint64_t input_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t mask_memory = kNumMaskTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scaler_memory = kNumScalerTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t gamma_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t rms_a_memory = kNumRmsATiles * bfloat16_single_tile_size_bytes;
+    const uint64_t dL_dout_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t one_memory = kNumOneTiles * bfloat16_single_tile_size_bytes;
+    // Memory for output tensors
+    const uint64_t dL_da_memory = Wt * bfloat16_single_tile_size_bytes;
+    const uint64_t dL_dgamma_components_memory = Wt * bfloat16_single_tile_size_bytes;
+    // Memory for intermediate computations
+    const uint64_t recip_rms_a_bcasted_memory = kNumRecipRmsATiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scale_memory = kNumScaleTiles * bfloat16_single_tile_size_bytes;
+    const uint64_t scale_bcasted_memory = kNumScaleBcastedTiles * bfloat16_single_tile_size_bytes;
+
+    // Total L1 memory required
+    const uint64_t required_L1_in_bytes = input_memory + mask_memory + scaler_memory + gamma_memory + rms_a_memory +
+                                          dL_dout_memory + one_memory + dL_da_memory + dL_dgamma_components_memory +
+                                          recip_rms_a_bcasted_memory + scale_memory + scale_bcasted_memory;
+
+    return required_L1_in_bytes <= available_L1_in_bytes;
+}
+
 RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::create(
     const operation_attributes_t& args, const tensor_args_t& tensor_args, tensor_return_value_t& output) {
     // -------------------------------------------------------------------------
@@ -228,35 +260,14 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
     // -------------------------------------------------------------------------
     const uint32_t twice_block_size = 2U * block_size;
 
-    // Move the memory check to a separate function. And just return boolean whether it fits in L1 or not.
-    const uint32_t available_L1_in_bytes =
-        device->l1_size_per_core() - device->allocator()->get_base_allocator_addr(tt::tt_metal::HalMemType::L1);
-
-    const uint64_t input_memory = Wt * bfloat16_single_tile_size_bytes;
-    const uint64_t mask_memory = kNumMaskTiles * bfloat16_single_tile_size_bytes;
-    const uint64_t scaler_memory = kNumScalerTiles * bfloat16_single_tile_size_bytes;
-    const uint64_t gamma_memory = Wt * bfloat16_single_tile_size_bytes;
-    const uint64_t rms_a_memory = kNumRmsATiles * bfloat16_single_tile_size_bytes;
-    const uint64_t dL_dout_memory = Wt * bfloat16_single_tile_size_bytes;
-    const uint64_t one_memory = kNumOneTiles * bfloat16_single_tile_size_bytes;
-    const uint64_t dL_da_memory = Wt * bfloat16_single_tile_size_bytes;
-    const uint64_t dL_dgamma_components_memory = Wt * bfloat16_single_tile_size_bytes;
-    const uint64_t recip_rms_a_bcasted_memory = kNumRecipRmsATiles * bfloat16_single_tile_size_bytes;
-    const uint64_t scale_memory = kNumScaleTiles * bfloat16_single_tile_size_bytes;
-    const uint64_t scale_bcasted_memory = kNumScaleBcastedTiles * bfloat16_single_tile_size_bytes;
-
-    // Total L1 memory required
-    // TODO: Add memory for intermediate computations
-    const uint64_t required_L1_in_bytes = input_memory + mask_memory + scaler_memory + gamma_memory + rms_a_memory +
-                                          dL_dout_memory + one_memory + dL_da_memory + dL_dgamma_components_memory +
-                                          recip_rms_a_bcasted_memory + scale_memory + scale_bcasted_memory;
-
-    const bool everything_fits_in_l1 = required_L1_in_bytes <= available_L1_in_bytes;
+    const bool everything_fits_in_l1 = fits_in_l1_check(Wt, block_size, bfloat16_single_tile_size_bytes, device);
 
     const uint32_t num_input_tiles =
         (everything_fits_in_l1) ? Wt : twice_block_size;  // If everything fits in L1, read Wt tiles, else read 2x block
 
-    // TODO: For now let's assume that everything is in bfloat16 format. Reduction should be in float32 format.
+    // TODO: For now let's assume that everything is in bfloat16 format. Reduction should be in float32 format, but
+    // according to the issue #23850 reduce_tile suffers from precision issues. It uses transpose that is done in
+    // bfloat16. The solution would either to use matmul with onehot vector or wait for the fix.
     auto data_format = input_data_format;  // tt::DataFormat::Float16_b
 
     auto cb_input = create_circular_buffer(
@@ -323,7 +334,7 @@ RMSNormBackwardProgramFactory::cached_program_t RMSNormBackwardProgramFactory::c
         "dL_dgamma buffer must be in DRAM. dL_dgamma buffer of type {}",
         magic_enum::enum_name(dL_dgamma_components_buffer->buffer_type()));
 
-    std::map<std::string, std::string> defines;  // Add defines as needed
+    std::map<std::string, std::string> defines;
     if (mask_w != 0) {
         defines[kMaskWDefineKey] = "1";
     }
@@ -432,7 +443,7 @@ void RMSNormBackwardProgramFactory::override_runtime_arguments(
     auto& reader_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_reader_kernel_id);
     auto& writer_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_writer_kernel_id);
     auto& compute_group_1_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_kernel_group_1_id);
-    // we need to initialize it with something, but if group 2 is  empty it will be used in the loop
+    // We need to initialize it with something, but if group 2 is empty it will not be used.
     auto& compute_group_2_runtime_args = core_group_2.ranges().empty()
                                              ? compute_group_1_runtime_args
                                              : GetRuntimeArgs(program, rmsnorm_bw_kernel_group_2_id);
