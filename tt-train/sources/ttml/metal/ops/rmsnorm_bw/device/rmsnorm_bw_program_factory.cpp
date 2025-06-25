@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <tt-metalium/host_api.hpp>
 
-#include "tt-train/sources/ttml/metal/ops/common/program_utils.hpp"
+#include "metal/ops/common/program_utils.hpp"
 
 namespace {
 
