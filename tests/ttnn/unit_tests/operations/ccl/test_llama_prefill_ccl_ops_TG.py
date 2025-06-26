@@ -26,7 +26,6 @@ def run_ag_with_trace(
     input_tensor,
     dim,
     persistent_output_tensor,
-    persistent_intermediate_buffer,
     num_links,
     cluster_axis,
     output_mem_config,
@@ -190,16 +189,6 @@ def run_all_gather_on_TG(
         mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
     )
 
-    ttnn_persistent_intermediate_tensor = ttnn.from_torch(
-        torch.zeros(padded_shape(per_chip_output_shape, tile, num_devices, num_links, input_dtype)),
-        tile=ttnn.Tile(tile),
-        dtype=input_dtype,
-        device=mesh_device,
-        layout=layout,
-        memory_config=output_mem_config,
-        mesh_mapper=ttnn.ReplicateTensorToMesh(mesh_device),
-    )
-
     sub_device_stall_group = []
     compute_grid_size = mesh_device.compute_with_storage_grid_size()
     ccl_sub_device_crs = ttnn.CoreRangeSet(
@@ -228,7 +217,6 @@ def run_all_gather_on_TG(
                 dim=dim,
                 cluster_axis=cluster_axis,
                 mesh_device=mesh_device,
-                persistent_intermediate_buffer=ttnn_persistent_intermediate_tensor,
                 persistent_output_tensor=ttnn_persistent_output_tensor,
                 num_links=num_links,
                 output_mem_config=output_mem_config,
