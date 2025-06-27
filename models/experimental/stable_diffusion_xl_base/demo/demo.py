@@ -212,7 +212,7 @@ def run_demo_inference(
         ],
         [tt_latents_device, *tt_prompt_embeds_device, *tt_text_embeds_device],
     )
-    run_tt_image_gen(
+    _, _, _, output_shape, _ = run_tt_image_gen(
         ttnn_device,
         tt_unet,
         tt_scheduler,
@@ -231,7 +231,10 @@ def run_demo_inference(
     )
 
     tid = None
+    output_device = None
+    tid_vae = None
     if capture_trace:
+        logger.info("Capturing model trace...")
         prepare_input_tensors(
             [
                 tt_latents,
@@ -241,7 +244,7 @@ def run_demo_inference(
             ],
             [tt_latents_device, *tt_prompt_embeds_device, *tt_text_embeds_device],
         )
-        _, tid = run_tt_image_gen(
+        _, tid, output_device, output_shape, tid_vae = run_tt_image_gen(
             ttnn_device,
             tt_unet,
             tt_scheduler,
@@ -278,7 +281,7 @@ def run_demo_inference(
             ],
             [tt_latents_device, *tt_prompt_embeds_device, *tt_text_embeds_device],
         )
-        imgs, tid = run_tt_image_gen(
+        imgs, tid, output_device, output_shape, tid_vae = run_tt_image_gen(
             ttnn_device,
             tt_unet,
             tt_scheduler,
@@ -294,12 +297,18 @@ def run_demo_inference(
             tt_vae if vae_on_device else pipeline.vae,
             batch_size,
             tid=tid,
+            output_device=output_device,
+            output_shape=output_shape,
+            tid_vae=tid_vae,
         )
-
-        logger.info(f"Denoising loop for {batch_size} promts completed in {profiler.get('denoising_loop'):.2f} seconds")
-        logger.info(
-            f"{'On device VAE' if vae_on_device else 'Host VAE'} decoding completed in {profiler.get('vae_decode'):.2f} seconds"
-        )
+        logger.info(f"Image gen for {batch_size} prompts completed in {profiler.get('image_gen'):.2f} seconds")
+        if not capture_trace:
+            logger.info(
+                f"Denoising loop for {batch_size} prompts completed in {profiler.get('denoising_loop'):.2f} seconds"
+            )
+            logger.info(
+                f"{'On device VAE' if vae_on_device else 'Host VAE'} decoding completed in {profiler.get('vae_decode'):.2f} seconds"
+            )
         profiler.clear()
 
         for idx, img in enumerate(imgs):
@@ -313,7 +322,10 @@ def run_demo_inference(
             else:
                 img.save(f"output/output{len(images) + start_from}.png")
                 logger.info(f"Image saved to output/output{len(images) + start_from}.png")
-
+    if capture_trace:
+        ttnn.release_trace(ttnn_device, tid)
+        if vae_on_device:
+            ttnn.release_trace(ttnn_device, tid_vae)
     return images
 
 
