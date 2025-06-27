@@ -658,39 +658,4 @@ TEST_F(DeviceFixture, TensixDataMovementOneToAllMulticastLinkedDirectedIdeal) {
         noc_id);
 }
 
-/* TEST */
-TEST_F(DeviceFixture, TensixDataMovementOneToAllMulticastTest) {
-    // Parameters
-    uint32_t test_case_id = 55;  // Arbitrary test id
-
-    bool loopback = true;
-    NOC noc_id = NOC::NOC_1;
-
-    bool is_multicast = true;
-    bool is_linked = true;
-
-    CoreCoord mst_core_coord = {0, 0};
-    CoreCoord sub_start_core_coord = {3, 3};
-
-    CoreCoord sub_grid_size;
-
-    for (uint32_t grid_dimension = 1; grid_dimension <= 6; grid_dimension++) {
-        sub_grid_size = {grid_dimension, 1};
-
-        // Run the directed ideal test for each grid size
-        tt::tt_metal::unit_tests::dm::core_to_all::directed_ideal_test(
-            arch_,
-            devices_,
-            num_devices_,
-            test_case_id,
-            is_multicast,
-            is_linked,
-            mst_core_coord,
-            sub_start_core_coord,
-            sub_grid_size,
-            loopback,
-            noc_id);
-    }
-}
-
 }  // namespace tt::tt_metal

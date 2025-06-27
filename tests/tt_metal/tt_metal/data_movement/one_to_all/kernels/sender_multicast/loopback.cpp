@@ -22,9 +22,9 @@ void kernel_main() {
     constexpr uint32_t end_y = get_compile_time_arg_val(11);
 
     // Specific for Multicast Schemes
-    constexpr uint32_t multicast_scheme_type = get_compile_time_arg_val(13);
-    constexpr uint32_t sub_grid_size_x = get_compile_time_arg_val(14);
-    constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(15);
+    constexpr uint32_t multicast_scheme_type = get_compile_time_arg_val(12);
+    constexpr uint32_t sub_grid_size_x = get_compile_time_arg_val(13);
+    constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(14);
 
     // Derivative values
     constexpr uint32_t bytes_per_transaction = pages_per_transaction * bytes_per_page;
@@ -35,7 +35,6 @@ void kernel_main() {
                                           : get_noc_multicast_addr(end_x, end_y, start_x, start_y, sub_base_addr);
 
     {
-        // DeviceZoneScopedN(riscv_str);
         DeviceZoneScopedN("RISCV0");
 
         for (uint32_t i = 0; i < num_of_transactions - 1; i++) {
@@ -57,7 +56,7 @@ void kernel_main() {
     DeviceTimestampedData("NoC Index", noc_index);
 
     // For multicast schemes, we can also log the multicast scheme type and grid size
-    if (multicast_scheme_type != 0) {
+    if constexpr (multicast_scheme_type != 0) {
         DeviceTimestampedData("Multicast Scheme Type", multicast_scheme_type);
         DeviceTimestampedData("Subordinate Grid Size X", sub_grid_size_x);
         DeviceTimestampedData("Subordinate Grid Size Y", sub_grid_size_y);

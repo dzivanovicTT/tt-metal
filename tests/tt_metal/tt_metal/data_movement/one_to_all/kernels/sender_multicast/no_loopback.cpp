@@ -15,17 +15,16 @@ void kernel_main() {
     constexpr uint32_t bytes_per_page = get_compile_time_arg_val(4);
     constexpr uint32_t test_id = get_compile_time_arg_val(5);
     constexpr uint32_t num_subordinates = get_compile_time_arg_val(6);
-    constexpr uint32_t sem_id = get_compile_time_arg_val(7);
-    constexpr bool is_linked = get_compile_time_arg_val(8);
-    constexpr uint32_t start_x = get_compile_time_arg_val(9);
-    constexpr uint32_t start_y = get_compile_time_arg_val(10);
-    constexpr uint32_t end_x = get_compile_time_arg_val(11);
-    constexpr uint32_t end_y = get_compile_time_arg_val(12);
+    constexpr bool is_linked = get_compile_time_arg_val(7);
+    constexpr uint32_t start_x = get_compile_time_arg_val(8);
+    constexpr uint32_t start_y = get_compile_time_arg_val(9);
+    constexpr uint32_t end_x = get_compile_time_arg_val(10);
+    constexpr uint32_t end_y = get_compile_time_arg_val(11);
 
     // Specific for Multicast Schemes
-    constexpr uint32_t multicast_scheme_type = get_compile_time_arg_val(13);
-    constexpr uint32_t sub_grid_size_x = get_compile_time_arg_val(14);
-    constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(15);
+    constexpr uint32_t multicast_scheme_type = get_compile_time_arg_val(12);
+    constexpr uint32_t sub_grid_size_x = get_compile_time_arg_val(13);
+    constexpr uint32_t sub_grid_size_y = get_compile_time_arg_val(14);
 
     // Derivative values
     constexpr uint32_t bytes_per_transaction = pages_per_transaction * bytes_per_page;
@@ -36,7 +35,6 @@ void kernel_main() {
                                           : get_noc_multicast_addr(end_x, end_y, start_x, start_y, sub_base_addr);
 
     {
-        // DeviceZoneScopedN(riscv_str);
         DeviceZoneScopedN("RISCV0");
 
         for (uint32_t i = 0; i < num_of_transactions - 1; i++) {
