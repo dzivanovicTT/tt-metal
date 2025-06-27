@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2025 Tenstorrent AI ULC
+//
+// SPDX-License-Identifier: Apache-2.0
+
 #ifndef TEST_ONE_TO_ALL_HPP
 #define TEST_ONE_TO_ALL_HPP
 
