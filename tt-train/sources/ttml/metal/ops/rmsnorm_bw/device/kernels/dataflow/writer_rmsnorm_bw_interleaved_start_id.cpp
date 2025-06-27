@@ -76,10 +76,10 @@ void kernel_main() {
 
     uint32_t end_row = start_row + num_rows_to_process;
     for (uint32_t r = start_row; r < end_row; ++r) {
-        // Write dx (grad w.r.t. input)
+        // Write da (gradient w.r.t. input) and dgamma_components (partial gradients w.r.t. gamma).
+        // Note: The final dL_dgamma (gradient w.r.t. gamma) requires reduction across batches, which is performed on
+        // the host. Here, we output the per-tile components for host-side reduction.
         write_cb_to_dram(cb_dL_da_idx, dx_output_addr_generator, r * Wt, Wt, block_size, tile_bytes);
-
-        // Write dgamma (grad w.r.t. gamma)
         write_cb_to_dram(cb_dL_dgamma_components, dgamma_output_addr_generator, r * Wt, Wt, block_size, tile_bytes);
     }
 }

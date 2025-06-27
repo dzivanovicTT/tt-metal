@@ -240,7 +240,6 @@ RMSNormForwardProgramFactory::cached_program_t RMSNormForwardProgramFactory::cre
     const uint64_t rms_memory =
         (kNumRmsBeforeReductionTiles + kNumRmsAfterReductionTiles + kNumInverseRmsAfterReductionTiles) *
         float32_single_tile_size_bytes;
-    // What is the difference between block_memory and weight_memory?
     const uint64_t block_memory = 2 * twice_block_size * bfloat16_single_tile_size_bytes;
     const uint64_t rms_output_memory = kNumRmsOutputTiles * bfloat16_single_tile_size_bytes;
     // Total L1 memory required

@@ -442,11 +442,6 @@ void RMSNormBackwardProgramFactory::override_runtime_arguments(
     // Only address arguments need updating here; tile counts remain the same as in create().
     auto& reader_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_reader_kernel_id);
     auto& writer_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_writer_kernel_id);
-    auto& compute_group_1_runtime_args = GetRuntimeArgs(program, rmsnorm_bw_kernel_group_1_id);
-    // We need to initialize it with something, but if group 2 is empty it will not be used.
-    auto& compute_group_2_runtime_args = core_group_2.ranges().empty()
-                                             ? compute_group_1_runtime_args
-                                             : GetRuntimeArgs(program, rmsnorm_bw_kernel_group_2_id);
 
     for (uint32_t i = 0; i < num_cores; i++) {
         CoreCoord core = {i / num_cores_y, i % num_cores_y};

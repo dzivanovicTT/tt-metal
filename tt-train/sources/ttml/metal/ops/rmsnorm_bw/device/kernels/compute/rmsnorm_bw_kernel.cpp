@@ -46,32 +46,10 @@ constexpr bool do_mask_w = true;
 constexpr bool do_mask_w = false;
 #endif
 
-// TODO: Maybe this should be moved to some utils?
-inline void pack_and_push(uint32_t reg, uint32_t cb) {
-    // NOTE:
-    // The order of commit and wait does not matter when they are next to each other, as they handle different
-    // threads. Commit releases the lock for the math thread, allowing the pack thread to start working on the
-    // data, while wait is for the pack thread to finish math. In principle, you can commit first and then wait,
-    // or wait first and then commit. Logically, it makes sense to say the math procedure is finished (commit)
-    // and then packing can start (wait), so commit first and then wait is preferred.
-    cb_reserve_back(cb, onetile);
-    tile_regs_wait();
-    pack_reconfig_data_format(cb);
-    pack_tile(reg, cb);
-    tile_regs_release();
-    cb_push_back(cb, onetile);
-}
-
-inline void compute_recip_rms_a_bcasted() {
-    const uint32_t reg_rms_a = 0;
-    tile_regs_acquire();
-    unary_bcast_init<BroadcastType::COL>(cb_rms_a_idx, cb_recip_rms_a_bcasted_idx);
-    unary_bcast<BroadcastType::COL>(cb_rms_a_idx, /* tile idx */ 0, /* reg tile idx */ reg_rms_a);
-    recip_tile_init();
-    recip_tile(reg_rms_a);
-    tile_regs_commit();
-    pack_and_push(reg_rms_a, cb_recip_rms_a_bcasted_idx);
-}
+// ============================================================================
+// The following functions are register-only helpers. They perform intermediate
+// computations using registers but do not write results directly to CBs.
+// ============================================================================
 
 inline void compute_gained_dL_dout(uint32_t col, uint32_t working_register, uint32_t tile_register) {
     // The output of this function is gained_dL_dout, which is stored in working_register.
@@ -86,6 +64,117 @@ inline void compute_gained_dL_dout(uint32_t col, uint32_t working_register, uint
     copy_tile(cb_dL_out_idx, col, tile_register);
     mul_binary_tile_init();
     mul_binary_tile(working_register, tile_register);
+}
+
+inline void compute_dL_da(
+    const uint32_t input_tile_idx,
+    const uint32_t dL_da_register,
+    const uint32_t rhs_register,
+    const uint32_t tile_register) {
+    // 4. Compute:
+    // auto scaled_outer = ttnn::multiply(
+    //     scale,
+    //     a,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     none,
+    //     none,
+    //     none,
+    //     false);  // [B,1,S,1] x [B,1,S,C] -> [B,1,S,C] (bcast)
+    mul_tiles_init(cb_input_idx, cb_scale_bcasted_idx);
+    mul_tiles(cb_input_idx, cb_scale_bcasted_idx, /* tile_idx */ input_tile_idx, /* tile_idx */ 0, rhs_register);
+
+    // 5. Compute:
+    // auto ms_a = ttnn::square(rms_a);  // [B,1,S,1] -> [B,1,S,1]
+    // auto c_by_ms_a = ttnn::multiply(
+    //     ms_a, c, std::nullopt, std::nullopt, std::nullopt, none, none, none, false);  //
+    //     [B,1,S,1] x [1]
+    //     ->
+    // [B,1,S,1] (bcast)
+    // auto rhs = ttnn::divide(
+    //     scaled_outer,
+    //     c_by_ms_a,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     none,
+    //     none,
+    //     none,
+    //     false);  // [B,1,S,C] x [B,1,S,1] -> [B,1,S,C] (bcast)
+    // NOTE: Both recip_rms_a and scaler are already broadcasted, so we can use them directly.
+    // Scaler is 1/C, so we multiply not divide by it.
+    copy_tile_init(cb_recip_rms_a_bcasted_idx);
+    copy_tile(cb_recip_rms_a_bcasted_idx, /* tile_idx */ 0, tile_register);
+    mul_binary_tile_init();
+    mul_binary_tile(rhs_register, tile_register);
+    mul_binary_tile(rhs_register, tile_register);
+    copy_tile_init(cb_scaler_idx);
+    copy_tile(cb_scaler_idx, /* tile_idx */ 0, tile_register);
+    mul_binary_tile_init();
+    mul_binary_tile(rhs_register, tile_register);
+
+    // 6. Compute:
+    // auto dL_da = ttnn::subtract(
+    //     gained_dL_dout,
+    //     rhs,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     std::nullopt,
+    //     none,
+    //     none,
+    //     none,
+    //     false);  // [B,1,S,C] x [B,1,S,C] -> [B,1,S,C]
+    compute_gained_dL_dout(input_tile_idx, dL_da_register, tile_register);
+    sub_binary_tile_init();
+    sub_binary_tile(dL_da_register, rhs_register);
+}
+
+inline void compute_dL_dgamma_components(
+    const uint32_t input_tile_idx, const uint32_t dL_dg_components_register, const uint32_t tile_register) {
+    // 7. Compute:
+    // auto dL_dg_components = ttnn::multiply(
+    //     dL_dout,
+    //     ttnn::divide(a, rms_a, std::nullopt, std::nullopt, std::nullopt, none, none, none,
+    //     false), std::nullopt, std::nullopt, std::nullopt, none, none, none, false);  // [B,1,S,C]
+    //     x [B,1,S,1] -> [B,1,S,C] (bcast); checked by add_grad
+    mul_tiles_init(cb_input_idx, cb_recip_rms_a_bcasted_idx);
+    mul_tiles(
+        cb_input_idx,
+        cb_recip_rms_a_bcasted_idx,
+        /* tile_idx */ input_tile_idx,
+        /* tile_idx */ 0,
+        dL_dg_components_register);
+    copy_tile_init(cb_dL_out_idx);
+    copy_tile(cb_dL_out_idx, /* tile_idx */ input_tile_idx, tile_register);
+    mul_binary_tile_init();
+    mul_binary_tile(dL_dg_components_register, tile_register);
+    // auto dL_dg = ttnn::sum(
+    //     dL_dg_components,
+    //     /* dim_arg */ ttnn::SmallVector<int>{0, 1, 2},
+    //     /* keep_dim */ true,
+    //     /* output_mem_config */ std::nullopt,
+    //     /*compute_kernel_config */ core::ComputeKernelConfig::precise());  // [B,1,S,C] ->
+    //     [1,1,1,C]
+    // NOTE: To compute dL_dg, we need to process all batches. Therefore, we will compute here only
+    // dL_dg_components, and then store them in CB. The reduction will be done outside the kernel.
+}
+
+// ============================================================================
+// Functions below compute final results for a pipeline stage and write them to
+// circular buffers (CBs). These functions produce outputs that are consumed by
+// later stages.
+// ============================================================================
+
+inline void compute_recip_rms_a_bcasted() {
+    const uint32_t reg_rms_a = 0;
+    tile_regs_acquire();
+    unary_bcast_init<BroadcastType::COL>(cb_rms_a_idx, cb_recip_rms_a_bcasted_idx);
+    unary_bcast<BroadcastType::COL>(cb_rms_a_idx, /* tile idx */ 0, /* reg tile idx */ reg_rms_a);
+    recip_tile_init();
+    recip_tile(reg_rms_a);
+    tile_regs_commit();
+    pack_and_push(reg_rms_a, cb_recip_rms_a_bcasted_idx);
 }
 
 // TODO: There was an idea to move compute_scale to separate files and include here only one based on the
@@ -294,113 +383,7 @@ inline void bcast_scale() {
     pack_and_push(reg_scale_bcasted, cb_scale_bcasted_idx);
 }
 
-inline void compute_dL_da(
-    const uint32_t input_tile_idx,
-    const uint32_t dL_da_register,
-    const uint32_t rhs_register,
-    const uint32_t tile_register) {
-    // 4. Compute:
-    // auto scaled_outer = ttnn::multiply(
-    //     scale,
-    //     a,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     none,
-    //     none,
-    //     none,
-    //     false);  // [B,1,S,1] x [B,1,S,C] -> [B,1,S,C] (bcast)
-    mul_tiles_init(cb_input_idx, cb_scale_bcasted_idx);
-    mul_tiles(cb_input_idx, cb_scale_bcasted_idx, /* tile_idx */ input_tile_idx, /* tile_idx */ 0, rhs_register);
-
-    // 5. Compute:
-    // auto ms_a = ttnn::square(rms_a);  // [B,1,S,1] -> [B,1,S,1]
-    // auto c_by_ms_a = ttnn::multiply(
-    //     ms_a, c, std::nullopt, std::nullopt, std::nullopt, none, none, none, false);  //
-    //     [B,1,S,1] x [1]
-    //     ->
-    // [B,1,S,1] (bcast)
-    // auto rhs = ttnn::divide(
-    //     scaled_outer,
-    //     c_by_ms_a,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     none,
-    //     none,
-    //     none,
-    //     false);  // [B,1,S,C] x [B,1,S,1] -> [B,1,S,C] (bcast)
-    // NOTE: Both recip_rms_a and scaler are already broadcasted, so we can use them directly.
-    // Scaler is 1/C, so we multiply not divide by it.
-    copy_tile_init(cb_recip_rms_a_bcasted_idx);
-    copy_tile(cb_recip_rms_a_bcasted_idx, /* tile_idx */ 0, tile_register);
-    mul_binary_tile_init();
-    mul_binary_tile(rhs_register, tile_register);
-    mul_binary_tile(rhs_register, tile_register);
-    copy_tile_init(cb_scaler_idx);
-    copy_tile(cb_scaler_idx, /* tile_idx */ 0, tile_register);
-    mul_binary_tile_init();
-    mul_binary_tile(rhs_register, tile_register);
-
-    // 6. Compute:
-    // auto dL_da = ttnn::subtract(
-    //     gained_dL_dout,
-    //     rhs,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     std::nullopt,
-    //     none,
-    //     none,
-    //     none,
-    //     false);  // [B,1,S,C] x [B,1,S,C] -> [B,1,S,C]
-    compute_gained_dL_dout(input_tile_idx, dL_da_register, tile_register);
-    sub_binary_tile_init();
-    sub_binary_tile(dL_da_register, rhs_register);
-}
-
-inline void compute_dL_dgamma_components(
-    const uint32_t input_tile_idx, const uint32_t dL_dg_components_register, const uint32_t tile_register) {
-    // 7. Compute:
-    // auto dL_dg_components = ttnn::multiply(
-    //     dL_dout,
-    //     ttnn::divide(a, rms_a, std::nullopt, std::nullopt, std::nullopt, none, none, none,
-    //     false), std::nullopt, std::nullopt, std::nullopt, none, none, none, false);  // [B,1,S,C]
-    //     x [B,1,S,1] -> [B,1,S,C] (bcast); checked by add_grad
-    mul_tiles_init(cb_input_idx, cb_recip_rms_a_bcasted_idx);
-    mul_tiles(
-        cb_input_idx,
-        cb_recip_rms_a_bcasted_idx,
-        /* tile_idx */ input_tile_idx,
-        /* tile_idx */ 0,
-        dL_dg_components_register);
-    copy_tile_init(cb_dL_out_idx);
-    copy_tile(cb_dL_out_idx, /* tile_idx */ input_tile_idx, tile_register);
-    mul_binary_tile_init();
-    mul_binary_tile(dL_dg_components_register, tile_register);
-    // auto dL_dg = ttnn::sum(
-    //     dL_dg_components,
-    //     /* dim_arg */ ttnn::SmallVector<int>{0, 1, 2},
-    //     /* keep_dim */ true,
-    //     /* output_mem_config */ std::nullopt,
-    //     /*compute_kernel_config */ core::ComputeKernelConfig::precise());  // [B,1,S,C] ->
-    //     [1,1,1,C]
-    // NOTE: To compute dL_dg, we need to process all batches. Therefore, we will compute here only
-    // dL_dg_components, and then store them in CB. The reduction will be done outside the kernel.
-}
-
-// TODO: this could be probably unified/merged with pack_and_push.
-inline void pack_and_push_block(uint32_t cb_output) {
-    tile_regs_wait();
-    pack_reconfig_data_format(cb_output);
-    for (uint32_t block_idx = 0; block_idx < block_size; ++block_idx) {
-        pack_tile(block_idx, cb_output);
-    }
-    tile_regs_release();
-    cb_push_back(cb_output, block_size);
-};
-
 // TODO: Ask about bfloat16 vs float32 for regs, cbs and computations on LLK channel
-
 // TASK: see how to prepare PR - have a look at Slava's past PRs
 inline void MAIN {
     if constexpr (do_mask_w) {
@@ -458,7 +441,7 @@ inline void MAIN {
                 }
                 tile_regs_commit();
 
-                pack_and_push_block(cb_dL_da_idx);
+                pack_and_push_block(cb_dL_da_idx, block_size);
             }
 
             // Compute dL_dgamma_components.
@@ -481,7 +464,7 @@ inline void MAIN {
                 }
                 tile_regs_commit();
 
-                pack_and_push_block(cb_dL_dgamma_components);
+                pack_and_push_block(cb_dL_dgamma_components, block_size);
             }
 #ifndef EVERYTHING_FITS_IN_L1
             cb_pop_front(cb_gamma_idx, block_size);
