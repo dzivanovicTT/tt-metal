@@ -1447,8 +1447,10 @@ std::vector<chan_id_t> ControlPlane::get_active_fabric_eth_routing_planes_in_dir
             this->router_port_directions_to_num_routing_planes_map_.at(fabric_node_id).at(routing_direction);
         TT_FATAL(
             eth_chans.size() >= num_routing_planes,
-            "Not enough active fabric eth channels in direction {}",
-            routing_direction);
+            "Not enough active fabric eth channels in direction {} for (chip_id: {}, mesh_id: {})",
+            routing_direction,
+            fabric_node_id.chip_id,
+            fabric_node_id.mesh_id);
         eth_chans.resize(num_routing_planes);
     }
     return eth_chans;
