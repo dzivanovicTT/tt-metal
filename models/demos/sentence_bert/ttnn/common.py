@@ -112,6 +112,7 @@ def preprocess_inputs(
     token_type_ids,
     position_ids,
     attention_mask,
+    attention_mask_2,
     device,
 ):
     input_ids = ttnn.from_torch(input_ids, dtype=ttnn.uint32, device=device, memory_config=ttnn.L1_MEMORY_CONFIG)
@@ -126,4 +127,11 @@ def preprocess_inputs(
         layout=ttnn.TILE_LAYOUT,
         memory_config=ttnn.L1_MEMORY_CONFIG,
     )
-    return input_ids, token_type_ids, position_ids, attention_mask
+    attention_mask_2 = ttnn.from_torch(
+        attention_mask_2,
+        dtype=ttnn.bfloat16,
+        device=device,
+        layout=ttnn.TILE_LAYOUT,
+        memory_config=ttnn.L1_MEMORY_CONFIG,
+    )
+    return input_ids, token_type_ids, position_ids, attention_mask, attention_mask_2

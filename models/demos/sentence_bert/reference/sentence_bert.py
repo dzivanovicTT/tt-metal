@@ -11,9 +11,25 @@ import torch.nn as nn
 from models.experimental.functional_common.attention_mask_functions import get_extended_attention_mask
 
 
+def mean_pooling(token_embeddings, attention_mask):
+    print("ref pos prc called")
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
+
 class BaseModelOutputWithPoolingAndCrossAttentions:
-    def __init__(self, last_hidden_state, pooler_output, hidden_states, past_key_values, attentions, cross_attentions):
+    def __init__(
+        self,
+        last_hidden_state,
+        post_processed_output,
+        pooler_output,
+        hidden_states,
+        past_key_values,
+        attentions,
+        cross_attentions,
+    ):
         self.last_hidden_state = last_hidden_state
+        self.post_processed_output = post_processed_output
         self.pooler_output = pooler_output
         self.hidden_states = hidden_states
         self.attentions = attentions
@@ -489,6 +505,7 @@ class BertModel(nn.Module):
         token_type_ids: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.Tensor] = None,
         head_mask: Optional[torch.Tensor] = None,
+        post_processed_output: Optional[torch.Tensor] = None,
         inputs_embeds: Optional[torch.Tensor] = None,
         encoder_hidden_states: Optional[torch.Tensor] = None,
         encoder_attention_mask: Optional[torch.Tensor] = None,
@@ -497,6 +514,8 @@ class BertModel(nn.Module):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        attention_mask_2: Optional[torch.Tensor] = None,
+        apply_post_process=False,
     ) -> Union[Tuple[torch.Tensor], BaseModelOutputWithPoolingAndCrossAttentions]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -565,12 +584,15 @@ class BertModel(nn.Module):
 
         sequence_output = encoder_outputs[0]
         pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
-
         if not return_dict:
             return (sequence_output, pooled_output) + encoder_outputs[1:]
 
+        if apply_post_process:
+            post_processed_output = mean_pooling(sequence_output, attention_mask_2)
+
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=sequence_output,
+            post_processed_output=post_processed_output,
             pooler_output=pooled_output,
             past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,

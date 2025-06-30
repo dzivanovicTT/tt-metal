@@ -26,5 +26,6 @@ class TtnnSentenceBertEncoder:
             attention_mask_interleaved = attention_mask
         for i in range(len(self.layers)):
             layer_outputs = self.layers[i](hidden_states, attention_mask_interleaved, device=device)
+            ttnn.DumpDeviceProfiler(device)
             hidden_states = layer_outputs
         return hidden_states
