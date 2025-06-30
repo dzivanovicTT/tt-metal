@@ -21,37 +21,39 @@ def main():
 
     tt_t1 = to_tt_tile(host_rand)
 
-    tt_t2 = ttnn.full(
+    # Alternatively, create TT-NN from numpy tensor with TILE_LAYOUT
+    t2 = np.array([[5, 6], [7, 8]], dtype=np.float32).repeat(16, axis=0).repeat(16, axis=1)
+    tt_t2 = ttnn.Tensor(t2, device=device, layout=ttnn.TILE_LAYOUT)
+
+    tt_t3 = ttnn.full(
         shape=(32, 32),
         fill_value=1.0,
         dtype=ttnn.float32,
         layout=ttnn.TILE_LAYOUT,
         device=device,
     )
-    tt_t3 = ttnn.zeros(
+    tt_t4 = ttnn.zeros(
         shape=(32, 32),
         dtype=ttnn.bfloat16,
         layout=ttnn.TILE_LAYOUT,
         device=device,
     )
-    tt_t4 = ttnn.ones(
+    tt_t5 = ttnn.ones(
         shape=(32, 32),
         dtype=ttnn.bfloat16,
         layout=ttnn.TILE_LAYOUT,
         device=device,
     )
-
-    t5 = np.array([[5, 6], [7, 8]], dtype=np.float32).repeat(16, axis=0).repeat(16, axis=1)
-    tt_t5 = ttnn.Tensor(t5, device=device, layout=ttnn.TILE_LAYOUT)
+    tt_t6 = ttnn.rand(shape=(32, 32), dtype=ttnn.bfloat16, layout=ttnn.TILE_LAYOUT, device=device)
 
     logger.info("\n--- TT-NN Tensor Operations on (32x32) Tiles ---")
-    add_result = ttnn.add(tt_t1, tt_t4)
+    add_result = ttnn.add(tt_t1, tt_t3)
     logger.info(f"Addition:\n{add_result}")
 
-    mul_result = ttnn.mul(tt_t1, tt_t5)
+    mul_result = ttnn.mul(tt_t1, tt_t2)
     logger.info(f"Element-wise Multiplication:\n{mul_result}")
 
-    matmul_result = ttnn.matmul(tt_t4, tt_t1, memory_config=ttnn.DRAM_MEMORY_CONFIG)
+    matmul_result = ttnn.matmul(tt_t3, tt_t1, memory_config=ttnn.DRAM_MEMORY_CONFIG)
     logger.info(f"Matrix Multiplication:\n{matmul_result}")
 
     logger.info("\n--- Simulated Broadcasting (32x32 + Broadcasted Row Vector) ---")
