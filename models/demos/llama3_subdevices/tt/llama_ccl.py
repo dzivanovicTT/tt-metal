@@ -16,7 +16,7 @@ LINE_AG = os.environ.get("LINE_AG", "0") == "1"
 
 assert not (LINE_RS or LINE_AG) or is_RING_6U, "LINE_RS and LINE_AG supported only if RING_6U=1"
 
-# AG KEYS THAT SHOULD USE LINE WHEN RING_AG IS 1
+# AG KEYS THAT SHOULD USE LINE WHEN RING_RS IS 1 AND LINE_AG IS 0
 USE_LINE_AG = {
     # "QKV",
     # "WO",
@@ -403,7 +403,6 @@ class TT_CCL:
         - FF2/WO: (1, 1, 128, 2048)
 
         """
-        print("USING LINE RS BUFFERS")
         persistent_buffers_all = {}
         for seqlen in self.support_seqlens:
             persistent_buffers = {}
@@ -493,7 +492,6 @@ class TT_CCL:
         """
         Currently, this is hardcoded with llama specific shapes with hardcoded padding.
         """
-        print("USING RING RS BUFFERS")
         persistent_buffers_all = {}
         for seqlen in self.support_seqlens:
             persistent_buffers = {}
@@ -543,7 +541,6 @@ class TT_CCL:
         Creates double buffered persistent CCL buffers for each cluster axis.
 
         """
-        print("USING LINE AG BUFFERS")
         ag_persistent_buffers_all = {}
         for seqlen in self.support_seqlens:
             ag_persistent_buffers = {}
@@ -572,7 +569,6 @@ class TT_CCL:
         return ag_persistent_buffers_all
 
     def get_ring_prefill_all_gather_buffers(self):
-        print("USING RING AG BUFFERS")
         ag_persistent_buffers_all = {}
         for seqlen in self.support_seqlens:
             ag_persistent_buffers = {}
@@ -676,7 +672,6 @@ class TT_CCL:
                     memory_config=memory_config,
                 )
                 return ttnn_tensor_out
-            # ttnn.synchronize_device(self.mesh_device)
             output_tensor_scattered = self.line_reduce_scatter(
                 input_tensor_mesh,
                 memory_config,
@@ -686,7 +681,6 @@ class TT_CCL:
                 math_op=ttnn.ReduceType.Sum,
                 buffer_key=buffer_key,
             )
-            # ttnn.synchronize_device(self.mesh_device)
             # Gather the scattered tensor
             output_tensor_mesh = self.line_all_gather(
                 output_tensor_scattered,
@@ -696,7 +690,6 @@ class TT_CCL:
                 num_links=num_links,
                 buffer_key=buffer_key,
             )
-            # ttnn.synchronize_device(self.mesh_device)
 
         self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
         return output_tensor_mesh
@@ -789,7 +782,6 @@ class TT_CCL:
         )
         self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
         self.reduce_scatter_buffer_idx[cluster_axis] = (self.reduce_scatter_buffer_idx[cluster_axis] + 1) % self.num_cbs
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         return ttnn_tensor_out, w3_out
 
     def llama_rs_create_heads(
@@ -857,7 +849,6 @@ class TT_CCL:
                 if seqlen not in self.persistent_buffers.keys()
                 else self.persistent_buffers[seqlen].get(buffer_key, None)
             )
-            print(f"+ LINE RS: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
             ttnn_tensor_out = ttnn.experimental.reduce_scatter_async(
                 input_tensor_mesh,
                 dim,
@@ -876,7 +867,6 @@ class TT_CCL:
                 subdevice_id=self.worker_sub_device_id,
                 persistent_output_tensors=persistent_buffers,
             )
-            print(f"- LINE RS: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
             # reshape input back
             ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))
             self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
@@ -904,7 +894,6 @@ class TT_CCL:
                 self.reduce_scatter_buffer_idx[cluster_axis] + 1
             ) % self.num_cbs
 
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         return ttnn_tensor_out
 
     def ring_reduce_scatter(
@@ -924,11 +913,11 @@ class TT_CCL:
         seqlen = input_tensor_mesh.shape[-2]
         persistent_buffers = self.persistent_buffers[seqlen].get(buffer_key, None)
 
-        if seqlen == 128 and buffer_key == "QKV":
+        # TODO: move this to op
+        if seqlen == 128 and buffer_key in ("FF1", "FF3"):
             num_links = 2
         else:
             num_links = 4
-        print(f"+ RING RS: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
         num_semaphores = 3 * num_links
         ttnn_tensor_out = ttnn.experimental.reduce_scatter_minimal_async(
             input_tensor=input_tensor_mesh,
@@ -948,8 +937,6 @@ class TT_CCL:
         # reshape input back
         ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))
         self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
-        print(f"- RING RS: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         return ttnn_tensor_out
 
     def line_all_gather(self, input_tensor_mesh, dim, cluster_axis, memory_config, num_links=1, buffer_key=None):
@@ -984,8 +971,6 @@ class TT_CCL:
             topology = ttnn.Topology.Ring if is_RING_6U else ttnn.Topology.Linear
             assert buffer_key is not None, "buffer_key is None"
             persistent_buffer = self.all_gather_buffers.get(buffer_key, None)
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
-        print(f"+ LINE AG: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor_mesh,
             dim,
@@ -1000,13 +985,11 @@ class TT_CCL:
             memory_config=memory_config,
             subdevice_id=self.worker_sub_device_id,
         )
-        print(f"- LINE AG: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
         if self.mode == "prefill" and buffer_key is not None:
             # reshape input back
             ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))
 
         self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         return ttnn_tensor_out
 
     def ring_all_gather(self, input_tensor_mesh, dim, cluster_axis, memory_config, num_links=1, buffer_key=None):
@@ -1017,9 +1000,7 @@ class TT_CCL:
         seqlen = input_tensor_mesh.shape[-2]
         persistent_buffers = self.all_gather_buffers[seqlen].get(buffer_key, None)
 
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         num_links = 4
-        print(f"+ !! RING AG: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
         ttnn_tensor_out = ttnn.experimental.all_gather_async(
             input_tensor=input_tensor_mesh,
             # persistent_intermediate_buffer=persistent_buffers["intermediate"],
@@ -1035,9 +1016,7 @@ class TT_CCL:
         if self.mode == "prefill" and buffer_key is not None:
             # reshape input back
             ttnn_tensor_out = ttnn.reshape(ttnn_tensor_out, (1, B, seqlen // B, ttnn_tensor_out.shape[-1]))
-        print(f"- !! RING AG: {buffer_key} - {input_tensor_mesh.shape} {num_links} links ")
         self.gather_idx[cluster_axis] = (self.gather_idx[cluster_axis] + 1) % self.num_cbs
-        # ttnn.synchronize_device(self.mesh_device, sub_device_ids=[self.worker_sub_device_id])
         return ttnn_tensor_out
 
     def all_gather_concat(
