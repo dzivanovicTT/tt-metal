@@ -213,7 +213,6 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
 
         std::vector<size_t> row_min_planes(mesh_shape[0], std::numeric_limits<size_t>::max());
         std::vector<size_t> col_min_planes(mesh_shape[1], std::numeric_limits<size_t>::max());
-        log_info(tt::LogMetal, "Mesh shape: {}", mesh_shape.dims());
 
         // First pass: Calculate minimums for each row/column
         size_t num_chips_in_mesh = intra_mesh_connectivity[mesh_id.get()].size();
