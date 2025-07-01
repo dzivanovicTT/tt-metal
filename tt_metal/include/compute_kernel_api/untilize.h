@@ -41,8 +41,11 @@ ALWI void untilize_init(uint32_t icb) {
  * operation. This function is used to transfer multiple tiles at once, with the number of tiles determined by the
  * template parameter `block_ct_dim`. The DEST register buffer must be in the acquired state before calling this function. The CB
  * ID provided must correspond to the buffer where the untilized data will be stored. Note that the maximum size
- * of the block is limited by the size of the DEST register, which is 8 tiles if the DEST is used in 16-bit mode,
- * and 4 tiles if the DEST is used in 32-bit mode.
+ * of the block is limited by the size of the DEST and synchroization mode used. These are maximum sizes:
+ * - half-sync mode (16-bit mode): 8 tiles
+ * - half-sync mode (32-bit mode): 4 tiles
+ * - full-sync mode (16-bit mode): 16 tiles
+ * - full-sync mode (32-bit mode): 8 tiles
  *
  * Return value: None
  *
