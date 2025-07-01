@@ -141,6 +141,8 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
     auto topology = FabricContext::get_topology_from_config(fabric_config);
     size_t min_routing_planes = std::numeric_limits<size_t>::max();
 
+    this->router_port_directions_to_num_routing_planes_map_.clear();
+
     auto apply_min =
         [this](
             const std::unordered_map<tt::tt_fabric::RoutingDirection, std::vector<tt::tt_fabric::chan_id_t>>&
@@ -211,6 +213,7 @@ void ControlPlane::initialize_dynamic_routing_plane_counts(
 
         std::vector<size_t> row_min_planes(mesh_shape[0], std::numeric_limits<size_t>::max());
         std::vector<size_t> col_min_planes(mesh_shape[1], std::numeric_limits<size_t>::max());
+        log_info(tt::LogMetal, "Mesh shape: {}", mesh_shape.dims());
 
         // First pass: Calculate minimums for each row/column
         size_t num_chips_in_mesh = intra_mesh_connectivity[mesh_id.get()].size();
@@ -1447,10 +1450,13 @@ std::vector<chan_id_t> ControlPlane::get_active_fabric_eth_routing_planes_in_dir
             this->router_port_directions_to_num_routing_planes_map_.at(fabric_node_id).at(routing_direction);
         TT_FATAL(
             eth_chans.size() >= num_routing_planes,
-            "Not enough active fabric eth channels in direction {} for (chip_id: {}, mesh_id: {})",
+            "Not enough active fabric eth channels in direction {} for (chip_id: {}, mesh_id: {}), num_routing_planes: "
+            "{}, eth_chans.size(): {}",
             routing_direction,
             fabric_node_id.chip_id,
-            fabric_node_id.mesh_id);
+            fabric_node_id.mesh_id,
+            num_routing_planes,
+            eth_chans.size());
         eth_chans.resize(num_routing_planes);
     }
     return eth_chans;
