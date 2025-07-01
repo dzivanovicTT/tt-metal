@@ -14,9 +14,9 @@ LINE_RS = os.environ.get("LINE_RS", "0") == "1"
 # SET TO 1 TO USE LINE FOR ANY AG
 LINE_AG = os.environ.get("LINE_AG", "0") == "1"
 
-assert not (LINE_RS or LINE_AG) or is_RING_6U, "LINE_RS and LINE_AG supported only if RING_6U=1"
+assert not (LINE_RS or LINE_AG) or is_RING_6U, "LINE_RS and LINE_AG supported only when RING_6U=1"
 
-# AG KEYS THAT SHOULD USE LINE WHEN RING_RS IS 1 AND LINE_AG IS 0
+# AG KEYS THAT USE LINE WHEN RING_6U IS 1 AND LINE_AG IS 0
 USE_LINE_AG = {
     # "QKV",
     # "WO",
