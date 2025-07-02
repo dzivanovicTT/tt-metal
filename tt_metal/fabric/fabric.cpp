@@ -146,16 +146,23 @@ void append_fabric_connection_rt_args(
 
     const auto candidate_eth_chans =
         control_plane.get_active_fabric_eth_channels_in_direction(src_fabric_node_id, forwarding_direction.value());
+
+    chip_id_t src_chip_id = control_plane.get_physical_chip_id_from_fabric_node_id(src_fabric_node_id);
+    chip_id_t dst_chip_id = control_plane.get_physical_chip_id_from_fabric_node_id(src_fabric_node_id);
+
     TT_FATAL(
         link_idx < candidate_eth_chans.size(),
-        "requested link idx {}, out of bounds, max available {}, cannot be used for forwarding b/w src (M {} D {}) and "
-        "dst  (M {} D {})",
+        "requested link idx {}, out of bounds, max available {}, cannot be used for forwarding b/w src  (M {} D {}) "
+        "and "
+        "dst  (M {} D {}).    src = {}    dst = {}",
         link_idx,
         candidate_eth_chans.size(),
         src_fabric_node_id.mesh_id,
         src_fabric_node_id.chip_id,
         dst_fabric_node_id.mesh_id,
-        dst_fabric_node_id.chip_id);
+        dst_fabric_node_id.chip_id,
+        src_chip_id,
+        dst_chip_id);
 
     const auto forwarding_links =
         get_forwarding_link_indices_in_direction(src_fabric_node_id, dst_fabric_node_id, forwarding_direction.value());
@@ -172,8 +179,6 @@ void append_fabric_connection_rt_args(
     const auto router_direction = control_plane.routing_direction_to_eth_direction(forwarding_direction.value());
 
     // src_chip_id is still required to get the fabric_router_virtual_core from tt_cluster
-    chip_id_t src_chip_id = control_plane.get_physical_chip_id_from_fabric_node_id(src_fabric_node_id);
-
     CoreCoord fabric_router_virtual_core =
         tt::tt_metal::MetalContext::instance().get_cluster().get_virtual_eth_core_from_channel(
             src_chip_id, fabric_router_channel);

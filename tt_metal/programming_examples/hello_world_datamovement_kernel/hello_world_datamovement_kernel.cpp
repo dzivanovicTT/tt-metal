@@ -4,6 +4,8 @@
 
 #include <tt-metalium/host_api.hpp>
 #include <tt-metalium/device.hpp>
+#include "tt-metalium/fabric_types.hpp"
+#include "tt-metalium/tt_metal.hpp"
 
 #ifndef OVERRIDE_KERNEL_PREFIX
 #define OVERRIDE_KERNEL_PREFIX ""
@@ -16,8 +18,14 @@ int main() {
     // Initialize Program and Device
 
     constexpr CoreCoord core = {0, 0};
-    int device_id = 0;
-    IDevice* device = CreateDevice(device_id);
+    int device_id = 4;
+    std::vector<int> devices_to_open;
+    devices_to_open.reserve(GetNumAvailableDevices());
+    for (int i = 0; i < GetNumAvailableDevices(); ++i) {
+        devices_to_open.push_back(i);
+    }
+    auto devices = detail::CreateDevices(devices_to_open);
+    IDevice* device = devices[device_id];
     CommandQueue& cq = device->command_queue();
     Program program = CreateProgram();
 
@@ -46,7 +54,7 @@ int main() {
 
     Finish(cq);
     printf("Thank you, Core {0, 0} on Device 0, for the completed task.\n");
-    CloseDevice(device);
+    detail::CloseDevices(devices);
 
     return 0;
 }

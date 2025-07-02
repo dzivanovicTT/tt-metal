@@ -872,6 +872,11 @@ bool DevicePool::close_devices(const std::vector<IDevice*>& devices, bool skip_s
         std::vector<uint32_t> termination_signal(1, signal);
 
         for (const auto& dev : this->get_all_active_devices()) {
+            log_info(
+                tt::LogMetal,
+                "Teardown Device {} with {} Fabric Routers",
+                dev->id(),
+                fabric_context.get_num_fabric_initialized_routers(dev->id()));
             if (fabric_context.get_num_fabric_initialized_routers(dev->id()) == 0) {
                 continue;
             }

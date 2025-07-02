@@ -1183,6 +1183,18 @@ void Cluster::reserve_ethernet_cores_for_fabric_routers(uint8_t num_routing_plan
                     this->device_eth_routing_info_.at(connnected_chip_id).at(connected_core) == EthRouterMode::IDLE) {
                     this->device_eth_routing_info_[chip_id][eth_core] = EthRouterMode::FABRIC_ROUTER;
                     this->device_eth_routing_info_[connnected_chip_id][connected_core] = EthRouterMode::FABRIC_ROUTER;
+
+                    log_info(
+                        LogMetal,
+                        "   RESERVE  Fabric core on chip {}, mmio is {} ---> which connects to {} mmio is {}: {} "
+                        "Distance = {})",
+                        chip_id,
+                        cluster_desc_->get_closest_mmio_capable_chip(chip_id),
+                        connnected_chip_id,
+                        cluster_desc_->get_closest_mmio_capable_chip(connnected_chip_id),
+                        eth_core.str(),
+                        this->cluster_desc_->get_ethernet_link_distance(
+                            cluster_desc_->get_closest_mmio_capable_chip(connnected_chip_id), connnected_chip_id));
                     num_reserved_cores++;
                 }
             }
