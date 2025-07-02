@@ -51,7 +51,6 @@
 #include "trace/trace.hpp"
 #include "dispatch_core_common.hpp"
 #include "dispatch/dispatch_settings.hpp"
-#include "dprint_server.hpp"
 #include "hal_types.hpp"
 #include "jit_build/build.hpp"
 #include "dispatch/launch_message_ring_buffer_state.hpp"
@@ -823,10 +822,6 @@ SubDeviceManagerId Device::get_default_sub_device_manager_id() const {
 
 SubDeviceManagerId Device::create_sub_device_manager(tt::stl::Span<const SubDevice> sub_devices, DeviceAddr local_l1_size) {
     return sub_device_manager_tracker_->create_sub_device_manager(sub_devices, local_l1_size);
-}
-
-std::tuple<SubDeviceManagerId, SubDeviceId> Device::create_sub_device_manager_with_fabric(tt::stl::Span<const SubDevice> sub_devices, DeviceAddr local_l1_size) {
-    return sub_device_manager_tracker_->create_sub_device_manager_with_fabric(sub_devices, local_l1_size);
 }
 
 void Device::load_sub_device_manager(SubDeviceManagerId sub_device_manager_id) {
