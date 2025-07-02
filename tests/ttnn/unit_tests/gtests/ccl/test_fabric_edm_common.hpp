@@ -547,6 +547,8 @@ void generate_sender_worker_kernels(
     log_trace(tt::LogTest, "last_message_semaphore_address: {}", local_worker_last_message_semaphore_id);
     log_trace(
         tt::LogTest, "Sender communicating with EDM: x={}, y={}", (uint32_t)edm_noc_core.x, (uint32_t)edm_noc_core.y);
+    // Looks like `fabric_erisc_datamover_sender_worker_sender.cpp` is for ETH core? as written in
+    // edm_fabric_worker_adapters.hpp's template
     std::vector<uint32_t> sender_worker_writer_runtime_args{
         worker_fabric_connection.edm_buffer_base_addr,
         worker_fabric_connection.edm_l1_sem_addr,
@@ -1002,7 +1004,7 @@ bool RunLocalTestWithMultiInputReaders(
 
     const size_t num_pages_per_edm_buffer = 2;
 
-    std::optional<tt::tt_fabric::SenderWorkerAdapterSpec> chip0_worker_forward_fabric_connection =
+    auto chip0_worker_forward_fabric_connection =
         fabric_enabled ? line_fabric->uniquely_connect_worker(devices[0], ttnn::ccl::EdmLineFabricOpInterface::FORWARD)
                        : std::optional<tt::tt_fabric::SenderWorkerAdapterSpec>{std::nullopt};
 
@@ -2024,6 +2026,8 @@ bool RunPipelinedWorkersTest(
                 reader_cmd_stream,
                 std::nullopt,
                 std::nullopt,
+                std::nullopt,
+                std::nullopt,
                 std::nullopt);
             ttnn::ccl::worker_detail::generate_multi_input_command_stream_kernel_rt_args(
                 program,
@@ -2035,6 +2039,8 @@ bool RunPipelinedWorkersTest(
                 cb_packet_size_in_pages,
                 {worker_cores.at(worker)},
                 writer_cmd_stream,
+                std::nullopt,
+                std::nullopt,
                 std::nullopt,
                 std::nullopt,
                 std::nullopt);
@@ -2978,7 +2984,7 @@ void Run1DFabricPacketSendTest(
                     } else {
                         const auto connection = local_device_fabric_handle->uniquely_connect_worker(device, direction);
                         const auto new_rt_args = ttnn::ccl::worker_detail::generate_edm_connection_rt_args(
-                            connection, program, {worker_core});
+                            connection, device->id(), program, {worker_core});
                         log_info(
                             tt::LogTest,
                             "On device: {}, connecting to EDM fabric in {} direction. EDM noc_x: {}, noc_y: {}",

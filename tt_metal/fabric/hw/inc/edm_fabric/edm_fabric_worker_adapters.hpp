@@ -12,6 +12,7 @@
 #include "fabric_edm_packet_header_validate.hpp"
 #include "fabric_stream_regs.hpp"
 #include "fabric_edm_types.hpp"
+#include "fabric_host_interface.h"
 #include "edm_fabric_flow_control_helpers.hpp"
 #include "tt_metal/fabric/hw/inc/edm_fabric/fabric_stream_regs.hpp"
 #include "tt_metal/hw/inc/utils/utils.h"
@@ -66,16 +67,22 @@ struct WorkerToFabricEdmSenderImpl {
     template <ProgrammableCoreType my_core_type>
     static WorkerToFabricEdmSenderImpl build_from_args(std::size_t& arg_idx) {
         constexpr bool is_persistent_fabric = true;
-        const auto direction = get_arg_val<uint32_t>(arg_idx++);
-        const WorkerXY edm_worker_xy = WorkerXY::from_uint32(get_arg_val<uint32_t>(arg_idx++));
-        const auto edm_buffer_base_addr = get_arg_val<uint32_t>(arg_idx++);
-        const uint8_t num_buffers_per_channel = get_arg_val<uint32_t>(arg_idx++);
-        const size_t edm_l1_sem_id = get_arg_val<uint32_t>(arg_idx++);
-        const auto edm_connection_handshake_l1_addr = get_arg_val<uint32_t>(arg_idx++);
-        const auto edm_worker_location_info_addr = get_arg_val<uint32_t>(arg_idx++);
-        const uint16_t buffer_size_bytes = get_arg_val<uint32_t>(arg_idx++);
-        const auto edm_copy_of_wr_counter_addr = get_arg_val<uint32_t>(arg_idx++);
+        tt_l1_ptr tensix_fabric_connections_l1_info_t* connection_info =
+            reinterpret_cast<tt_l1_ptr tensix_fabric_connections_l1_info_t*>(MEM_TENSIX_FABRIC_CONNECTIONS_BASE);
+        uint32_t eth_channel = get_arg_val<uint32_t>(arg_idx++);
+        const auto& conn = connection_info->connections[eth_channel];
+
+        uint32_t direction = conn.edm_direction;
+        WorkerXY edm_worker_xy = WorkerXY::from_uint32(conn.edm_noc_xy);
+        uint32_t edm_buffer_base_addr = conn.edm_buffer_base_addr;
+        uint32_t num_buffers_per_channel = conn.num_buffers_per_channel;
+        uint32_t edm_l1_sem_id = conn.edm_l1_sem_addr;
+        uint32_t edm_connection_handshake_l1_addr = conn.edm_connection_handshake_addr;
+        uint32_t edm_worker_location_info_addr = conn.edm_worker_location_info_addr;
+        uint32_t buffer_size_bytes = conn.buffer_size_bytes;
+        uint32_t edm_copy_of_wr_counter_addr = conn.buffer_index_semaphore_id;
         const auto writer_send_sem_id = get_arg_val<uint32_t>(arg_idx++);
+
         auto writer_send_sem_addr =
             reinterpret_cast<volatile uint32_t* const>(get_semaphore<my_core_type>(writer_send_sem_id));
 
