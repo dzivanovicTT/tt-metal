@@ -312,7 +312,7 @@ def evaluation(
             index += 1
     if model_type == "tt_metal":
         if model_name in ["YOLOv8x"]:
-            model.release_yolov8x_trace_2cqs_inference()
+            model.release()
         elif model_name in ["YOLOv10", "YOLOv9c", "YOLOv8s_World", "YOLOv8s"]:
             model.release()
     ground_truth = []
@@ -461,7 +461,7 @@ def test_yolov8s_world(device, model_type, res, reset_seeds):
 )
 @pytest.mark.parametrize("res", [(640, 640)])
 def test_yolov8x(device, model_type, res, reset_seeds):
-    from models.demos.yolov8x.tests.yolov8x_e2e_performant import Yolov8xTrace2CQ
+    from models.demos.yolov8x.runner.performant_runner import Yolov8xTrace2CQ
 
     torch_model = YOLO("yolov8x.pt")
     torch_model = torch_model.model
