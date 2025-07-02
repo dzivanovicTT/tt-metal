@@ -5,7 +5,7 @@
 #include <cstdint>
 
 #include "compute_kernel_api/pack_untilize.h"
-#include "compute_kernel_api/transpose_wh.h"
+#include "compute_kernel_api/transpose.h"
 
 template <int BATCH_SIZE>
 FORCE_INLINE void transpose(uint32_t cb_in, uint32_t cb_out) {
@@ -13,14 +13,14 @@ FORCE_INLINE void transpose(uint32_t cb_in, uint32_t cb_out) {
 
     tile_regs_acquire();
     for (uint32_t i = 0; i < BATCH_SIZE; i++) {
-        transpose_wh_tile(cb_in, i, i);
+        transpose_tile(cb_in, i, i);
     }
     tile_regs_commit();
     cb_pop_front(cb_in, BATCH_SIZE);
 
     cb_reserve_back(cb_out, BATCH_SIZE);
     tile_regs_wait();
-    pack_untilize_dst<1>(cb_out, BATCH_SIZE);
+    pack_untilize_dest<1>(cb_out, BATCH_SIZE);
     tile_regs_release();
 
     cb_push_back(cb_out, BATCH_SIZE);
@@ -34,10 +34,11 @@ void MAIN {
     constexpr uint32_t cb_in = get_compile_time_arg_val(0);
     constexpr uint32_t cb_transpose_in = get_compile_time_arg_val(1);
 
+    compute_kernel_hw_startup(cb_in, cb_transpose_in);
     pack_untilize_init(cb_in, cb_transpose_in);
-    transpose_wh_init(cb_in, cb_transpose_in);
+    transpose_init(cb_in);
 
-    pack_untilize_dst_init_short<1>(cb_transpose_in);
+    pack_untilize_dest_init<1>(cb_transpose_in);
 
     for (uint32_t i = 0; i < num_batches; i++) {
         transpose<BATCH_SIZE>(cb_in, cb_transpose_in);
