@@ -4,6 +4,7 @@
 
 #include "topk_op.hpp"
 #include "topk_program_factory.hpp"
+#include "topk_constants.hpp"
 
 using namespace tt::tt_metal;
 
@@ -70,9 +71,8 @@ static inline bool verify_single_core_cost(const std::vector<Tensor>& input_tens
     return memory_cost_local < device->l1_size_per_core();
 }
 
-constexpr uint32_t multi_core_min_width = 8192;
-constexpr uint32_t min_dim_per_core = 64;
 }  // namespace topk_utils
+
 namespace ttnn::operations::reduction {
 
 void TopK::validate_with_output_tensors(
@@ -81,9 +81,10 @@ void TopK::validate_with_output_tensors(
     TT_FATAL(input_shape.rank() == 4, "Input shape must be 4D, got {}", input_shape.rank());
 
     TT_FATAL(
-        input_shape[-1] >= topk_utils::min_dim_per_core,
-        "Input shape inner dim {} must be a multiple of 64, pad with +/-infinity if necessary",
-        input_shape[-1]);
+        input_shape[-1] >= topk::constants::min_dim_per_core,
+        "Input shape inner dim {} must be >= {}, pad with +/-infinity if necessary",
+        input_shape[-1],
+        topk::constants::min_dim_per_core);
     TT_FATAL(
         (input_shape[0] * input_shape[1] * input_shape[2]) % 32 == 0,
         "Input height (combined input_shape[0-3]) {} must be a multiple of 32",
@@ -94,11 +95,11 @@ void TopK::validate_with_output_tensors(
 
     bool can_run = false;
 
-    if (input_shape[dim] >= topk_utils::multi_core_min_width) {  // multicore implementation
+    if (input_shape[dim] >= topk::constants::multi_core_min_width) {  // multicore implementation
         can_run = topk_utils::verify_multi_core_cost(
             input_tensors,
             input_shape[this->dim],
-            topk_utils::min_dim_per_core,
+            topk::constants::min_dim_per_core,
             input_shape[this->dim] / 2,
             this->k,
             this->sub_core_grids);
@@ -154,7 +155,7 @@ operation::ProgramWithCallbacks TopK::create_program(
     const std::vector<Tensor>& input_tensors, std::vector<Tensor>& output_tensors) const {
     const auto& input_tensor = input_tensors.at(0);
     bool multicore_supported = true;
-    multicore_supported &= (input_tensor.padded_shape()[dim] >= topk_utils::multi_core_min_width);
+    multicore_supported &= (input_tensor.padded_shape()[dim] >= topk::constants::multi_core_min_width);
 
     auto input_shape = input_tensors.at(0).padded_shape();
     auto device = input_tensors.at(0).device();
@@ -171,7 +172,7 @@ operation::ProgramWithCallbacks TopK::create_program(
     multicore_supported &= topk_utils::verify_multi_core_cost(
         input_tensors,
         input_shape[this->dim],
-        topk_utils::min_dim_per_core,
+        topk::constants::min_dim_per_core,
         input_shape[this->dim] / 2,
         this->k,
         this->sub_core_grids);
