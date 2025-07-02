@@ -60,7 +60,8 @@ Tensor ExecuteAddalpha::invoke(
     tt::stl::Span<const unary::UnaryWithParam> lhs_activations,
     tt::stl::Span<const unary::UnaryWithParam> rhs_activations,
     std::optional<bool> use_legacy) {
-    SmallVector<unary::UnaryWithParam> modified_rhs_activations{{unary::UnaryOpType::MUL_UNARY_SFPU, alpha}};
+    SmallVector<unary::UnaryWithParam> modified_rhs_activations(rhs_activations.begin(), rhs_activations.end());
+    modified_rhs_activations.emplace_back(unary::UnaryOpType::MUL_UNARY_SFPU, alpha);
     return BinaryOperation<operations::binary::BinaryOpType::ADD>::invoke(
         queue_id,
         input_tensor_a,
@@ -87,7 +88,8 @@ Tensor ExecuteSubalpha::invoke(
     tt::stl::Span<const unary::UnaryWithParam> lhs_activations,
     tt::stl::Span<const unary::UnaryWithParam> rhs_activations,
     std::optional<bool> use_legacy) {
-    SmallVector<unary::UnaryWithParam> modified_rhs_activations{{unary::UnaryOpType::MUL_UNARY_SFPU, alpha}};
+    SmallVector<unary::UnaryWithParam> modified_rhs_activations(rhs_activations.begin(), rhs_activations.end());
+    modified_rhs_activations.emplace_back(unary::UnaryOpType::MUL_UNARY_SFPU, alpha);
     return BinaryOperation<operations::binary::BinaryOpType::SUB>::invoke(
         queue_id,
         input_tensor_a,
