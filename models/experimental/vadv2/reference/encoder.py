@@ -4,11 +4,11 @@ import torch.nn as nn
 import copy
 import warnings
 
-from VADv2.reference.ffn import FFN
+from models.experimental.vadv2.reference.ffn import FFN
 
-from VADv2.reference.temporal_self_attention import TemporalSelfAttention
+from models.experimental.vadv2.reference.temporal_self_attention import TemporalSelfAttention
 
-from VADv2.reference.spatial_cross_attention import SpatialCrossAttention
+from models.experimental.vadv2.reference.spatial_cross_attention import SpatialCrossAttention
 
 
 class BEVFormerEncoder(nn.Module):
@@ -118,10 +118,7 @@ class BEVFormerEncoder(nn.Module):
         num_cam = lidar2img.size(1)
 
         reference_points = reference_points.view(D, B, 1, num_query, 4).repeat(1, 1, num_cam, 1, 1).unsqueeze(-1)
-        # print("lidar2img",lidar2img.shape)
-        # print("num_cam",num_cam)
-        # print("num_query",num_query)
-        # ss
+
         lidar2img = lidar2img.view(1, B, num_cam, 1, 4, 4).repeat(D, 1, 1, num_query, 1, 1)
 
         reference_points_cam = torch.matmul(lidar2img.to(torch.float32), reference_points.to(torch.float32)).squeeze(-1)
@@ -197,8 +194,6 @@ class BEVFormerEncoder(nn.Module):
             device=bev_query.device,
             dtype=bev_query.dtype,
         )
-        print("batchsize", bev_query.size(1))
-        print(ref_3d.shape)
 
         ref_2d = self.get_reference_points(
             bev_h, bev_w, dim="2d", bs=bev_query.size(1), device=bev_query.device, dtype=bev_query.dtype
@@ -263,16 +258,12 @@ class BEVFormerLayer(nn.Module):
         self.batch_first = True
         self.attentions = nn.ModuleList()
         index = 0
-        print("defining operation order", self.operation_order)
         for operation_name in self.operation_order:
             if operation_name in ["self_attn", "cross_attn"]:
-                print("operation name", operation_name)
                 if "batch_first" in attn_cfgs[index]:
                     assert self.batch_first == attn_cfgs[index]["batch_first"]
                 else:
                     attn_cfgs[index]["batch_first"] = self.batch_first
-                print(attn_cfgs[index])
-                print("whuuu")
                 if attn_cfgs[index]["type"] == "TemporalSelfAttention":
                     type = attn_cfgs[index].pop("type")
                     attention = TemporalSelfAttention(**attn_cfgs[index])
@@ -285,16 +276,13 @@ class BEVFormerLayer(nn.Module):
                 self.attentions.append(attention)
                 index += 1
 
-        print("--------------", attn_cfgs)
         self.pre_norm = operation_order[0] == "norm"
 
         self.embed_dims = self.attentions[0].embed_dims
 
         num_attn = operation_order.count("self_attn") + operation_order.count("cross_attn")
-        print("------------", num_attn)
         if isinstance(attn_cfgs, dict):
             attn_cfgs = [copy.deepcopy(attn_cfgs) for _ in range(num_attn)]
-            print(attn_cfgs)
         else:
             assert num_attn == len(attn_cfgs), (
                 f"The length "
@@ -317,7 +305,6 @@ class BEVFormerLayer(nn.Module):
 
         assert len(operation_order) == 6
         assert set(operation_order) == set(["self_attn", "norm", "cross_attn", "ffn"])
-        print("one laer finished")
 
     def forward(
         self,
@@ -384,8 +371,6 @@ class BEVFormerLayer(nn.Module):
 
             # spaital cross attention
             elif layer == "cross_attn":
-                print(self.attentions[attn_index])
-                print("query_pos", query_pos)
                 query = self.attentions[attn_index](
                     query,
                     key,
