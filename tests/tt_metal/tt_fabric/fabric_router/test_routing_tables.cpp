@@ -376,4 +376,357 @@ TEST(MeshGraphValidation, TestExplicitShapeValidationNegative) {
     EXPECT_THROW(std::make_unique<tt_fabric::MeshGraph>(invalid_shape_mesh_graph_desc_path.string()), std::exception);
 }
 
+TEST(MeshGraphValidation, TestSingleGalaxyMesh) {
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_mesh_graph_descriptor.yaml";
+    auto mesh_graph = std::make_unique<MeshGraph>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_connectivity = mesh_graph->get_intra_mesh_connectivity();
+
+    EXPECT_EQ(intra_mesh_connectivity.size(), 1);
+    std::uint32_t mesh_size = 32;  // 8x4 mesh
+    std::uint32_t mesh_row_size = 4;
+    std::uint32_t num_ports_per_side = 4;
+
+    EXPECT_EQ(intra_mesh_connectivity[0].size(), mesh_size);
+    for (std::uint32_t i = 0; i < mesh_size; ++i) {
+        int N = i - mesh_row_size;  // North neighbor
+        int E = i + 1;              // East neighbor
+        int S = i + mesh_row_size;  // South neighbor
+        int W = i - 1;              // West neighbor
+
+        auto row = i / mesh_row_size;
+        auto col = i % mesh_row_size;
+        int N_wrap = (i - mesh_row_size + mesh_size) % mesh_size;
+        int E_wrap = row * mesh_row_size + (col + 1) % mesh_row_size;
+        int S_wrap = (i + mesh_row_size) % mesh_size;
+        int W_wrap = row * mesh_row_size + (col - 1 + mesh_row_size) % mesh_row_size;
+
+        if (N == N_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(N_wrap).port_direction, RoutingDirection::N);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(N_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, N_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 0);
+        }
+        if (E == E_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(E_wrap).port_direction, RoutingDirection::E);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(E_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, E_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 0);
+        }
+        if (S == S_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(S_wrap).port_direction, RoutingDirection::S);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(S_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, S_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 0);
+        }
+        if (W == W_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(W_wrap).port_direction, RoutingDirection::W);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(W_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, W_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 0);
+        }
+    }
+}
+
+TEST(RoutingTableValidation, TestSingleGalaxyMesh) {
+    // Testing XY dimension order routing, if algorithm changes we can remove this test
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_mesh_graph_descriptor.yaml";
+    auto routing_table_generator = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_routing_table = routing_table_generator->get_intra_mesh_table();
+    routing_table_generator->mesh_graph->print_connectivity();
+    routing_table_generator->print_routing_tables();
+    std::uint32_t nw_fabric_id = 0;
+    std::uint32_t ne_fabric_id = 3;
+    std::uint32_t sw_fabric_id = 28;
+    std::uint32_t se_fabric_id = 31;
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][nw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][ne_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][sw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][se_fabric_id], RoutingDirection::S);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][nw_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][ne_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][sw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][se_fabric_id], RoutingDirection::S);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][nw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][ne_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][sw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][se_fabric_id], RoutingDirection::E);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][nw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][ne_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][sw_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][se_fabric_id], RoutingDirection::C);
+}
+
+TEST(MeshGraphValidation, TestSingleGalaxyTorusXY) {
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_xy_graph_descriptor.yaml";
+    auto mesh_graph = std::make_unique<MeshGraph>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_connectivity = mesh_graph->get_intra_mesh_connectivity();
+
+    EXPECT_EQ(intra_mesh_connectivity.size(), 1);
+    std::uint32_t mesh_size = 32;  // 8x4 mesh
+    std::uint32_t mesh_row_size = 4;
+    std::uint32_t num_ports_per_side = 4;
+
+    EXPECT_EQ(intra_mesh_connectivity[0].size(), mesh_size);
+    for (std::uint32_t i = 0; i < mesh_size; ++i) {
+        auto row = i / mesh_row_size;
+        auto col = i % mesh_row_size;
+        int N_wrap = (i - mesh_row_size + mesh_size) % mesh_size;
+        int E_wrap = row * mesh_row_size + (col + 1) % mesh_row_size;
+        int S_wrap = (i + mesh_row_size) % mesh_size;
+        int W_wrap = row * mesh_row_size + (col - 1 + mesh_row_size) % mesh_row_size;
+
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(N_wrap).port_direction, RoutingDirection::N);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(N_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, N_wrap));
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(E_wrap).port_direction, RoutingDirection::E);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(E_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, E_wrap));
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(S_wrap).port_direction, RoutingDirection::S);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(S_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, S_wrap));
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(W_wrap).port_direction, RoutingDirection::W);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(W_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, W_wrap));
+    }
+}
+
+TEST(RoutingTableValidation, TestSingleGalaxyTorusXY) {
+    // Testing XY dimension order routing, if algorithm changes we can remove this test
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_xy_graph_descriptor.yaml";
+    auto routing_table_generator = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_routing_table = routing_table_generator->get_intra_mesh_table();
+    routing_table_generator->mesh_graph->print_connectivity();
+    routing_table_generator->print_routing_tables();
+    std::uint32_t nw_fabric_id = 0;
+    std::uint32_t ne_fabric_id = 3;
+    std::uint32_t sw_fabric_id = 28;
+    std::uint32_t se_fabric_id = 31;
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][nw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][ne_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][sw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][se_fabric_id], RoutingDirection::N);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][nw_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][ne_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][sw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][se_fabric_id], RoutingDirection::N);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][nw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][ne_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][sw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][se_fabric_id], RoutingDirection::W);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][nw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][ne_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][sw_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][se_fabric_id], RoutingDirection::C);
+}
+
+TEST(MeshGraphValidation, TestSingleGalaxyTorusX) {
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_x_graph_descriptor.yaml";
+    auto mesh_graph = std::make_unique<MeshGraph>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_connectivity = mesh_graph->get_intra_mesh_connectivity();
+
+    EXPECT_EQ(intra_mesh_connectivity.size(), 1);
+    std::uint32_t mesh_size = 32;  // 8x4 mesh
+    std::uint32_t mesh_row_size = 4;
+    std::uint32_t num_ports_per_side = 4;
+
+    EXPECT_EQ(intra_mesh_connectivity[0].size(), mesh_size);
+    for (std::uint32_t i = 0; i < mesh_size; ++i) {
+        int N = i - mesh_row_size;  // North neighbor
+        int S = i + mesh_row_size;  // South neighbor
+        auto row = i / mesh_row_size;
+        auto col = i % mesh_row_size;
+        int N_wrap = (i - mesh_row_size + mesh_size) % mesh_size;
+        int E_wrap = row * mesh_row_size + (col + 1) % mesh_row_size;
+        int S_wrap = (i + mesh_row_size) % mesh_size;
+        int W_wrap = row * mesh_row_size + (col - 1 + mesh_row_size) % mesh_row_size;
+
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(E_wrap).port_direction, RoutingDirection::E);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(E_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, E_wrap));
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(W_wrap).port_direction, RoutingDirection::W);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(W_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, W_wrap));
+        if (N == N_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(N_wrap).port_direction, RoutingDirection::N);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(N_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, N_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 0);
+        }
+        if (S == S_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(S_wrap).port_direction, RoutingDirection::S);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(S_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, S_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 0);
+        }
+    }
+}
+
+TEST(RoutingTableValidation, TestSingleGalaxyTorusX) {
+    // Testing XY dimension order routing, if algorithm changes we can remove this test
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_x_graph_descriptor.yaml";
+    auto routing_table_generator = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_routing_table = routing_table_generator->get_intra_mesh_table();
+    routing_table_generator->mesh_graph->print_connectivity();
+    routing_table_generator->print_routing_tables();
+    std::uint32_t nw_fabric_id = 0;
+    std::uint32_t ne_fabric_id = 3;
+    std::uint32_t sw_fabric_id = 28;
+    std::uint32_t se_fabric_id = 31;
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][nw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][ne_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][sw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][se_fabric_id], RoutingDirection::S);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][nw_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][ne_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][sw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][se_fabric_id], RoutingDirection::S);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][nw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][ne_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][sw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][se_fabric_id], RoutingDirection::W);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][nw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][ne_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][sw_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][se_fabric_id], RoutingDirection::C);
+}
+
+TEST(MeshGraphValidation, TestSingleGalaxyTorusY) {
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_y_graph_descriptor.yaml";
+    auto mesh_graph = std::make_unique<MeshGraph>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_connectivity = mesh_graph->get_intra_mesh_connectivity();
+
+    EXPECT_EQ(intra_mesh_connectivity.size(), 1);
+    std::uint32_t mesh_size = 32;  // 8x4 mesh
+    std::uint32_t mesh_row_size = 4;
+    std::uint32_t num_ports_per_side = 4;
+
+    EXPECT_EQ(intra_mesh_connectivity[0].size(), mesh_size);
+    for (std::uint32_t i = 0; i < mesh_size; ++i) {
+        int E = i + 1;  // East neighbor
+        int W = i - 1;  // West neighbor
+        auto row = i / mesh_row_size;
+        auto col = i % mesh_row_size;
+        int N_wrap = (i - mesh_row_size + mesh_size) % mesh_size;
+        int E_wrap = row * mesh_row_size + (col + 1) % mesh_row_size;
+        int S_wrap = (i + mesh_row_size) % mesh_size;
+        int W_wrap = row * mesh_row_size + (col - 1 + mesh_row_size) % mesh_row_size;
+
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(N_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(N_wrap).port_direction, RoutingDirection::N);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(N_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, N_wrap));
+
+        EXPECT_EQ(intra_mesh_connectivity[0][i].count(S_wrap), 1);
+        EXPECT_EQ(intra_mesh_connectivity[0][i].at(S_wrap).port_direction, RoutingDirection::S);
+        EXPECT_EQ(
+            intra_mesh_connectivity[0][i].at(S_wrap).connected_chip_ids,
+            std::vector<chip_id_t>(num_ports_per_side, S_wrap));
+        if (E == E_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(E_wrap).port_direction, RoutingDirection::E);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(E_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, E_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(E_wrap), 0);
+        }
+        if (W == W_wrap) {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 1);
+            EXPECT_EQ(intra_mesh_connectivity[0][i].at(W_wrap).port_direction, RoutingDirection::W);
+            EXPECT_EQ(
+                intra_mesh_connectivity[0][i].at(W_wrap).connected_chip_ids,
+                std::vector<chip_id_t>(num_ports_per_side, W_wrap));
+        } else {
+            EXPECT_EQ(intra_mesh_connectivity[0][i].count(W_wrap), 0);
+        }
+    }
+}
+
+TEST(RoutingTableValidation, TestSingleGalaxyTorusY) {
+    // Testing XY dimension order routing, if algorithm changes we can remove this test
+    const std::filesystem::path mesh_graph_desc_path =
+        std::filesystem::path(tt::tt_metal::MetalContext::instance().rtoptions().get_root_dir()) /
+        "tt_metal/fabric/mesh_graph_descriptors/single_galaxy_torus_y_graph_descriptor.yaml";
+    auto routing_table_generator = std::make_unique<RoutingTableGenerator>(mesh_graph_desc_path.string());
+    const auto& intra_mesh_routing_table = routing_table_generator->get_intra_mesh_table();
+    routing_table_generator->mesh_graph->print_connectivity();
+    routing_table_generator->print_routing_tables();
+    std::uint32_t nw_fabric_id = 0;
+    std::uint32_t ne_fabric_id = 3;
+    std::uint32_t sw_fabric_id = 28;
+    std::uint32_t se_fabric_id = 31;
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][nw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][ne_fabric_id], RoutingDirection::E);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][sw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][nw_fabric_id][se_fabric_id], RoutingDirection::N);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][nw_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][ne_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][sw_fabric_id], RoutingDirection::N);
+    EXPECT_EQ(intra_mesh_routing_table[0][ne_fabric_id][se_fabric_id], RoutingDirection::N);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][nw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][ne_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][sw_fabric_id], RoutingDirection::C);
+    EXPECT_EQ(intra_mesh_routing_table[0][sw_fabric_id][se_fabric_id], RoutingDirection::E);
+
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][nw_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][ne_fabric_id], RoutingDirection::S);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][sw_fabric_id], RoutingDirection::W);
+    EXPECT_EQ(intra_mesh_routing_table[0][se_fabric_id][se_fabric_id], RoutingDirection::C);
+}
 }  // namespace tt::tt_fabric::fabric_router_tests
