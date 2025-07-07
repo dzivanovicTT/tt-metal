@@ -449,14 +449,9 @@ struct LineSyncConfig {
 
     void global_sync_finish() {
         // sync wait
-        // DPRINT << "finishing global sync" <<ENDL();
+        // DPRINT << "line_sync_val " << (uint)line_sync_val<<ENDL();
 
-        while (line_sync_ptr[0] != line_sync_val) {
-            DPRINT << "line_sync_ptr " << (uint)line_sync_ptr[0] << ENDL();
-            for (int i = 0; i < 10000000; ++i) {
-                asm volatile("nop");
-            }
-        }
+        while (line_sync_ptr[0] != line_sync_val);
     }
 
 private:
@@ -909,15 +904,17 @@ private:
         // add line sync initializations here, for each fabric connection, ex, forward and backward connection, run line
         // sync for all.
         if constexpr (LINE_SYNC) {
-            uint32_t line_sync_val = get_arg_val<uint32_t>(arg_idx++);
-            for (uint8_t i = 0; i < NUM_SYNC_FABRIC_CONNECTIONS; i++) {
-                uint32_t packet_header_address = this->memory_allocator.get_packet_header_address();
-                new (&line_sync_configs()[i])
-                    LineSyncConfig(&sync_fabric_connections()[i], packet_header_address, line_sync_val);
+            if constexpr (MASTER_SYNC_CORE) {
+                uint32_t line_sync_val = get_arg_val<uint32_t>(arg_idx++);
+                for (uint8_t i = 0; i < NUM_SYNC_FABRIC_CONNECTIONS; i++) {
+                    uint32_t packet_header_address = this->memory_allocator.get_packet_header_address();
+                    new (&line_sync_configs()[i])
+                        LineSyncConfig(&sync_fabric_connections()[i], packet_header_address, line_sync_val);
 
-                // setup packet header fields, 6 rt args for 1D.
-                line_sync_configs()[i].template setup_packet_header<IS_2D_FABRIC, USE_DYNAMIC_ROUTING>(
-                    arg_idx, packet_header_address);
+                    // setup packet header fields, 6 rt args for 1D.
+                    line_sync_configs()[i].template setup_packet_header<IS_2D_FABRIC, USE_DYNAMIC_ROUTING>(
+                        arg_idx, packet_header_address);
+                }
             }
 
             uint32_t sync_address = get_arg_val<uint32_t>(arg_idx++);

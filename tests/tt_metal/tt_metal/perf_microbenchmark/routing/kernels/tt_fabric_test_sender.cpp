@@ -28,7 +28,11 @@ void kernel_main() {
     size_t rt_args_idx = 0;
     auto sender_config = SenderKernelConfig::build_from_args(rt_args_idx);
 
+    // DPRINT << "NUM_FABRIC_CONNECTIONS " << (uint)NUM_FABRIC_CONNECTIONS <<ENDL();
+    // DPRINT << "LINE_SYNC " << (uint)LINE_SYNC <<ENDL();
     // DPRINT << "MASTER_SYNC_CORE " << (uint)MASTER_SYNC_CORE <<ENDL();
+    // DPRINT << "NUM_LOCAL_SYNC_CORES " << (uint)NUM_LOCAL_SYNC_CORES <<ENDL();
+    // DPRINT << "NUM_SYNC_FABRIC_CONNECTIONS " << (uint)NUM_SYNC_FABRIC_CONNECTIONS <<ENDL();
 
     // clear out test results area
 
@@ -37,6 +41,8 @@ void kernel_main() {
         if constexpr (MASTER_SYNC_CORE) {
             sender_config.global_sync();
             sender_config.local_sync();
+            // master sync core doesn't process any subsequent traffic.
+            return;
         } else {
             sender_config.local_sync();
         }
@@ -47,22 +53,22 @@ void kernel_main() {
     bool packets_left_to_send = true;
 
     // Round-robin packet sending: send one packet from each config per iteration
-    // while (packets_left_to_send) {
-    //     packets_left_to_send = false;
-    //     for (uint8_t i = 0; i < NUM_TRAFFIC_CONFIGS; i++) {
-    //         auto* traffic_config = sender_config.traffic_config_ptrs[i];
-    //         if (!traffic_config->has_packets_to_send()) {
-    //             continue;
-    //         }
+    while (packets_left_to_send) {
+        packets_left_to_send = false;
+        for (uint8_t i = 0; i < NUM_TRAFFIC_CONFIGS; i++) {
+            auto* traffic_config = sender_config.traffic_config_ptrs[i];
+            if (!traffic_config->has_packets_to_send()) {
+                continue;
+            }
 
-    //         // TODO: might want to check if the buffer has wrapped or not
-    //         // if wrapped, then wait for credits from the receiver
+            // TODO: might want to check if the buffer has wrapped or not
+            // if wrapped, then wait for credits from the receiver
 
-    //         // Always send exactly one packet per config per round
-    //         traffic_config->send_one_packet<BENCHMARK_MODE>();
-    //         packets_left_to_send |= traffic_config->has_packets_to_send();
-    //     }
-    // }
+            // Always send exactly one packet per config per round
+            traffic_config->send_one_packet<BENCHMARK_MODE>();
+            packets_left_to_send |= traffic_config->has_packets_to_send();
+        }
+    }
 
     sender_config.close_connections();
 

@@ -1151,45 +1151,100 @@ private:
         std::vector<FabricNodeId> all_devices = device_info_provider_.get_all_node_ids();
         TT_FATAL(!all_devices.empty(), "Cannot expand line sync patterns because no devices were found.");
 
-        // Create sync pattern based on topology
+        // Create sync patterns based on topology - returns multiple patterns per device for mcast
         for (const auto& src_device : all_devices) {
-            TrafficPatternConfig sync_pattern =
-                create_sync_pattern_for_topology(src_device, test.fabric_setup.topology);
+            const auto& sync_patterns_and_sync_val_pair =
+                create_sync_patterns_for_topology(src_device, all_devices, test.fabric_setup.topology);
 
-            SenderConfig sync_sender = {.device = src_device, .patterns = {sync_pattern}};
+            const auto& sync_patterns = sync_patterns_and_sync_val_pair.first;
+            const auto& sync_val = sync_patterns_and_sync_val_pair.second;
 
-            test.global_line_sync_configs.push_back(sync_sender);
+            // Create sender config with all split sync patterns
+            SenderConfig sync_sender = {.device = src_device, .patterns = std::move(sync_patterns)};
+
+            test.global_line_sync_configs.push_back(std::move(sync_sender));
+
+            // global sync value
+            test.line_sync_val = sync_val;
         }
 
-        log_info(LogTest, "Generated {} line sync configurations", test.global_line_sync_configs.size());
+        log_info(
+            LogTest,
+            "Generated {} line sync configurations, line_syn_val: {}",
+            test.global_line_sync_configs.size(),
+            test.line_sync_val);
     }
 
-    TrafficPatternConfig create_sync_pattern_for_topology(FabricNodeId src_device, tt::tt_fabric::Topology topology) {
-        TrafficPatternConfig sync_pattern;
+    std::pair<std::vector<TrafficPatternConfig>, uint32_t> create_sync_patterns_for_topology(
+        const FabricNodeId& src_device, const std::vector<FabricNodeId>& devices, tt::tt_fabric::Topology topology) {
+        std::vector<TrafficPatternConfig> sync_patterns;
 
         // Common sync pattern characteristics
-        sync_pattern.ftype = ChipSendType::CHIP_MULTICAST;         // Global sync across devices
-        sync_pattern.ntype = NocSendType::NOC_UNICAST_ATOMIC_INC;  // Sync signal via atomic increment
-        sync_pattern.size = 0;                                     // No payload, just sync signal
-        sync_pattern.num_packets = 1;                              // Single sync signal
-        sync_pattern.atomic_inc_val = 1;                           // Increment by 1
-        sync_pattern.atomic_inc_wrap = 0xFFFF;                     // Large wrap value
+        TrafficPatternConfig base_sync_pattern;
+        base_sync_pattern.ftype = ChipSendType::CHIP_MULTICAST;         // Global sync across devices
+        base_sync_pattern.ntype = NocSendType::NOC_UNICAST_ATOMIC_INC;  // Sync signal via atomic increment
+        base_sync_pattern.size = 0;                                     // No payload, just sync signal
+        base_sync_pattern.num_packets = 1;                              // Single sync signal
+        base_sync_pattern.atomic_inc_val = 1;                           // Increment by 1
+        base_sync_pattern.atomic_inc_wrap = 0xFFFF;                     // Large wrap value
 
-        // Topology-specific routing
-        std::unordered_map<RoutingDirection, uint32_t> sync_hops;
+        // Topology-specific routing - get multi-directional hops first
+        std::unordered_map<RoutingDirection, uint32_t> multi_directional_hops;
+        uint32_t line_sync_val = 0;
 
         switch (topology) {
-            case tt::tt_fabric::Topology::Ring: sync_hops = this->route_manager_.get_full_mcast_hops(src_device); break;
-            case tt::tt_fabric::Topology::Linear:
-                sync_hops = this->route_manager_.get_full_mcast_hops(src_device);
+            case tt::tt_fabric::Topology::Ring: {
+                // Get ring neighbors - returns nullopt for non-perimeter devices
+                auto ring_neighbors = this->route_manager_.get_wrap_around_mesh_ring_neighbors(src_device, devices);
+
+                // Check if the result is valid (has value)
+                if (!ring_neighbors.has_value()) {
+                    // Skip this device as it's not on the perimeter and can't participate in ring multicast
+                    log_info(LogTest, "Skipping device {} as it's not on the perimeter ring", src_device.chip_id);
+                    return {{}, 0};
+                }
+
+                // Extract the valid ring neighbors
+                auto [dst_node_forward, dst_node_backward] = ring_neighbors.value();
+
+                multi_directional_hops = this->route_manager_.get_full_or_half_ring_mcast_hops(
+                    src_device, dst_node_forward, dst_node_backward, HighLevelTrafficPattern::FullRingMulticast);
+
+                line_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 1;
                 break;
-            case tt::tt_fabric::Topology::Mesh: sync_hops = this->route_manager_.get_full_mcast_hops(src_device); break;
-            default: TT_FATAL(false, "Unsupported topology for line sync: {}", static_cast<int>(topology));
+            }
+            case tt::tt_fabric::Topology::Linear: {
+                multi_directional_hops = this->route_manager_.get_full_mcast_hops(src_device);
+                line_sync_val = this->route_manager_.get_linear_topology_num_sync_devices() - 1;
+                break;
+            }
+            case tt::tt_fabric::Topology::Mesh: {
+                multi_directional_hops = this->route_manager_.get_full_mcast_hops(src_device);
+                line_sync_val = this->route_manager_.get_mesh_topology_num_sync_devices() - 1;
+                TT_THROW("We need mcast support for mesh topology to perform sync");
+                break;
+            }
+            default: TT_THROW("Unsupported topology for line sync: {}", static_cast<int>(topology));
         }
 
-        sync_pattern.destination = DestinationConfig{.hops = sync_hops};
+        // Split multi-directional hops into single-direction patterns
+        auto split_hops_vec = this->route_manager_.split_multicast_hops(multi_directional_hops);
 
-        return sync_pattern;
+        log_debug(
+            LogTest,
+            "Splitting sync pattern for device {} from 1 multi-directional to {} single-direction patterns",
+            src_device.chip_id,
+            split_hops_vec.size());
+
+        // Create separate sync pattern for each direction
+        sync_patterns.reserve(split_hops_vec.size());
+        for (const auto& single_direction_hops : split_hops_vec) {
+            TrafficPatternConfig sync_pattern = base_sync_pattern;
+            sync_pattern.destination = DestinationConfig{.hops = single_direction_hops};
+            sync_patterns.push_back(std::move(sync_pattern));
+        }
+
+        return {sync_patterns, line_sync_val};
     }
 
     void add_senders_from_pairs(

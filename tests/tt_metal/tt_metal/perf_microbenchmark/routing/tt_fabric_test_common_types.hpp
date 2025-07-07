@@ -85,6 +85,7 @@ struct TestConfig {
     std::optional<std::string> bw_calc_func;
     bool benchmark_mode = false;  // Enable benchmark mode for performance testing
     bool line_sync = false;       // Enable line sync for device synchronization
+    uint32_t line_sync_val = 0;
     uint32_t seed;
 };
 
