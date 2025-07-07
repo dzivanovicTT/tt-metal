@@ -439,9 +439,6 @@ struct LineSyncConfig {
     void global_sync_finish() {
         // sync wait
         while (line_sync_ptr[0] != line_sync_val);
-
-        // reset location to 0
-        line_sync_ptr[0] = 0;
     }
 
 private:
