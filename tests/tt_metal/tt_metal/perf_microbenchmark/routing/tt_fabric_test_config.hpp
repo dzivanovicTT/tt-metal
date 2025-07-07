@@ -1210,7 +1210,8 @@ private:
                 multi_directional_hops = this->route_manager_.get_full_or_half_ring_mcast_hops(
                     src_device, dst_node_forward, dst_node_backward, HighLevelTrafficPattern::FullRingMulticast);
 
-                line_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 1;
+                // minus 2 because full ring pattern traverse each node twice.
+                line_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 2;
                 break;
             }
             case tt::tt_fabric::Topology::Linear: {

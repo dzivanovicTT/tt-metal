@@ -15,32 +15,32 @@ Tests:
       - type: unidirectional_linear_multicast
 
 
-  # - name: "FullRingMulticast"
-  #   benchmark_mode: true
-  #   line_sync: false
-  #   fabric_setup:
-  #     topology: Ring
+  - name: "FullRingMulticast"
+    benchmark_mode: true
+    line_sync: true
+    fabric_setup:
+      topology: Ring
 
-  #   defaults:
-  #     ftype: mcast
-  #     ntype: unicast_write
-  #     size: 4096
-  #     num_packets: 200000
+    defaults:
+      ftype: mcast
+      ntype: unicast_write
+      size: 4096
+      num_packets: 200000
 
-  #   patterns:
-  #     - type: full_ring_multicast
+    patterns:
+      - type: full_ring_multicast
 
-  # - name: "HalfRingMulticast"
-  #   benchmark_mode: true
-  #   line_sync: false
-  #   fabric_setup:
-  #     topology: Ring
+  - name: "HalfRingMulticast"
+    benchmark_mode: true
+    line_sync: false
+    fabric_setup:
+      topology: Ring
 
-  #   defaults:
-  #     ftype: mcast
-  #     ntype: unicast_write
-  #     size: 4096
-  #     num_packets: 200000
+    defaults:
+      ftype: mcast
+      ntype: unicast_write
+      size: 4096
+      num_packets: 200000
 
-  #   patterns:
-  #     - type: half_ring_multicast
+    patterns:
+      - type: half_ring_multicast

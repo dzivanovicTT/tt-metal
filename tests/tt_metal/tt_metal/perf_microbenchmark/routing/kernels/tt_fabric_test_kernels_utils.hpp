@@ -451,7 +451,13 @@ struct LineSyncConfig {
         // sync wait
         // DPRINT << "line_sync_val " << (uint)line_sync_val<<ENDL();
 
-        while (line_sync_ptr[0] != line_sync_val);
+        while (line_sync_ptr[0] != line_sync_val) {
+            // DPRINT << "line_sync_ptr " << (uint)line_sync_ptr[0]<<ENDL();
+
+            // for (int i=0; i<10000000; ++i) {
+            //     asm volatile("nop");
+            // }
+        }
     }
 
 private:
