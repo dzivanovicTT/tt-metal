@@ -72,13 +72,15 @@ public:
     uint32_t get_global_sync_address() { return global_sync_address_; }
     uint32_t get_packet_header_region_base() { return packet_header_region_base_; }
     uint32_t get_payload_buffer_region_base() { return payload_buffer_region_base_; }
+    uint32_t get_local_sync_address() { return local_sync_address_; }
     uint32_t get_highest_usable_address() { return highest_usable_address_; }
 
 private:
-    static constexpr uint32_t global_sync_address_ = 0x50000;
     static constexpr uint32_t packet_header_region_base_ = 0x30000;
     static constexpr uint32_t payload_buffer_region_base_ = 0x40000;
     static constexpr uint32_t highest_usable_address_ = 0x100000;
+    static constexpr uint32_t global_sync_address_ = 0x100010;
+    static constexpr uint32_t local_sync_address_ = 0x100020;
 
     void add_traffic_config(const TestTrafficConfig& traffic_config);
 
@@ -176,7 +178,8 @@ void TestContext::initialize_sync_memory() {
     log_info(tt::LogTest, "Initializing sync memory for line sync");
 
     // Initialize sync memory location with 16 bytes of zeros on all devices
-    const uint32_t sync_address = this->get_global_sync_address();            // Hard-coded sync address
+    const uint32_t global_sync_address = this->get_global_sync_address();
+    const uint32_t local_sync_address = this->get_local_sync_address();
     const uint32_t sync_memory_size = 16;                                     // 16 bytes
     std::vector<uint32_t> zero_data(sync_memory_size / sizeof(uint32_t), 0);  // 4 uint32_t zeros
 
@@ -186,17 +189,25 @@ void TestContext::initialize_sync_memory() {
         auto worker_cores =
             device->worker_cores(tt::tt_metal::HalProgrammableCoreType::TENSIX, tt::tt_metal::SubDeviceId{0});
         for (const auto& core : corerange_to_cores(worker_cores)) {
-            tt::tt_metal::detail::WriteToDeviceL1(device, core, sync_address, zero_data);
+            tt::tt_metal::detail::WriteToDeviceL1(device, core, global_sync_address, zero_data);
+        }
+        for (const auto& core : corerange_to_cores(worker_cores)) {
+            tt::tt_metal::detail::WriteToDeviceL1(device, core, local_sync_address, zero_data);
         }
         log_debug(
             tt::LogTest,
-            "Initialized sync memory at address 0x{:x} on device {} for {} cores",
-            sync_address,
+            "Initialized sync memory at address 0x{:x} and address 0x{:x} on device {} for {} cores",
+            global_sync_address,
+            local_sync_address,
             device->id(),
             worker_cores.size());
     }
 
-    log_info(tt::LogTest, "Sync memory initialization complete at address: 0x{:x}", sync_address);
+    log_info(
+        tt::LogTest,
+        "Sync memory initialization complete at address: 0x{:x} and address 0x{:x}",
+        global_sync_address,
+        local_sync_address);
 }
 
 void TestContext::compile_programs() {
@@ -209,7 +220,10 @@ void TestContext::compile_programs() {
 
         // Set memory addresses for all test devices
         test_device.set_memory_addresses(
-            get_packet_header_region_base(), get_payload_buffer_region_base(), get_highest_usable_address());
+            get_packet_header_region_base(),
+            get_payload_buffer_region_base(),
+            get_highest_usable_address(),
+            get_local_sync_address());
 
         auto device_id = test_device.get_node_id();
         test_device.set_sync_core(device_sync_cores_[device_id]);

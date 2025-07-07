@@ -456,7 +456,6 @@ struct LocalSyncConfig {
     LocalSyncConfig(const uint32_t sync_address, const uint32_t sync_val) :
         sync_address(sync_address), sync_val(sync_val) {
         sync_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(sync_address);
-        sync_ptr[0] = 0;
     }
 
     void setup_core_coordinates(size_t& arg_idx) {

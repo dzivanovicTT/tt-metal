@@ -118,9 +118,14 @@ public:
     void set_benchmark_mode(bool benchmark_mode) { benchmark_mode_ = benchmark_mode; }
     void set_global_sync(bool global_sync) { global_sync_ = global_sync; }
     void set_global_sync_val(uint32_t global_sync_val) { global_sync_val_ = global_sync_val; }
-    void set_memory_addresses(uint32_t packet_header_base, uint32_t payload_buffer_base, uint32_t highest_usable) {
+    void set_memory_addresses(
+        uint32_t packet_header_base,
+        uint32_t payload_buffer_base,
+        uint32_t highest_usable,
+        uint32_t local_sync_address) {
         packet_header_region_base_ = packet_header_base;
         payload_buffer_region_base_ = payload_buffer_base;
+        local_sync_address_ = local_sync_address;
         highest_usable_address_ = highest_usable;
     }
     RoutingDirection get_forwarding_direction(const std::unordered_map<RoutingDirection, uint32_t>& hops) const;
@@ -159,6 +164,7 @@ private:
     uint32_t packet_header_region_base_ = 0x30000;  // Default values
     uint32_t payload_buffer_region_base_ = 0x40000;
     uint32_t highest_usable_address_ = 0x100000;
+    uint32_t local_sync_address_ = 0x100020;
 
     // controller?
 };
