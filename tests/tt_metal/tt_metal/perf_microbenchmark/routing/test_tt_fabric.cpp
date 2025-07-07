@@ -196,7 +196,7 @@ void TestContext::initialize_sync_memory() {
         }
         log_debug(
             tt::LogTest,
-            "Initialized sync memory at address 0x{:x} and address 0x{:x} on device {} for {} cores",
+            "Initialized sync memory at address {} and address {} on device {} for {} cores",
             global_sync_address,
             local_sync_address,
             device->id(),
@@ -205,7 +205,7 @@ void TestContext::initialize_sync_memory() {
 
     log_info(
         tt::LogTest,
-        "Sync memory initialization complete at address: 0x{:x} and address 0x{:x}",
+        "Sync memory initialization complete at address: {} and address: {}",
         global_sync_address,
         local_sync_address);
 }
@@ -299,6 +299,29 @@ void TestContext::process_traffic_config(TestConfig& config) {
                 // Add sync config to the master sender on this device
                 this->test_devices_.at(device_coord).add_sender_sync_config(sync_core, std::move(sync_config));
             }
+        }
+
+        // Validate that all sync cores have the same coordinate
+        if (!device_sync_cores_.empty()) {
+            CoreCoord reference_sync_core = device_sync_cores_.begin()->second;
+            for (const auto& [device_id, sync_core] : device_sync_cores_) {
+                if (sync_core.x != reference_sync_core.x || sync_core.y != reference_sync_core.y) {
+                    TT_THROW(
+                        "Global sync requires all devices to use the same sync core coordinate. "
+                        "Device {} uses sync core ({}, {}) but expected ({}, {}) based on first device.",
+                        device_id.chip_id,
+                        sync_core.x,
+                        sync_core.y,
+                        reference_sync_core.x,
+                        reference_sync_core.y);
+                }
+            }
+            log_info(
+                tt::LogTest,
+                "Validated sync core consistency: all {} devices use sync core ({}, {})",
+                device_sync_cores_.size(),
+                reference_sync_core.x,
+                reference_sync_core.y);
         }
     }
 
@@ -417,8 +440,6 @@ int main(int argc, char** argv) {
         // Set benchmark mode and line sync for this test group
         test_context.set_benchmark_mode(test_config.benchmark_mode);
         test_context.set_global_sync(test_config.global_sync);
-        // Initialize sync memory if line sync is enabled
-        test_context.initialize_sync_memory();
 
         auto built_tests = builder.build_tests({test_config});
 
@@ -427,6 +448,9 @@ int main(int argc, char** argv) {
 
             test_context.setup_devices();
             log_info(tt::LogTest, "Device setup complete");
+
+            // Initialize sync memory if line sync is enabled
+            test_context.initialize_sync_memory();
 
             test_context.process_traffic_config(built_test);
             log_info(tt::LogTest, "Traffic config processed");

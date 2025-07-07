@@ -474,10 +474,9 @@ inline void TestDevice::create_sync_kernel() {
 
     // ===== LOCAL SYNC ARGS =====
     // Add local sync configuration args
-    uint32_t local_sync_address = 0x60000;  // Fixed local sync address
     uint32_t local_sync_val =
         static_cast<uint32_t>(senders_.size() + 1);  // Expected sync value (all senders + sync core)
-    global_sync_args.push_back(local_sync_address);
+    global_sync_args.push_back(local_sync_address_);
     global_sync_args.push_back(local_sync_val);
 
     // Add sync core's own NOC encoding first
@@ -553,10 +552,9 @@ inline void TestDevice::create_sender_kernels() {
         std::vector<uint32_t> local_sync_args;
         if (global_sync_) {
             // Add local sync configuration args (same as sync core, but no global sync)
-            uint32_t local_sync_address = 0x60000;  // Fixed local sync address
             uint32_t local_sync_val =
                 static_cast<uint32_t>(senders_.size() + 1);  // Expected sync value (all senders + sync core)
-            local_sync_args.push_back(local_sync_address);
+            local_sync_args.push_back(local_sync_address_);
             local_sync_args.push_back(local_sync_val);
 
             // Add sync core's NOC encoding (the master for local sync)

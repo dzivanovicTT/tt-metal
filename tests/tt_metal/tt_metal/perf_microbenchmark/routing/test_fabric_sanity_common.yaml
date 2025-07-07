@@ -1,6 +1,6 @@
 Tests:
   - name: "SimpleUnicastWriteLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -15,7 +15,7 @@ Tests:
               device: [0, 1]
 
   - name: "TestNocSendTypesLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -32,7 +32,7 @@ Tests:
               device: [0, 1]
 
   - name: "AllToAllUnicastWriteLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -46,7 +46,7 @@ Tests:
       - type: all_to_all_unicast
 
   - name: "AllToAllUnicastTestNocSendTypesLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -62,7 +62,7 @@ Tests:
       - type: all_to_all_unicast
 
   - name: "AllToAllMulticastLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -76,7 +76,7 @@ Tests:
       - type: all_to_all_multicast
 
   - name: "UnidirectionalMulticastLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
@@ -90,7 +90,7 @@ Tests:
       - type: unidirectional_linear_multicast
 
   - name: "FullDevicePairingLinear"
-    line_sync: true
+    sync: true
     fabric_setup:
       topology: Linear
 
