@@ -353,8 +353,6 @@ struct ChipSendTypeHandler<ChipSendType::CHIP_MULTICAST, false, USE_DYNAMIC_ROUT
         volatile tt_l1_ptr PACKET_HEADER_TYPE* packet_header,
         WorkerToFabricEdmSender* fabric_connection_handle) {
         const auto mcast_fields = ChipMulticastFields1D::build_from_args(arg_idx);
-        // DPRINT << "mcast_start_hops " << mcast_fields.mcast_start_hops << " num_hops " << mcast_fields.num_hops
-        // <<ENDL();
         packet_header->to_chip_multicast(MulticastRoutingCommandHeader{
             static_cast<uint8_t>(mcast_fields.mcast_start_hops), static_cast<uint8_t>(mcast_fields.num_hops)});
     }
@@ -424,14 +422,7 @@ struct LineSyncConfig {
 
         // set up noc fields, 4 rt args
         auto fields = NocUnicastAtomicIncFields::build_from_args<true>(arg_idx);
-
-        // set the addr to 0
         line_sync_ptr = reinterpret_cast<volatile tt_l1_ptr uint32_t*>(fields.dst_address);
-        // line_sync_ptr[0] = 0;
-
-        // DPRINT << "dst_noc_encoding " << fields.dst_noc_encoding << " dst_address " << fields.dst_address <<ENDL();
-        // DPRINT << "atomic_inc_val " << fields.atomic_inc_val << " atomic_inc_wrap " << fields.atomic_inc_wrap
-        // <<ENDL();
 
         uint64_t noc_addr = get_noc_addr_helper(fields.dst_noc_encoding, fields.dst_address);
         packet_header->to_noc_unicast_atomic_inc(
@@ -443,23 +434,13 @@ struct LineSyncConfig {
         fabric_connection_handle->wait_for_empty_write_slot();
         fabric_connection_handle->send_payload_flush_non_blocking_from_address(
             (uint32_t)packet_header, sizeof(PACKET_HEADER_TYPE));
-
-        // DPRINT << "start global sync" <<ENDL();
     }
 
     void global_sync_finish() {
         // sync wait
-        // DPRINT << "line_sync_val " << (uint)line_sync_val<<ENDL();
+        while (line_sync_ptr[0] != line_sync_val);
 
-        while (line_sync_ptr[0] != line_sync_val) {
-            // DPRINT << "line_sync_ptr " << (uint)line_sync_ptr[0]<<ENDL();
-
-            // for (int i=0; i<10000000; ++i) {
-            //     asm volatile("nop");
-            // }
-        }
-
-        // reset location to 0.
+        // reset location to 0
         line_sync_ptr[0] = 0;
     }
 

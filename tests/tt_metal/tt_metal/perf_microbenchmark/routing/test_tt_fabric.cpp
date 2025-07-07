@@ -67,15 +67,15 @@ public:
     void wait_for_prorgams();
     void close_devices();
     void set_benchmark_mode(bool benchmark_mode) { benchmark_mode_ = benchmark_mode; }
-    void set_line_sync(bool line_sync) { line_sync_ = line_sync; }
-    void set_line_sync_val(uint32_t val) { line_sync_val_ = val; }
-    uint32_t get_line_sync_address() { return global_line_sync_address_; }
+    void set_global_sync(bool global_sync) { global_sync_ = global_sync; }
+    void set_global_sync_val(uint32_t val) { global_sync_val_ = val; }
+    uint32_t get_global_sync_address() { return global_sync_address_; }
     uint32_t get_packet_header_region_base() { return packet_header_region_base_; }
     uint32_t get_payload_buffer_region_base() { return payload_buffer_region_base_; }
     uint32_t get_highest_usable_address() { return highest_usable_address_; }
 
 private:
-    static constexpr uint32_t global_line_sync_address_ = 0x50000;
+    static constexpr uint32_t global_sync_address_ = 0x50000;
     static constexpr uint32_t packet_header_region_base_ = 0x30000;
     static constexpr uint32_t payload_buffer_region_base_ = 0x40000;
     static constexpr uint32_t highest_usable_address_ = 0x100000;
@@ -89,8 +89,8 @@ private:
     std::unordered_map<MeshCoordinate, TestDevice> test_devices_;
     std::unique_ptr<tt::tt_fabric::fabric_tests::GlobalAllocator> allocator_;
     bool benchmark_mode_ = false;  // Benchmark mode for current test
-    bool line_sync_ = false;       // Line sync for current test
-    uint32_t line_sync_val_ = 0;
+    bool global_sync_ = false;     // Line sync for current test
+    uint32_t global_sync_val_ = 0;
 };
 
 void TestContext::add_traffic_config(const TestTrafficConfig& traffic_config) {
@@ -169,14 +169,14 @@ void TestContext::open_devices(Topology topology, RoutingType routing_type) {
 }
 
 void TestContext::initialize_sync_memory() {
-    if (!line_sync_) {
+    if (!global_sync_) {
         return;  // Only initialize sync memory if line sync is enabled
     }
 
     log_info(tt::LogTest, "Initializing sync memory for line sync");
 
     // Initialize sync memory location with 16 bytes of zeros on all devices
-    const uint32_t sync_address = this->get_line_sync_address();              // Hard-coded sync address
+    const uint32_t sync_address = this->get_global_sync_address();            // Hard-coded sync address
     const uint32_t sync_memory_size = 16;                                     // 16 bytes
     std::vector<uint32_t> zero_data(sync_memory_size / sizeof(uint32_t), 0);  // 4 uint32_t zeros
 
@@ -204,8 +204,8 @@ void TestContext::compile_programs() {
     // TODO: should we be taking const ref?
     for (auto& [coord, test_device] : test_devices_) {
         test_device.set_benchmark_mode(benchmark_mode_);
-        test_device.set_line_sync(line_sync_);
-        test_device.set_line_sync_val(line_sync_val_);
+        test_device.set_global_sync(global_sync_);
+        test_device.set_global_sync_val(global_sync_val_);
 
         // Set memory addresses for all test devices
         test_device.set_memory_addresses(
@@ -232,12 +232,12 @@ void TestContext::process_traffic_config(TestConfig& config) {
     this->allocator_->allocate_resources(config);
     log_info(tt::LogTest, "Resource allocation complete");
 
-    if (config.line_sync) {
+    if (config.global_sync) {
         // set it only after the test_config is built since it needs set the sync value during expand the high-level
         // patterns.
-        this->set_line_sync_val(config.line_sync_val);
+        this->set_global_sync_val(config.global_sync_val);
 
-        for (const auto& sync_sender : config.global_line_sync_configs) {
+        for (const auto& sync_sender : config.global_sync_configs) {
             CoreCoord sync_core = sync_sender.core.value();
             const auto& device_coord = this->fixture_->get_device_coord(sync_sender.device);
 
@@ -268,7 +268,7 @@ void TestContext::process_traffic_config(TestConfig& config) {
                 // For sync patterns, we use a dummy destination core and fixed sync address
                 // The actual sync will be handled by atomic operations
                 CoreCoord dummy_dst_core = {0, 0};  // Sync doesn't need specific dst core
-                uint32_t sync_address = this->get_line_sync_address();  // Hard-coded sync address
+                uint32_t sync_address = this->get_global_sync_address();  // Hard-coded sync address
                 uint32_t dst_noc_encoding = this->fixture_->get_worker_noc_encoding(
                     sync_sender.device, sync_core);  // populate the master coord
 
@@ -402,7 +402,7 @@ int main(int argc, char** argv) {
 
         // Set benchmark mode and line sync for this test group
         test_context.set_benchmark_mode(test_config.benchmark_mode);
-        test_context.set_line_sync(test_config.line_sync);
+        test_context.set_global_sync(test_config.global_sync);
         // Initialize sync memory if line sync is enabled
         test_context.initialize_sync_memory();
 

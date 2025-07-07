@@ -381,8 +381,8 @@ inline TestConfig YamlConfigParser::parse_test_config(const YAML::Node& test_yam
         test_config.benchmark_mode = parse_scalar<bool>(test_yaml["benchmark_mode"]);
     }
 
-    if (test_yaml["line_sync"]) {
-        test_config.line_sync = parse_scalar<bool>(test_yaml["line_sync"]);
+    if (test_yaml["sync"]) {
+        test_config.global_sync = parse_scalar<bool>(test_yaml["sync"]);
     }
 
     return test_config;
@@ -785,8 +785,8 @@ private:
             iteration_test.seed = std::uniform_int_distribution<uint32_t>()(this->gen_);
 
             // Add line sync pattern expansion if enabled
-            if (iteration_test.line_sync) {
-                expand_line_sync_patterns(iteration_test);
+            if (iteration_test.global_sync) {
+                expand_sync_patterns(iteration_test);
             }
 
             if (p_config.patterns.has_value()) {
@@ -941,7 +941,7 @@ private:
             sender.device);
     }
 
-    void validate_line_sync_pattern(
+    void validate_sync_pattern(
         const TrafficPatternConfig& pattern, const SenderConfig& sender, const TestConfig& test) const {
         TT_FATAL(
             pattern.ftype.has_value() && pattern.ftype.value() == ChipSendType::CHIP_MULTICAST,
@@ -988,10 +988,10 @@ private:
         }
 
         // Validate line sync patterns if present
-        if (test.line_sync) {
-            for (const auto& sync_sender : test.global_line_sync_configs) {
+        if (test.global_sync) {
+            for (const auto& sync_sender : test.global_sync_configs) {
                 for (const auto& sync_pattern : sync_sender.patterns) {
-                    validate_line_sync_pattern(sync_pattern, sync_sender, test);
+                    validate_sync_pattern(sync_pattern, sync_sender, test);
                 }
             }
         }
@@ -1141,7 +1141,7 @@ private:
         }
     }
 
-    void expand_line_sync_patterns(TestConfig& test) {
+    void expand_sync_patterns(TestConfig& test) {
         log_info(
             LogTest,
             "Expanding line sync patterns for test: {} with topology: {}",
@@ -1162,17 +1162,17 @@ private:
             // Create sender config with all split sync patterns
             SenderConfig sync_sender = {.device = src_device, .patterns = std::move(sync_patterns)};
 
-            test.global_line_sync_configs.push_back(std::move(sync_sender));
+            test.global_sync_configs.push_back(std::move(sync_sender));
 
             // global sync value
-            test.line_sync_val = sync_val;
+            test.global_sync_val = sync_val;
         }
 
         log_info(
             LogTest,
             "Generated {} line sync configurations, line_syn_val: {}",
-            test.global_line_sync_configs.size(),
-            test.line_sync_val);
+            test.global_sync_configs.size(),
+            test.global_sync_val);
     }
 
     std::pair<std::vector<TrafficPatternConfig>, uint32_t> create_sync_patterns_for_topology(
@@ -1190,7 +1190,7 @@ private:
 
         // Topology-specific routing - get multi-directional hops first
         std::unordered_map<RoutingDirection, uint32_t> multi_directional_hops;
-        uint32_t line_sync_val = 0;
+        uint32_t global_sync_val = 0;
 
         switch (topology) {
             case tt::tt_fabric::Topology::Ring: {
@@ -1211,17 +1211,17 @@ private:
                     src_device, dst_node_forward, dst_node_backward, HighLevelTrafficPattern::FullRingMulticast);
 
                 // minus 2 because full ring pattern traverse each node twice.
-                line_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 2;
+                global_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 2;
                 break;
             }
             case tt::tt_fabric::Topology::Linear: {
                 multi_directional_hops = this->route_manager_.get_full_mcast_hops(src_device);
-                line_sync_val = this->route_manager_.get_linear_topology_num_sync_devices() - 1;
+                global_sync_val = this->route_manager_.get_linear_topology_num_sync_devices() - 1;
                 break;
             }
             case tt::tt_fabric::Topology::Mesh: {
                 multi_directional_hops = this->route_manager_.get_full_mcast_hops(src_device);
-                line_sync_val = this->route_manager_.get_mesh_topology_num_sync_devices() - 1;
+                global_sync_val = this->route_manager_.get_mesh_topology_num_sync_devices() - 1;
                 TT_THROW("We need mcast support for mesh topology to perform sync");
                 break;
             }
@@ -1245,7 +1245,7 @@ private:
             sync_patterns.push_back(std::move(sync_pattern));
         }
 
-        return {sync_patterns, line_sync_val};
+        return {sync_patterns, global_sync_val};
     }
 
     void add_senders_from_pairs(
@@ -1574,9 +1574,9 @@ private:
             out << YAML::Value << config.benchmark_mode;
         }
 
-        if (config.line_sync) {
-            out << YAML::Key << "line_sync";
-            out << YAML::Value << config.line_sync;
+        if (config.global_sync) {
+            out << YAML::Key << "sync";
+            out << YAML::Value << config.global_sync;
         }
 
         out << YAML::Key << "fabric_setup";
@@ -1594,11 +1594,11 @@ private:
         out << YAML::EndSeq;
 
         // Add line sync configurations if present
-        if (!config.global_line_sync_configs.empty()) {
-            out << YAML::Key << "global_line_sync_configs";
+        if (!config.global_sync_configs.empty()) {
+            out << YAML::Key << "global_sync_configs";
             out << YAML::Value;
             out << YAML::BeginSeq;
-            for (const auto& sync_sender : config.global_line_sync_configs) {
+            for (const auto& sync_sender : config.global_sync_configs) {
                 to_yaml(out, sync_sender);
             }
             out << YAML::EndSeq;

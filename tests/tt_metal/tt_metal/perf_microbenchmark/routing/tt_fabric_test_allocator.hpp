@@ -458,8 +458,8 @@ inline TestDeviceResources& GlobalAllocator::get_or_create_device_resources(cons
 }
 
 inline void GlobalAllocator::allocate_resources(TestConfig& test_config) {
-    // PASS 0: Reserve sync cores for line synchronization
-    for (auto& sync_sender : test_config.global_line_sync_configs) {
+    // PASS 0: Reserve sync cores for synchronization
+    for (auto& sync_sender : test_config.global_sync_configs) {
         auto& device_resources = get_or_create_device_resources(sync_sender.device);
         sync_sender.core = device_resources.reserve_sync_core();
     }

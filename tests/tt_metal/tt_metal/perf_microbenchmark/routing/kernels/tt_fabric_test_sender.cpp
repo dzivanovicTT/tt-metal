@@ -28,12 +28,6 @@ void kernel_main() {
     size_t rt_args_idx = 0;
     auto sender_config = SenderKernelConfig::build_from_args(rt_args_idx);
 
-    // DPRINT << "NUM_FABRIC_CONNECTIONS " << (uint)NUM_FABRIC_CONNECTIONS <<ENDL();
-    // DPRINT << "LINE_SYNC " << (uint)LINE_SYNC <<ENDL();
-    // DPRINT << "MASTER_SYNC_CORE " << (uint)MASTER_SYNC_CORE <<ENDL();
-    // DPRINT << "NUM_LOCAL_SYNC_CORES " << (uint)NUM_LOCAL_SYNC_CORES <<ENDL();
-    // DPRINT << "NUM_SYNC_FABRIC_CONNECTIONS " << (uint)NUM_SYNC_FABRIC_CONNECTIONS <<ENDL();
-
     // clear out test results area
 
     // add line sync here
