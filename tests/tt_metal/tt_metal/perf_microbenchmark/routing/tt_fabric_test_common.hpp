@@ -170,6 +170,16 @@ public:
 
     std::vector<FabricNodeId> get_all_node_ids() const override { return available_node_ids_; }
 
+    std::vector<tt::tt_metal::IDevice*> get_all_devices() const {
+        std::vector<tt::tt_metal::IDevice*> devices;
+        if (mesh_device_) {
+            for (const auto& coord : available_device_coordinates_) {
+                devices.push_back(mesh_device_->get_device(coord));
+            }
+        }
+        return devices;
+    }
+
     uint32_t get_l1_unreserved_base(const FabricNodeId& node_id) const override {
         const auto& device_coord = get_device_coord(node_id);
         auto* device = mesh_device_->get_device(device_coord);

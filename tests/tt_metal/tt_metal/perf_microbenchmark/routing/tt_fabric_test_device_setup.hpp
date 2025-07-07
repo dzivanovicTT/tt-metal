@@ -118,6 +118,11 @@ public:
     void set_benchmark_mode(bool benchmark_mode) { benchmark_mode_ = benchmark_mode; }
     void set_line_sync(bool line_sync) { line_sync_ = line_sync; }
     void set_line_sync_val(uint32_t line_sync_val) { line_sync_val_ = line_sync_val; }
+    void set_memory_addresses(uint32_t packet_header_base, uint32_t payload_buffer_base, uint32_t highest_usable) {
+        packet_header_region_base_ = packet_header_base;
+        payload_buffer_region_base_ = payload_buffer_base;
+        highest_usable_address_ = highest_usable;
+    }
     RoutingDirection get_forwarding_direction(const std::unordered_map<RoutingDirection, uint32_t>& hops) const;
     std::vector<uint32_t> get_forwarding_link_indices_in_direction(const RoutingDirection& direction) const;
     void set_sync_core(CoreCoord coord) { sync_core_coord_ = coord; };
@@ -150,6 +155,10 @@ private:
     bool line_sync_ = false;
     uint32_t line_sync_val_ = 0;
     CoreCoord sync_core_coord_;
+    // Memory address configuration
+    uint32_t packet_header_region_base_ = 0x30000;  // Default values
+    uint32_t payload_buffer_region_base_ = 0x40000;
+    uint32_t highest_usable_address_ = 0x100000;
 
     // controller?
 };
@@ -425,11 +434,8 @@ inline void TestDevice::create_sync_kernel() {
         sync_sender.global_line_sync_configs_.size() /* num sync configs */};
 
     // memory map args
-    uint32_t packet_header_region_base = 0x30000;
-    uint32_t payload_buffer_region_base = 0x40000;
-    uint32_t highest_usable_address = 0x100000;
     std::vector<uint32_t> memory_allocator_args = {
-        packet_header_region_base, payload_buffer_region_base, highest_usable_address};
+        packet_header_region_base_, payload_buffer_region_base_, highest_usable_address_};
 
     // Sync fabric connection args (no regular fabric connections for sync core)
     std::vector<uint32_t> sync_fabric_connection_args;
@@ -535,12 +541,8 @@ inline void TestDevice::create_sender_kernels() {
             0u /* num sync fabric connections */};
 
         // memory map args
-        // TODO: move to the right place
-        uint32_t packet_header_region_base = 0x30000;
-        uint32_t payload_buffer_region_base = 0x40000;
-        uint32_t highest_usable_address = 0x100000;
         std::vector<uint32_t> memory_allocator_args = {
-            packet_header_region_base, payload_buffer_region_base, highest_usable_address};
+            packet_header_region_base_, payload_buffer_region_base_, highest_usable_address_};
 
         std::vector<uint32_t> fabric_connection_args;
         if (!sender.fabric_connections_.empty()) {
