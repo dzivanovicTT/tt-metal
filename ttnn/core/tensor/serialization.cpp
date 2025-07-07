@@ -98,7 +98,7 @@ TensorSpec load_tensor_spec(FILE* input_file) {
     return ttnn::from_flatbuffer(spec);
 }
 
-void dump_host_storage(FILE* output_file, const HostStorage& storage, DataType dtype) {
+void dump_host_storage(FILE* output_file, const HostBuffer& buffer, DataType dtype) {
     // TODO: #16067 - When dumping storage, we should not care about dtype.
     // We should dump the `size` of raw bytes, not the size of logical elements.
     const size_t element_size = [dtype]() {
@@ -117,7 +117,7 @@ void dump_host_storage(FILE* output_file, const HostStorage& storage, DataType d
         TT_THROW("Unreachable");
     }();
 
-    auto raw_bytes = storage.buffer.view_bytes();
+    auto raw_bytes = buffer.view_bytes();
     uint64_t size = raw_bytes.size() / element_size;
     safe_fwrite(&size, sizeof(size), 1, output_file);
     safe_fwrite(raw_bytes.data(), raw_bytes.size(), 1, output_file);
@@ -125,7 +125,7 @@ void dump_host_storage(FILE* output_file, const HostStorage& storage, DataType d
 
 void dump_multi_device_host_storage(
     FILE* output_file,
-    const MultiDeviceHostStorage& storage,
+    const HostStorage& storage,
     const DistributedTensorConfig& strategy,
     const TensorSpec& tensor_spec) {
     std::vector<HostBuffer> buffers;
@@ -220,7 +220,7 @@ DistributedStorage load_multi_device_host_storage(
         distributed_host_buffer.emplace_shard(*dst_coord_it, [b = buffers[i]]() { return b; });
     }
 
-    return {MultiDeviceHostStorage{std::move(distributed_host_buffer)}, strategy};
+    return {HostStorage{std::move(distributed_host_buffer)}, strategy};
 }
 
 HostStorage load_host_storage(FILE* input_file, DataType data_type) {
@@ -268,7 +268,7 @@ DistributedStorage load_multi_device_host_storage(
 
 DistributedStorage load_storage(
     FILE* input_file, DataType data_type, Layout layout, StorageType storage_type, MeshDevice* device) {
-    if (storage_type == StorageType::MULTI_DEVICE_HOST or storage_type == StorageType::DEVICE) {
+    if (storage_type == StorageType::DEVICE) {
         // TODO: #22262 - Migrate to the new serialization format that embeds the required information into the tensor
         // file.
         TT_FATAL(device != nullptr, "MeshDevice is required for loading multi-device host storage");
@@ -331,13 +331,10 @@ void dump_tensor(const std::string& file_name, const Tensor& tensor) {
 
     std::visit(
         tt::stl::overloaded{
-            [output_file, dtype = tensor.dtype()](const HostStorage& storage) {
-                dump_host_storage(output_file, storage, dtype);
-            },
             [output_file, dtype = tensor.dtype()](const DeviceStorage& storage) {
                 TT_THROW("Device storage isn't supported");
             },
-            [output_file, &tensor](const MultiDeviceHostStorage& storage) {
+            [output_file, &tensor](const HostStorage& storage) {
                 dump_multi_device_host_storage(
                     output_file, storage, tensor.distributed_tensor_config(), tensor.tensor_spec());
             },

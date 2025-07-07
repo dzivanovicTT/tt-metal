@@ -95,20 +95,16 @@ bool is_arch_whb0(const tt::ARCH& arch) { return arch == tt::ARCH::WORMHOLE_B0; 
 
 bool is_cpu_tensor(const Tensor& tensor) { return tensor.storage_type() == StorageType::HOST; }
 
-bool is_multi_device_host_tensor(const Tensor& tensor) {
-    return tensor.storage_type() == StorageType::MULTI_DEVICE_HOST;
-}
-
 bool is_device_tensor(const Tensor& tensor) { return tensor.storage_type() == StorageType::DEVICE; }
 
 Tensor transform(const Tensor& tensor, const std::function<Tensor(const Tensor&)>& transform_func) {
-    TT_FATAL(is_multi_device_host_tensor(tensor), "transform only supports multi-device host tensors");
+    TT_FATAL(is_cpu_tensor(tensor), "transform only supports cpu tensors");
     // TODO: #15840 - Push this down to OPs, so that instead of transforming the multi-device shards as `Tensor`, we
     // operate on buffers directly. OPs code should not differentiate between host and multi-device host storage.
     std::optional<TensorSpec> transformed_spec;
     std::mutex transformed_buffer_mutex;
     DistributedHostBuffer transformed_buffer =
-        std::get<MultiDeviceHostStorage>(tensor.storage())
+        std::get<HostStorage>(tensor.storage())
             .distributed_buffer()
             .transform(
                 [&](const HostBuffer& buffer) {
@@ -125,18 +121,18 @@ Tensor transform(const Tensor& tensor, const std::function<Tensor(const Tensor&)
                             transformed_spec = transformed_tensor.get_tensor_spec();
                         }
                     }
-                    return host_storage->buffer;
+                    return host_buffer::get_host_buffer(transformed_tensor);
                 },
                 DistributedHostBuffer::ProcessShardExecutionPolicy::PARALLEL);
     return Tensor(
-        MultiDeviceHostStorage(std::move(transformed_buffer)),
+        HostStorage(std::move(transformed_buffer)),
         transformed_spec.value_or(tensor.get_tensor_spec()),
         tensor.get_distributed_tensor_config());
 }
 
 void apply(const Tensor& tensor, const std::function<void(const Tensor&)>& callable) {
-    TT_FATAL(is_multi_device_host_tensor(tensor), "apply only supports multi-device host tensors");
-    std::get<MultiDeviceHostStorage>(tensor.storage()).distributed_buffer().apply([&](const HostBuffer& buffer) {
+    TT_FATAL(is_cpu_tensor(tensor), "apply only supports cpu tensors");
+    std::get<HostStorage>(tensor.storage()).distributed_buffer().apply([&](const HostBuffer& buffer) {
         callable(Tensor(buffer, tensor.get_tensor_spec()));
     });
 }

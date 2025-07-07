@@ -45,9 +45,9 @@ std::shared_ptr<MeshDevice> open_mesh_device(
 void close_mesh_device(const std::shared_ptr<MeshDevice>& mesh_device) { mesh_device->close(); }
 
 std::vector<Tensor> get_device_tensors(const Tensor& tensor) {
-    if (std::holds_alternative<tt::tt_metal::MultiDeviceHostStorage>(tensor.storage())) {
+    if (std::holds_alternative<tt::tt_metal::HostStorage>(tensor.storage())) {
         std::vector<ttnn::Tensor> tensors;
-        auto& host_storage = std::get<tt::tt_metal::MultiDeviceHostStorage>(tensor.get_storage());
+        auto& host_storage = std::get<tt::tt_metal::HostStorage>(tensor.get_storage());
         const auto& distributed_buffer = host_storage.distributed_buffer();
         distributed_buffer.apply(
             [&](const HostBuffer& buffer) { tensors.push_back(Tensor{buffer, tensor.get_tensor_spec()}); });
@@ -82,14 +82,12 @@ Tensor from_host_shards(const std::vector<Tensor>& tensor_shards, const MeshShap
     auto distributed_host_buffer = DistributedHostBuffer::create(mesh_shape);
     auto shard_it = tensor_shards.begin();
     for (const auto& coord : distributed::MeshCoordinateRange(mesh_shape)) {
-        HostBuffer buffer = std::get<HostStorage>((shard_it++)->get_storage()).buffer;
+        HostBuffer buffer = host_buffer::get_host_buffer(*(shard_it++));
         distributed_host_buffer.emplace_shard(coord, [&]() { return std::move(buffer); });
     }
 
     return Tensor(
-        MultiDeviceHostStorage{std::move(distributed_host_buffer)},
-        reference_shard.get_tensor_spec(),
-        AllGatherTensor{});
+        HostStorage{std::move(distributed_host_buffer)}, reference_shard.get_tensor_spec(), AllGatherTensor{});
 }
 
 Tensor combine_device_tensors(const std::vector<Tensor>& tensor_shards) {

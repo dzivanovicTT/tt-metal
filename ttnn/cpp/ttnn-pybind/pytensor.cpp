@@ -448,10 +448,8 @@ RowMajorHostBuffer convert_to_row_major_host_buffer(const Tensor& tt_tensor, con
 
     return convert_to_logical(std::visit(
         tt::stl::overloaded{
-            [](const HostStorage& storage) { return storage.buffer; },
-            [](const MultiDeviceHostStorage& storage) {
-                std::vector<HostBuffer> buffers;
-                storage.distributed_buffer().apply([&buffers](const HostBuffer& shard) { buffers.push_back(shard); });
+            [](const HostStorage& storage) {
+                std::vector<HostBuffer> buffers = storage.get_device_buffers();
                 TT_FATAL(
                     buffers.size() == 1,
                     "Can't get a single buffer from multi device host storage of size: {}",
@@ -1482,8 +1480,15 @@ void pytensor_module(py::module& m_tensor) {
             [](const Tensor& self) -> HostBuffer {
                 return std::visit(
                     tt::stl::overloaded{
-                        [](const HostStorage& s) -> HostBuffer { return s.buffer; },
-                        [&](auto&&) -> HostBuffer {
+                        [](const HostStorage& s) -> HostBuffer {
+                            std::vector<HostBuffer> buffers = s.get_device_buffers();
+                            TT_FATAL(
+                                buffers.size() == 1,
+                                "Can't get a single buffer from multi device host storage of size: {}",
+                                buffers.size());
+                            return buffers.front();
+                        },
+                        [&](const DeviceStorage& s) -> HostBuffer {
                             TT_THROW(
                                 "{} doesn't support buffer method",
                                 tt::stl::get_active_type_name_in_variant(self.storage()));

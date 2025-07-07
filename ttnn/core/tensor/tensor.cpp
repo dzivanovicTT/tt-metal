@@ -152,7 +152,6 @@ void Tensor::deallocate_impl(bool force) {
         std::visit(
             tt::stl::overloaded{
                 [](HostStorage&) {},
-                [](MultiDeviceHostStorage&) {},
                 [this, force, &can_deallocate](DeviceStorage& storage) {
                     if (can_deallocate(storage.mesh_buffer, force)) {
                         storage.mesh_buffer->deallocate();
@@ -517,7 +516,6 @@ bool Tensor::is_allocated() const {
         tt::stl::overloaded{
             [](const DeviceStorage& storage) { return storage.is_allocated(); },
             [](const HostStorage&) { return true; },
-            [](const MultiDeviceHostStorage&) { return true; },
         },
         this->storage());
     return output;
@@ -528,7 +526,6 @@ StorageType Tensor::storage_type() const {
         tt::stl::overloaded{
             [](const HostStorage&) { return StorageType::HOST; },
             [](const DeviceStorage&) { return StorageType::DEVICE; },
-            [](const MultiDeviceHostStorage&) { return StorageType::MULTI_DEVICE_HOST; },
         },
         this->storage());
 }
@@ -733,7 +730,7 @@ void write_tensor(const Tensor& host_tensor, Tensor device_tensor, QueueId cq_id
     ZoneScoped;
     TT_FATAL(device_tensor.storage_type() == StorageType::DEVICE, "Destination tensor must be on device");
     TT_FATAL(
-        host_tensor.storage_type() == StorageType::HOST or host_tensor.storage_type() == StorageType::MULTI_DEVICE_HOST,
+        host_tensor.storage_type() == StorageType::HOST,
         "write_tensor only supports host_tensor to device_tensor data transfer");
 
     auto& device_storage = std::get<DeviceStorage>(device_tensor.storage());
@@ -752,9 +749,6 @@ void write_tensor(const Tensor& host_tensor, Tensor device_tensor, QueueId cq_id
                 const void* host_data = std::visit(
                     tt::stl::overloaded{
                         [](const HostStorage& host_storage) -> const void* {
-                            return host_storage.buffer.view_bytes().data();
-                        },
-                        [](const MultiDeviceHostStorage& host_storage) -> const void* {
                             std::vector<HostBuffer> buffers;
                             host_storage.distributed_buffer().apply(
                                 [&buffers](const HostBuffer& shard) { buffers.push_back(shard); });

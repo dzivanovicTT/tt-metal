@@ -36,10 +36,6 @@ bool is_arch_whb0(const tt::ARCH& arch);
 // Returns true if tensor has Host storage.
 bool is_cpu_tensor(const Tensor& tensor);
 
-// Returns true if tensor has MultiDeviceHost storage.
-// TODO: #19177 - Remove this once host and multi-device host tensors are unified.
-bool is_multi_device_host_tensor(const Tensor& tensor);
-
 // Returns true if tensor is on device.
 bool is_device_tensor(const Tensor& tensor);
 
