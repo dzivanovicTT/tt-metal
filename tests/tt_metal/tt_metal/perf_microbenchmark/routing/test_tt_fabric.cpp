@@ -211,8 +211,6 @@ void TestContext::compile_programs() {
         test_device.set_memory_addresses(
             get_packet_header_region_base(), get_payload_buffer_region_base(), get_highest_usable_address());
 
-        log_info(tt::LogTest, "set_line_sync_val {}", line_sync_val_);
-
         auto device_id = test_device.get_node_id();
         test_device.set_sync_core(device_sync_cores_[device_id]);
 
@@ -245,12 +243,6 @@ void TestContext::process_traffic_config(TestConfig& config) {
 
             // Track sync core for this device
             device_sync_cores_[sync_sender.device] = sync_core;
-
-            log_info(
-                tt::LogTest,
-                "Processing {} already-split sync patterns for device {}",
-                sync_sender.patterns.size(),
-                sync_sender.device.chip_id);
 
             // Process each already-split sync pattern for this device
             for (const auto& sync_pattern : sync_sender.patterns) {
@@ -294,7 +286,6 @@ void TestContext::process_traffic_config(TestConfig& config) {
                 this->test_devices_.at(device_coord).add_sender_sync_config(sync_core, std::move(sync_config));
             }
         }
-        log_info(tt::LogTest, "Line sync config processed");
     }
 
     for (const auto& sender : config.senders) {
@@ -414,8 +405,6 @@ int main(int argc, char** argv) {
         test_context.set_line_sync(test_config.line_sync);
         // Initialize sync memory if line sync is enabled
         test_context.initialize_sync_memory();
-
-        log_info(tt::LogTest, "test_context set_line_sync_val {}", test_config.line_sync_val);
 
         auto built_tests = builder.build_tests({test_config});
 

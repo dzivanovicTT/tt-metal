@@ -458,6 +458,9 @@ struct LineSyncConfig {
             //     asm volatile("nop");
             // }
         }
+
+        // reset location to 0.
+        line_sync_ptr[0] = 0;
     }
 
 private:

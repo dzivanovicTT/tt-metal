@@ -445,15 +445,9 @@ inline void TestDevice::create_sync_kernel() {
 
     // Add line sync runtime args (both global and local sync)
     std::vector<uint32_t> line_sync_args;
-    log_info(
-        tt::LogTest,
-        "Adding global + local sync args for sync core {} - {} global sync configs",
-        sync_core,
-        sync_sender.global_line_sync_configs_.size());
 
     // ===== GLOBAL SYNC ARGS =====
     // Expected sync value for global sync
-    log_info(tt::LogTest, "line_sync_val : {}", line_sync_val_);
     line_sync_args.push_back(line_sync_val_);  // Use the stored line sync value from test config
 
     for (size_t i = 0; i < sync_sender.global_line_sync_configs_.size(); ++i) {
@@ -461,7 +455,7 @@ inline void TestDevice::create_sync_kernel() {
 
         // Add sync routing args (chip send type + routing info)
         auto sync_traffic_args = sync_config.get_args(true);
-        log_info(
+        log_debug(
             tt::LogTest,
             "fabric connection {} has sync config src_node_id: {} dst_node_ids {} hops {} mcast_start_hops {} ",
             fabric_conn_idx,
@@ -489,12 +483,6 @@ inline void TestDevice::create_sync_kernel() {
         uint32_t sender_noc_encoding = this->device_info_provider_->get_worker_noc_encoding(this->coord_, sender_core);
         line_sync_args.push_back(sender_noc_encoding);
     }
-
-    log_info(
-        tt::LogTest,
-        "Generated {} total line sync runtime args (global + local) for sync core {}",
-        line_sync_args.size(),
-        sync_core);
 
     // No traffic config mapping or traffic config args for sync core
     std::vector<uint32_t> traffic_config_to_fabric_connection_args;
@@ -558,8 +546,6 @@ inline void TestDevice::create_sender_kernels() {
         // Add local sync args for regular senders (they participate as sync receivers)
         std::vector<uint32_t> local_sync_args;
         if (line_sync_) {
-            log_info(tt::LogTest, "Adding local sync args for sender on core {} (sync participant)", core);
-
             // Add local sync configuration args (same as sync core, but no global sync)
             uint32_t local_sync_address = 0x60000;  // Fixed local sync address
             uint32_t local_sync_val =
@@ -578,9 +564,6 @@ inline void TestDevice::create_sender_kernels() {
                     this->device_info_provider_->get_worker_noc_encoding(this->coord_, sender_core);
                 local_sync_args.push_back(sender_noc_encoding);
             }
-
-            log_info(
-                tt::LogTest, "Generated {} local sync runtime args for sender core {}", local_sync_args.size(), core);
         }
 
         // TODO: handle this properly when adding configs for the sender

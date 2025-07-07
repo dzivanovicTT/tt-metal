@@ -462,8 +462,6 @@ inline void GlobalAllocator::allocate_resources(TestConfig& test_config) {
     for (auto& sync_sender : test_config.global_line_sync_configs) {
         auto& device_resources = get_or_create_device_resources(sync_sender.device);
         sync_sender.core = device_resources.reserve_sync_core();
-
-        log_info(tt::LogTest, "allocate sync core: {} to fabric node: {}", sync_sender.core, sync_sender.device);
     }
 
     // PASS 1: Reserve all specified sender cores first. This establishes the pool of
