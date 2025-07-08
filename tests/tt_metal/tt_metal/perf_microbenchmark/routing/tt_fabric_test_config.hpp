@@ -1175,20 +1175,9 @@ private:
             test.global_sync_val);
     }
 
-    std::pair<std::vector<TrafficPatternConfig>, uint32_t> create_sync_patterns_for_topology(
+    /// Helper to compute per‐direction hops and the global sync value
+    std::pair<std::unordered_map<RoutingDirection, uint32_t>, uint32_t> get_sync_hops_and_val(
         const FabricNodeId& src_device, const std::vector<FabricNodeId>& devices, tt::tt_fabric::Topology topology) {
-        std::vector<TrafficPatternConfig> sync_patterns;
-
-        // Common sync pattern characteristics
-        TrafficPatternConfig base_sync_pattern;
-        base_sync_pattern.ftype = ChipSendType::CHIP_MULTICAST;         // Global sync across devices
-        base_sync_pattern.ntype = NocSendType::NOC_UNICAST_ATOMIC_INC;  // Sync signal via atomic increment
-        base_sync_pattern.size = 0;                                     // No payload, just sync signal
-        base_sync_pattern.num_packets = 1;                              // Single sync signal
-        base_sync_pattern.atomic_inc_val = 1;                           // Increment by 1
-        base_sync_pattern.atomic_inc_wrap = 0xFFFF;                     // Large wrap value
-
-        // Topology-specific routing - get multi-directional hops first
         std::unordered_map<RoutingDirection, uint32_t> multi_directional_hops;
         uint32_t global_sync_val = 0;
 
@@ -1211,7 +1200,9 @@ private:
                     src_device, dst_node_forward, dst_node_backward, HighLevelTrafficPattern::FullRingMulticast);
 
                 // minus 2 because full ring pattern traverse each node twice.
-                global_sync_val = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices() - 2;
+                auto num_sync_devices = this->route_manager_.get_wrap_around_mesh_ring_topology_num_sync_devices();
+                global_sync_val =
+                    2 * num_sync_devices - 2;  // minus 2 because in a full ring pattern we dont mcast to self (twice).
                 break;
             }
             case tt::tt_fabric::Topology::Linear: {
@@ -1228,6 +1219,25 @@ private:
             default: TT_THROW("Unsupported topology for line sync: {}", static_cast<int>(topology));
         }
 
+        return {std::move(multi_directional_hops), global_sync_val};
+    }
+
+    std::pair<std::vector<TrafficPatternConfig>, uint32_t> create_sync_patterns_for_topology(
+        const FabricNodeId& src_device, const std::vector<FabricNodeId>& devices, tt::tt_fabric::Topology topology) {
+        std::vector<TrafficPatternConfig> sync_patterns;
+
+        // Common sync pattern characteristics
+        TrafficPatternConfig base_sync_pattern;
+        base_sync_pattern.ftype = ChipSendType::CHIP_MULTICAST;         // Global sync across devices
+        base_sync_pattern.ntype = NocSendType::NOC_UNICAST_ATOMIC_INC;  // Sync signal via atomic increment
+        base_sync_pattern.size = 0;                                     // No payload, just sync signal
+        base_sync_pattern.num_packets = 1;                              // Single sync signal
+        base_sync_pattern.atomic_inc_val = 1;                           // Increment by 1
+        base_sync_pattern.atomic_inc_wrap = 0xFFFF;                     // Large wrap value
+
+        // Topology-specific routing - get multi-directional hops first
+        auto [multi_directional_hops, global_sync_val] = get_sync_hops_and_val(src_device, devices, topology);
+
         // Split multi-directional hops into single-direction patterns
         auto split_hops_vec = this->route_manager_.split_multicast_hops(multi_directional_hops);
 
@@ -1237,7 +1247,8 @@ private:
             src_device.chip_id,
             split_hops_vec.size());
 
-        // Create separate sync pattern for each direction
+        // Create separate sync pattern for each mcast direction. This is required since test infra only handle mcast
+        // for one direction. Ex, mcast to E/W will split into EAST and WEST patterns.
         sync_patterns.reserve(split_hops_vec.size());
         for (const auto& single_direction_hops : split_hops_vec) {
             TrafficPatternConfig sync_pattern = base_sync_pattern;

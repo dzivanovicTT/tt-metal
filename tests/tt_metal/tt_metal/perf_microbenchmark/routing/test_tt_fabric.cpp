@@ -188,19 +188,20 @@ void TestContext::initialize_sync_memory() {
         // Initialize sync address on ALL tensix cores since we don't know which will be the sync core
         auto worker_cores =
             device->worker_cores(tt::tt_metal::HalProgrammableCoreType::TENSIX, tt::tt_metal::SubDeviceId{0});
-        for (const auto& core : corerange_to_cores(worker_cores)) {
+        auto worker_cores_vec = corerange_to_cores(worker_cores);
+        for (const auto& core : worker_cores_vec) {
             tt::tt_metal::detail::WriteToDeviceL1(device, core, global_sync_address, zero_data);
         }
-        for (const auto& core : corerange_to_cores(worker_cores)) {
+        for (const auto& core : worker_cores_vec) {
             tt::tt_metal::detail::WriteToDeviceL1(device, core, local_sync_address, zero_data);
         }
-        log_debug(
+        log_info(
             tt::LogTest,
             "Initialized sync memory at address {} and address {} on device {} for {} cores",
             global_sync_address,
             local_sync_address,
             device->id(),
-            worker_cores.size());
+            worker_cores_vec.size());
     }
 
     log_info(

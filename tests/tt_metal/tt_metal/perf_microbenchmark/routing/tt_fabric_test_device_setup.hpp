@@ -427,15 +427,19 @@ inline void TestDevice::create_sync_kernel() {
 
     auto& [sync_core, sync_sender] = *sync_senders_.begin();
 
+    uint32_t is_mater_sync_core = 1;
+    uint32_t num_test_traffic_fabric_connections = 0;
+    uint32_t num_test_traffic_configs = 0;
+
     // get ct args
     std::vector<uint32_t> ct_args = {
         is_2d_fabric,
         use_dynamic_routing,
-        0,                                          /* num fabric connections */
-        0,                                          /* num regular traffic configs (sync core has none) */
-        benchmark_mode_ ? 1u : 0u,                  /* benchmark mode */
-        1u,                                         /* line sync enabled */
-        1u,                                         /* is master sync core */
+        num_test_traffic_fabric_connections,        /* num fabric connections */
+        num_test_traffic_configs,                   /* num regular traffic configs (sync core has none) */
+        (uint32_t)benchmark_mode_,                  /* benchmark mode */
+        (uint32_t)global_sync_,                     /* line sync enabled */
+        is_mater_sync_core,                         /* is master sync core */
         static_cast<uint32_t>(senders_.size() + 1), /* num local sync cores (all senders + sync core) */
         sync_sender.global_sync_configs_.size() /* num sync configs */};
 
@@ -519,6 +523,9 @@ inline void TestDevice::create_sender_kernels() {
     // all local senders + one sync core
     uint32_t num_local_sync_cores = static_cast<uint32_t>(this->senders_.size()) + 1;
 
+    uint32_t is_mater_sync_core = 0;
+    uint32_t num_sync_fabric_connections = 0;
+
     for (const auto& [core, sender] : this->senders_) {
         // get ct args
         // TODO: fix these- number of fabric connections, mappings etc
@@ -527,11 +534,11 @@ inline void TestDevice::create_sender_kernels() {
             use_dynamic_routing,
             sender.fabric_connections_.size(), /* num fabric connections */
             sender.configs_.size(),
-            benchmark_mode_ ? 1u : 0u, /* benchmark mode */
-            global_sync_ ? 1u : 0u,    /* line sync */
-            0u,                        /* master sync core */
+            (uint32_t)benchmark_mode_, /* benchmark mode */
+            (uint32_t)global_sync_,    /* sync */
+            is_mater_sync_core,        /* master sync core */
             num_local_sync_cores,      /* num local sync cores */
-            0u /* num sync fabric connections */};
+            num_sync_fabric_connections /* num sync fabric connections */};
 
         // memory map args
         std::vector<uint32_t> memory_allocator_args = {
