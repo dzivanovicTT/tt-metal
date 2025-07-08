@@ -12,7 +12,6 @@
 #include "dispatch_core_common.hpp"
 #include "impl/context/metal_context.hpp"
 #include "impl/debug/noc_logging.hpp"
-#include "impl/debug/watcher_server.hpp"
 #include "impl/dispatch/debug_tools.hpp"
 #include "impl/dispatch/system_memory_manager.hpp"
 
