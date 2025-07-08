@@ -177,7 +177,9 @@ protected:
         DebugToolsFixture::TearDown();
 
         // If test induced a watcher error, re-initialize the context.
-        if (MetalContext::instance().watcher_server()->killed_due_to_error() or reset_server) {
+        if (MetalContext::instance().watcher_server() and
+                MetalContext::instance().watcher_server()->killed_due_to_error() or
+            reset_server) {
             // Special case for watcher_dump testing, keep the error for watcher dump to look at later. TODO: remove
             // when watcher_dump is removed.
             if (getenv("TT_METAL_WATCHER_KEEP_ERRORS") == nullptr) {
@@ -194,7 +196,9 @@ protected:
         tt::tt_metal::MetalContext::instance().rtoptions().set_watcher_noinline(watcher_previous_noinline);
         tt::tt_metal::MetalContext::instance().rtoptions().set_test_mode_enabled(test_mode_previous);
         tt::tt_metal::MetalContext::instance().rtoptions().set_watcher_enabled(watcher_previous_enabled);
-        MetalContext::instance().watcher_server()->set_killed_due_to_error_flag(false);
+        if (MetalContext::instance().watcher_server()) {
+            MetalContext::instance().watcher_server()->set_killed_due_to_error_flag(false);
+        }
     }
 
     void RunTestOnDevice(

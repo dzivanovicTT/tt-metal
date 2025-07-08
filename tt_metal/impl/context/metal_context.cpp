@@ -191,6 +191,9 @@ void MetalContext::initialize(
 }
 
 void MetalContext::teardown() {
+    if (!initialized_) {
+        return;
+    }
     initialized_ = false;
 
     // Set internal routing to false to exit active ethernet FW & go back to base FW
