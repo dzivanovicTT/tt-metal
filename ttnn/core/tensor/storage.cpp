@@ -12,8 +12,8 @@
 namespace tt::tt_metal {
 
 HostStorage::HostStorage(HostBuffer buffer) :
-    distributed_buffer_(DistributedHostBuffer::create(distributed::MeshShape(1))) {
-    distributed_buffer_.emplace_shard(distributed::MeshCoordinate(0), [&buffer]() { return std::move(buffer); });
+    distributed_buffer_(DistributedHostBuffer::create(distributed::MeshShape(1, 1))) {
+    distributed_buffer_.emplace_shard(distributed::MeshCoordinate(0, 0), [&buffer]() { return std::move(buffer); });
 }
 HostStorage::HostStorage(DistributedHostBuffer buffer) : distributed_buffer_(std::move(buffer)) {}
 
