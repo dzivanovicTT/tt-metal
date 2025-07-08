@@ -425,37 +425,38 @@ void to_string(
 }  // namespace detail
 
 template <typename T>
-std::string to_string(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout) {
+std::string to_string(const Tensor& tensor) {
     const auto tile = tensor.tensor_spec().tile();
     const auto& shape = tensor.logical_shape();
-    const auto dtype = original_dtype.value_or(tensor.dtype());
-    const auto layout = original_layout.value_or(tensor.layout());
 
     if (!tensor.is_allocated()) {
         return fmt::format(
             "{}(<buffer is not allocated>, shape={}, dtype={}, layout={})",
             detail::TENSOR_TYPE_STRING,
             shape,
-            dtype,
-            layout);
+            tensor.dtype(),
+            tensor.layout());
     }
+
+    auto get_row_major_tensor = [&](const Tensor& tensor) -> Tensor {
+        if (tensor.layout() == Layout::ROW_MAJOR) {
+            return tensor;
+        } else if (tensor.dtype() == DataType::BFLOAT8_B || tensor.dtype() == DataType::BFLOAT4_B) {
+            return ttnn::to_layout(ttnn::to_dtype(tensor, DataType::FLOAT32), Layout::ROW_MAJOR);
+        } else {
+            return ttnn::to_layout(tensor, Layout::ROW_MAJOR);
+        }
+    };
 
     return std::visit(
         tt::stl::overloaded{
             [&](const HostStorage& storage) -> std::string {
-                if (tensor.layout() != Layout::ROW_MAJOR) {
-                    if (tensor.dtype() == DataType::BFLOAT8_B || tensor.dtype() == DataType::BFLOAT4_B) {
-                        return to_string<float>(ttnn::to_dtype(tensor, DataType::FLOAT32), dtype, layout);
-                    }
-                    return to_string<T>(ttnn::to_layout(tensor, Layout::ROW_MAJOR), dtype, layout);
-                }
-
-                const auto strides = tensor.tensor_spec().compute_strides();
-                const auto buffers = storage.get_device_buffers();
+                const Tensor row_major_tensor = get_row_major_tensor(tensor);
+                const auto strides = row_major_tensor.tensor_spec().compute_strides();
+                const auto buffers = std::get<HostStorage>(row_major_tensor.storage()).get_device_buffers();
                 std::stringstream ss;
                 for (size_t i = 0; i < buffers.size(); i++) {
-                    detail::to_string(ss, buffers[i].view_as<T>(), shape, strides, dtype, layout);
+                    detail::to_string(ss, buffers[i].view_as<T>(), shape, strides, tensor.dtype(), tensor.layout());
                     if (i + 1 != buffers.size()) {
                         ss << std::endl;
                     }
@@ -473,42 +474,41 @@ std::string to_string(
                 if (mesh_device->num_devices() == 1) {
                     return to_string<T>(ttnn::distributed::get_device_tensors(cpu_tensor).at(0));
                 }
+
+                const Tensor row_major_tensor = get_row_major_tensor(cpu_tensor);
+                const auto strides = row_major_tensor.tensor_spec().compute_strides();
                 const auto& coords = storage.coords;
                 auto coords_it = coords.begin();
+                const auto buffers = std::get<HostStorage>(row_major_tensor.storage()).get_device_buffers();
                 std::stringstream ss;
-                apply(cpu_tensor, [&](const Tensor& device_shard) {
+                for (size_t i = 0; i < buffers.size(); i++) {
                     const distributed::MeshCoordinate coord = *coords_it++;
                     ss << "device_id: " << mesh_device->get_device(coord)->id() << ", " << coord << std::endl;
-                    ss << to_string<T>(device_shard) << std::endl;
-                });
+                    detail::to_string(ss, buffers[i].view_as<T>(), shape, strides, tensor.dtype(), tensor.layout());
+                    if (i + 1 != buffers.size()) {
+                        ss << std::endl;
+                    }
+                }
                 return ss.str();
             }},
         tensor.storage());
 }
 
-template std::string to_string<bfloat16>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
-template std::string to_string<float>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
-template std::string to_string<int32_t>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
-template std::string to_string<uint32_t>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
-template std::string to_string<uint16_t>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
-template std::string to_string<uint8_t>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout);
+template std::string to_string<bfloat16>(const Tensor& tensor);
+template std::string to_string<float>(const Tensor& tensor);
+template std::string to_string<int32_t>(const Tensor& tensor);
+template std::string to_string<uint32_t>(const Tensor& tensor);
+template std::string to_string<uint16_t>(const Tensor& tensor);
+template std::string to_string<uint8_t>(const Tensor& tensor);
 
 template <>
-std::string to_string<bfloat8_b>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout) {
-    return to_string<uint32_t>(tensor, original_dtype);
+std::string to_string<bfloat8_b>(const Tensor& tensor) {
+    return to_string<float>(tensor);
 }
 
 template <>
-std::string to_string<bfloat4_b>(
-    const Tensor& tensor, std::optional<DataType> original_dtype, std::optional<Layout> original_layout) {
-    return to_string<uint32_t>(tensor, original_dtype);
+std::string to_string<bfloat4_b>(const Tensor& tensor) {
+    return to_string<float>(tensor);
 }
 
 // ======================================================================================

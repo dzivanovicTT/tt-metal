@@ -97,13 +97,6 @@ bool is_cpu_tensor(const Tensor& tensor) { return tensor.storage_type() == Stora
 
 bool is_device_tensor(const Tensor& tensor) { return tensor.storage_type() == StorageType::DEVICE; }
 
-void apply(const Tensor& tensor, const std::function<void(const Tensor&)>& callable) {
-    TT_FATAL(is_cpu_tensor(tensor), "apply only supports cpu tensors");
-    std::get<HostStorage>(tensor.storage()).distributed_buffer().apply([&](const HostBuffer& buffer) {
-        callable(Tensor(buffer, tensor.get_tensor_spec()));
-    });
-}
-
 ShardDivisionSpec compute_shard_division_spec(const Shape2D& shape, const Shape2D& shard_shape) {
     const auto num_shards_height = tt::div_up(shape.height(), shard_shape.height());
     const auto last_shard_height =

@@ -39,9 +39,6 @@ bool is_cpu_tensor(const Tensor& tensor);
 // Returns true if tensor is on device.
 bool is_device_tensor(const Tensor& tensor);
 
-// Given a multi-device host tensor and a callable, applies the function to all per-device tensors.
-void apply(const Tensor& tensor, const std::function<void(const Tensor&)>& callable);
-
 template <class T>
 uint32_t get_batch_size(const T& shape) {
     uint32_t result = 1;
