@@ -97,39 +97,6 @@ bool is_cpu_tensor(const Tensor& tensor) { return tensor.storage_type() == Stora
 
 bool is_device_tensor(const Tensor& tensor) { return tensor.storage_type() == StorageType::DEVICE; }
 
-Tensor transform(const Tensor& tensor, const std::function<Tensor(const Tensor&)>& transform_func) {
-    TT_FATAL(is_cpu_tensor(tensor), "transform only supports cpu tensors");
-    // TODO: #15840 - Push this down to OPs, so that instead of transforming the multi-device shards as `Tensor`, we
-    // operate on buffers directly. OPs code should not differentiate between host and multi-device host storage.
-    std::optional<TensorSpec> transformed_spec;
-    std::mutex transformed_buffer_mutex;
-    DistributedHostBuffer transformed_buffer =
-        std::get<HostStorage>(tensor.storage())
-            .distributed_buffer()
-            .transform(
-                [&](const HostBuffer& buffer) {
-                    auto transformed_tensor = transform_func(Tensor(buffer, tensor.get_tensor_spec()));
-                    auto* host_storage = std::get_if<HostStorage>(&transformed_tensor.get_storage());
-                    TT_FATAL(host_storage != nullptr, "transform function must return a host tensor");
-                    {
-                        std::lock_guard<std::mutex> lock(transformed_buffer_mutex);
-                        if (transformed_spec.has_value()) {
-                            TT_FATAL(
-                                *transformed_spec == transformed_tensor.get_tensor_spec(),
-                                "All shards must have the same spec");
-                        } else {
-                            transformed_spec = transformed_tensor.get_tensor_spec();
-                        }
-                    }
-                    return host_buffer::get_host_buffer(transformed_tensor);
-                },
-                DistributedHostBuffer::ProcessShardExecutionPolicy::PARALLEL);
-    return Tensor(
-        HostStorage(std::move(transformed_buffer)),
-        transformed_spec.value_or(tensor.get_tensor_spec()),
-        tensor.get_distributed_tensor_config());
-}
-
 void apply(const Tensor& tensor, const std::function<void(const Tensor&)>& callable) {
     TT_FATAL(is_cpu_tensor(tensor), "apply only supports cpu tensors");
     std::get<HostStorage>(tensor.storage()).distributed_buffer().apply([&](const HostBuffer& buffer) {

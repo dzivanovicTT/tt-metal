@@ -653,8 +653,7 @@ std::shared_ptr<Buffer> to_device_buffer(
     return std::visit(
         tt::stl::overloaded{
             [&device, &tensor_spec, cq_id](const HostStorage& storage) {
-                std::vector<HostBuffer> buffers;
-                storage.distributed_buffer().apply([&buffers](const HostBuffer& shard) { buffers.push_back(shard); });
+                auto buffers = storage.get_device_buffers();
                 TT_FATAL(
                     buffers.size() == 1,
                     "Can't get a single buffer from multi device host storage of size: {}",
@@ -1367,13 +1366,11 @@ Tensor unpad(const Tensor& tensor, const ttnn::Shape& output_tensor_start, const
             return HostBuffer(unpad(buffer));
         }),
         TensorSpec(
-            tensor.logical_shape(),
-            TensorLayout::fromPaddedShape(
+            ttnn::Shape(output_shape),
+            tt::tt_metal::TensorLayout(
                 tensor.dtype(),
-                PageConfig(tensor.layout(), tensor.tensor_spec().tile()),
-                MemoryConfig{},
-                tensor.logical_shape(),
-                ttnn::Shape(output_shape))),
+                tt::tt_metal::PageConfig(tensor.layout(), tensor.tensor_spec().tile()),
+                tt::tt_metal::MemoryConfig{})),
         tensor.distributed_tensor_config());
 }
 

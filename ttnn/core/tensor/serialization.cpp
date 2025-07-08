@@ -38,6 +38,12 @@ using MeshDevice = distributed::MeshDevice;
 
 namespace {
 
+enum class SerializedStorageType {
+    HOST = 0,
+    DEVICE = 1,
+    MULTI_DEVICE_HOST = 4,
+};
+
 void validate_version(uint8_t version_id) {
     TT_FATAL(
         version_id >= 5,
@@ -267,8 +273,8 @@ DistributedStorage load_multi_device_host_storage(
 }
 
 DistributedStorage load_storage(
-    FILE* input_file, DataType data_type, Layout layout, StorageType storage_type, MeshDevice* device) {
-    if (storage_type == StorageType::DEVICE) {
+    FILE* input_file, DataType data_type, Layout layout, SerializedStorageType storage_type, MeshDevice* device) {
+    if (storage_type == SerializedStorageType::MULTI_DEVICE_HOST || storage_type == SerializedStorageType::DEVICE) {
         // TODO: #22262 - Migrate to the new serialization format that embeds the required information into the tensor
         // file.
         TT_FATAL(device != nullptr, "MeshDevice is required for loading multi-device host storage");
@@ -298,7 +304,7 @@ Tensor load_tensor(const std::string& file_name, MeshDevice* device) {
     validate_version(version_id);
 
     auto spec = load_tensor_spec(input_file);
-    StorageType storage_type = StorageType::HOST;
+    SerializedStorageType storage_type = SerializedStorageType::HOST;
     safe_fread(&storage_type, sizeof(storage_type), 1, input_file);
     auto storage = load_storage(input_file, spec.data_type(), spec.layout(), storage_type, device);
     Tensor tensor(std::move(storage.storage), spec, storage.strategy);

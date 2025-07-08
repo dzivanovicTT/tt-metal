@@ -749,9 +749,7 @@ void write_tensor(const Tensor& host_tensor, Tensor device_tensor, QueueId cq_id
                 const void* host_data = std::visit(
                     tt::stl::overloaded{
                         [](const HostStorage& host_storage) -> const void* {
-                            std::vector<HostBuffer> buffers;
-                            host_storage.distributed_buffer().apply(
-                                [&buffers](const HostBuffer& shard) { buffers.push_back(shard); });
+                            auto buffers = host_storage.get_device_buffers();
                             TT_FATAL(
                                 buffers.size() == 1,
                                 "Can't get a single buffer from multi device host storage of size: {}",
