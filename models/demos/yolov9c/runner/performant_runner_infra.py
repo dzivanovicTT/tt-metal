@@ -22,32 +22,38 @@ class YOLOv9PerformanceRunnerInfra:
         act_dtype,
         weight_dtype,
         model_task="segment",
-        model_location_generator=None,
         resolution=(640, 640),
         torch_input_tensor=None,
+        mesh_mapper=None,
+        weights_mesh_mapper=None,
+        mesh_composer=None,
     ):
         torch.manual_seed(0)
         self.resolution = resolution
         self.pcc_passed = False
         self.pcc_message = "Did you forget to call validate()?"
+
         self.device = device
+        self.num_devices = self.device.get_num_devices()
+        self.mesh_mapper = mesh_mapper
+        self.weights_mesh_mapper = weights_mesh_mapper
+        self.mesh_composer = mesh_composer
+
         self.batch_size = batch_size
         self.act_dtype = act_dtype
         self.weight_dtype = weight_dtype
-        self.model_location_generator = model_location_generator
         self.model_task = model_task
         self.enable_segment = self.model_task == "segment"
         self.torch_input_tensor = torch_input_tensor
-
         self.torch_model = load_torch_model(model_task=self.model_task)
 
         self.torch_input_tensor = (
-            torch.randn((1, 3, 640, 640), dtype=torch.float32)
+            torch.randn((batch_size * self.num_devices, 3, 640, 640), dtype=torch.float32)
             if self.torch_input_tensor is None
             else self.torch_input_tensor
         )
-
-        self.parameters = create_yolov9c_model_parameters(self.torch_model, self.torch_input_tensor, device=self.device)
+        self.torch_input_params = torch.randn((batch_size, 3, 640, 640), dtype=torch.float32)
+        self.parameters = create_yolov9c_model_parameters(self.torch_model, self.torch_input_params, device=self.device)
 
         self.ttnn_yolov9c_model = YoloV9(
             self.device, self.parameters, enable_segment=self.enable_segment
@@ -55,36 +61,37 @@ class YOLOv9PerformanceRunnerInfra:
 
         self.torch_output_tensor = self.torch_model(self.torch_input_tensor)
 
-    def _setup_l1_sharded_input(self, device, torch_input_tensor=None):
+    def setup_l1_sharded_input(self, device, torch_input_tensor=None):
         if is_wormhole_b0():
             core_grid = ttnn.CoreGrid(y=8, x=8)
         else:
             exit("Unsupported device")
 
-        num_devices = device.get_num_devices()
         torch_input_tensor = self.torch_input_tensor if torch_input_tensor is None else torch_input_tensor
         n, c, h, w = torch_input_tensor.shape
         ## Converting from image based channels (3) to min channels (16)
         if c == 3:
             c = 16
         input_mem_config = ttnn.create_sharded_memory_config(
-            [n, c, h, w],
+            [n // self.num_devices, c, h, w],
             ttnn.CoreGrid(x=8, y=8),
             ttnn.ShardStrategy.HEIGHT,
         )
-        tt_inputs_host = ttnn.from_torch(torch_input_tensor, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT)
+        tt_inputs_host = ttnn.from_torch(
+            torch_input_tensor, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT, mesh_mapper=self.mesh_mapper
+        )
 
         return tt_inputs_host, input_mem_config
 
     def setup_dram_sharded_input(self, device, torch_input_tensor=None, mesh_mapper=None, mesh_composer=None):
-        tt_inputs_host, input_mem_config = self._setup_l1_sharded_input(device)
+        tt_inputs_host, input_mem_config = self.setup_l1_sharded_input(device)
         dram_grid_size = device.dram_grid_size()
         dram_shard_spec = ttnn.ShardSpec(
             ttnn.CoreRangeSet(
                 {ttnn.CoreRange(ttnn.CoreCoord(0, 0), ttnn.CoreCoord(dram_grid_size.x - 1, dram_grid_size.y - 1))}
             ),
             [
-                divup(tt_inputs_host.volume() // tt_inputs_host.shape[-1], dram_grid_size.x * dram_grid_size.y),
+                divup(tt_inputs_host.volume() // tt_inputs_host.shape[-1], (dram_grid_size.x * dram_grid_size.y)),
                 tt_inputs_host.shape[-1],
             ],
             ttnn.ShardOrientation.ROW_MAJOR,
@@ -101,7 +108,7 @@ class YOLOv9PerformanceRunnerInfra:
     def validate(self, output_tensor=None, torch_output_tensor=None):
         ttnn_output_tensor = self.output_tensor if output_tensor is None else output_tensor
         torch_output_tensor = self.torch_output_tensor if torch_output_tensor is None else torch_output_tensor
-        output_tensor = ttnn.to_torch(ttnn_output_tensor[0])
+        output_tensor = ttnn.to_torch(ttnn_output_tensor[0], mesh_composer=self.mesh_composer)
         self.pcc_passed, self.pcc_message = assert_with_pcc(self.torch_output_tensor[0], output_tensor, pcc=0.99)
 
         logger.info(

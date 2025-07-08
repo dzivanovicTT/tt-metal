@@ -4,30 +4,63 @@ Demo showcasing Yolov9c running on Wormhole - n150, n300 using ttnn.
 ## Platforms:
     WH N150, N300
 
+### Note:
+
+- On N300 ,Make sure to use `WH_ARCH_YAML=wormhole_b0_80_arch_eth_dispatch.yaml` with the pytest.
+
+- Or, make sure to set the following environment variable in the terminal:
+  ```
+  export WH_ARCH_YAML=wormhole_b0_80_arch_eth_dispatch.yaml
+  ```
+- To obtain the perf reports through profiler, please build with following command:
+  ```
+  ./build_metal.sh -p
+  ```
+
 ## Introduction:
 Yolov9 marks a significant advancement in real-time object detection, introducing groundbreaking techniques such as Programmable Gradient Information (PGI) and the Generalized Efficient Layer Aggregation Network (GELAN). Yolov9c is a compact and optimized variant of Yolov9, designed for efficient object detection with reduced computational overhead. It balances speed and accuracy.
 
 ## Details:
-The entry point to functional_yolov9c model is YoloV9 in `models/demos/yolov9c/tt/ttnn_yolov9c.py`. The model picks up certain configs and weights from Ultralytics pretrained model. We've used weights available [here](https://docs.ultralytics.com/models/yolov9/#performance-on-ms-coco-dataset) under YOLOv9c.
+The model picks up certain configs and weights from Ultralytics pretrained model. We've used weights available [here](https://docs.ultralytics.com/models/yolov9/#performance-on-ms-coco-dataset) under YOLOv9c.
+
+- The entry point to the `functional_yolov9c` is `YoloV9` in :`models/demos/yolov9c/tt/ttnn_yolov9c.py`.
+- Batch Size : `1` (Single Device), `2` (Multi Device).
+- Supported Input Resolution - `(640, 640)` - (Height, Width).
+
 
 ## How to Run:
-If running on Wormhole N300 (not required for N150 or Blackhole), the following environment variable needs to be set as the model requires at least 8x8 core grid size:
-```sh
-export WH_ARCH_YAML=wormhole_b0_80_arch_eth_dispatch.yaml
-```
-
 #### Note:
 - Use `yolov9c-seg.pt` pre-trained weights for segmentation tasks and `yolov9c.pt` pre-trained weights for detection in Tests and Demos.
 - Set the `enable_segment` flag accordingly when initializing the TTNN model in tests and demos. Segmentation task is set as default in model.
 
 
 Use the following command to run the Yolov9c model :
-```
-pytest --disable-warnings tests/ttnn/integration_tests/yolov9c/test_ttnn_yolov9c.py::test_yolov9c
-```
+
+  ```
+  pytest --disable-warnings tests/ttnn/integration_tests/yolov9c/test_ttnn_yolov9c.py::test_yolov9c
+  ```
+
 ### Demo
 
 #### Instance Segmentation:
+
+### Single Device (BS=1):
+
+- Use the following command to run the demo with Trace and CQs:
+
+  ```bash
+  pytest --disable-warnings models/demos/yolov9c/demo/demo.py::test_demo[tt_model-segment-True-models/demos/yolov9c/demo/image.png-device_params0]
+  ```
+
+#### Object Detection:
+
+- Use the following command to run the demo with Trace and CQs:
+
+  ```bash
+  pytest --disable-warnings models/demos/yolov9c/demo/demo.py::test_demo[tt_model-detect-True-models/demos/yolov9c/demo/image.png-device_params0]
+  ```
+
+### Multi Device (DP=2, N300):
 
 - Use the following command to run the demo with Trace and CQs:
 
@@ -46,20 +79,34 @@ pytest --disable-warnings tests/ttnn/integration_tests/yolov9c/test_ttnn_yolov9c
 #### Outputs
 - The Demo outputs are saved inside this directory: `models/demos/yolov9c/demo/runs`
 
-### Model performant
+## Model performant running with Trace+2CQ
 
-#### For 640x640 - Segmentation:
-- end-2-end perf with Trace+2CQ for Segmentation is 43 FPS.
+### Single Device (BS=1):
+
+- For `640x640` - `Segmentation`, end-2-end perf is `50` FPS.
 
   ```bash
   pytest models/demos/yolov9c/tests/perf/test_e2e_performant_segment.py::test_e2e_performant
   ```
 
-#### For 640x640 - Detection:
-- end-2-end perf with Trace+2CQ for Detection is 52 FPS.
+- For `640x640` - `Detection`, end-2-end perf is `45` FPS.
 
   ```bash
   pytest models/demos/yolov9c/tests/perf/test_e2e_performant_detect.py::test_e2e_performant
+  ```
+
+### Multi Device (DP=2, N300):
+
+- For `640x640` - `Segmentation`, end-2-end perf is `90` FPS.
+
+  ```bash
+  pytest models/demos/yolov9c/tests/perf/test_e2e_performant_segment.py::test_e2e_performant_dp
+  ```
+
+- For `640x640` - `Detection`, end-2-end perf is `88` FPS.
+
+  ```bash
+  pytest models/demos/yolov9c/tests/perf/test_e2e_performant_detect.py::test_e2e_performant_dp
   ```
 
 ### Performant evaluation with Trace+2CQ for Detection task
