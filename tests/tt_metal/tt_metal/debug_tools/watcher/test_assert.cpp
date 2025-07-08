@@ -25,7 +25,6 @@
 #include <tt-metalium/program.hpp>
 #include <tt_stl/span.hpp>
 #include <tt-metalium/utils.hpp>
-#include "watcher_server.hpp"
 
 //////////////////////////////////////////////////////////////////////////////////////////
 // A test for checking watcher asserts.
@@ -170,7 +169,7 @@ static void RunTest(
         fixture->RunProgram(device, program);
     } catch (std::runtime_error &e) {
         string expected = "Command Queue could not finish: device hang due to illegal NoC transaction. See {} for details.\n";
-        expected += tt::watcher_get_log_file_name();
+        expected += MetalContext::instance().watcher_server()->log_file_name();
         const string error = string(e.what());
         log_info(LogTest, "Caught exception (one is expected in this test)");
         EXPECT_TRUE(error.find(expected) != string::npos);
@@ -227,10 +226,10 @@ static void RunTest(
     log_info(LogTest, "Expected error: {}", expected);
     std::string exception = "";
     do {
-        exception = get_watcher_exception_message();
+        exception = MetalContext::instance().watcher_server()->exception_message();
     } while (exception == "");
     log_info(LogTest, "Reported error: {}", exception);
-    EXPECT_TRUE(expected == get_watcher_exception_message());
+    EXPECT_TRUE(expected == MetalContext::instance().watcher_server()->exception_message());
 }
 }
 

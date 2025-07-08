@@ -109,12 +109,21 @@ void MetalContext::initialize(
         dprint_server_ = std::make_unique<DPrintServer>(rtoptions_);
     }
 
+    // Initialize debug servers. Attaching individual devices done below
+    if (rtoptions_.get_feature_enabled(tt::llrt::RunTimeDebugFeatureDprint)) {
+        TT_FATAL(!rtoptions_.get_profiler_enabled(), "Both DPRINT and Profiler cannot be enabled at the same time.");
+        rtoptions_.set_disable_dma_ops(true);  // DMA is not thread-safe
+        dprint_server_ = std::make_unique<DPrintServer>(rtoptions_);
+    }
+    watcher_server_ =
+        std::make_unique<WatcherServer>();  // Watcher server always created, since we use it to register kernels
+
     // Minimal setup, don't initialize FW/Dispatch/etc.
     if (minimal) {
         return;
     }
 
-    // TODO: Move FW, fabric, dispatch init here
+    // Clear state, build FW
     auto all_devices = cluster_->all_chip_ids();
     for (chip_id_t device_id : all_devices) {
         // Clear L1/DRAM if requested
@@ -157,11 +166,10 @@ void MetalContext::initialize(
     // Initialize debug tools, reset cores, init FW
     if (dprint_server_) {
         dprint_server_->attach_devices();
-    };
+    }
+    watcher_server_->init_devices();
     for (chip_id_t device_id : all_devices) {
-        // Init debug tools
         ClearNocData(device_id);
-        watcher_init(device_id);
 
         // TODO: as optimization, investigate removing all this call for already initialized devivces
         if (!rtoptions_.get_skip_reset_cores_on_init()) {
@@ -169,11 +177,10 @@ void MetalContext::initialize(
         }
 
         initialize_and_launch_firmware(device_id);
-
-        // Watcher needs to init before FW since FW needs watcher mailboxes to be set up, and needs to attach after FW
-        // starts since it also writes to watcher mailboxes.
-        watcher_attach(device_id);
     }
+    // Watcher needs to init before FW since FW needs watcher mailboxes to be set up, and needs to attach after FW
+    // starts since it also writes to watcher mailboxes.
+    watcher_server_->attach_devices();
 
     // Register teardown function, but only once.
     if (not teardown_registered_) {
@@ -196,8 +203,9 @@ void MetalContext::teardown() {
     }
 
     auto all_devices = cluster_->all_chip_ids();
+    watcher_server_->detach_devices();
+    watcher_server_.reset();
     for (chip_id_t device_id : all_devices) {
-        watcher_detach(device_id);
         assert_cores(device_id);
 
         cluster_->l1_barrier(device_id);
