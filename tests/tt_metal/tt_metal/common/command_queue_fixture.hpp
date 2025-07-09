@@ -10,6 +10,7 @@
 #include "gtest/gtest.h"
 #include "dispatch_fixture.hpp"
 #include "hostdevcommon/common_values.hpp"
+#include <tt-logger/tt-logger.hpp>
 #include <tt-metalium/device.hpp>
 #include "umd/device/types/cluster_descriptor_types.h"
 #include <tt-metalium/host_api.hpp>
@@ -219,12 +220,12 @@ class CommandQueueSingleCardProgramFixture : virtual public CommandQueueSingleCa
 // If the device should open closed/reopned for each test case then override the SetUpTestSuite and TearDownTestSuite
 // methods
 class CommandQueueMultiDeviceFixture : public DispatchFixture {
-private:
+protected:
     inline static std::vector<tt::tt_metal::IDevice*> devices_internal;
     inline static std::map<chip_id_t, tt::tt_metal::IDevice*> reserved_devices_internal;
     inline static size_t num_devices_internal;
+    inline static ARCH arch_internal = tt::ARCH::Invalid;
 
-protected:
     static bool ShouldSkip() {
         if (getenv("TT_METAL_SLOW_DISPATCH_MODE") != nullptr) {
             return true;
@@ -252,9 +253,9 @@ protected:
         }
 
         auto dispatch_core_config = tt::tt_metal::MetalContext::instance().rtoptions().get_dispatch_core_config();
-        const tt::ARCH arch = tt::get_arch_from_string(tt::test_utils::get_umd_arch_name());
+        arch_internal = tt::get_arch_from_string(tt::test_utils::get_umd_arch_name());
 
-        if (num_cqs > 1 && arch == tt::ARCH::WORMHOLE_B0 && tt::tt_metal::GetNumAvailableDevices() != 1) {
+        if (num_cqs > 1 && arch_internal == tt::ARCH::WORMHOLE_B0 && tt::tt_metal::GetNumAvailableDevices() != 1) {
             if (!tt::tt_metal::IsGalaxyCluster()) {
                 log_warning(
                     tt::LogTest, "Ethernet Dispatch not being explicitly used. Set this configuration in Setup()");
@@ -297,7 +298,6 @@ protected:
         devices_.clear();
         reserved_devices_.clear();
         num_devices_ = 0;
-        arch_ = tt::ARCH::Invalid;
     }
 
     std::vector<tt::tt_metal::IDevice*> devices_;
@@ -341,27 +341,37 @@ public:
 
 class CommandQueueMultiDeviceOnFabricFixture : public CommandQueueMultiDeviceFixture,
                                                public ::testing::WithParamInterface<tt::tt_metal::FabricConfig> {
+private:
+    inline static ARCH arch_ = tt::ARCH::Invalid;
+    inline static bool is_galaxy_ = false;
+
 protected:
     // Multiple fabric configs so need to reset the devices for each test
-    static void SetUpTestSuite() {}
+    static void SetUpTestSuite() {
+        arch_ = tt::get_arch_from_string(tt::test_utils::get_umd_arch_name());
+        is_galaxy_ = tt::tt_metal::IsGalaxyCluster();
+    }
+
     static void TearDownTestSuite() {}
 
     void SetUp() override {
         if (CommandQueueMultiDeviceFixture::ShouldSkip()) {
             GTEST_SKIP() << CommandQueueMultiDeviceFixture::GetSkipMessage();
         }
-        if (tt::get_arch_from_string(tt::test_utils::get_umd_arch_name()) != tt::ARCH::WORMHOLE_B0) {
+        if (arch_ != tt::ARCH::WORMHOLE_B0) {
             GTEST_SKIP() << "Dispatch on Fabric tests only applicable on Wormhole B0";
         }
         // Skip for TG as it's still being implemented
-        if (tt::tt_metal::IsGalaxyCluster()) {
+        if (is_galaxy_) {
             GTEST_SKIP();
         }
         tt::tt_metal::MetalContext::instance().rtoptions().set_fd_fabric(true);
         // This will force dispatch init to inherit the FabricConfig param
         tt::tt_metal::detail::SetFabricConfig(GetParam(), FabricReliabilityMode::STRICT_SYSTEM_HEALTH_SETUP_MODE, 1);
         CommandQueueMultiDeviceFixture::DoSetUpTestSuite();
-        CommandQueueMultiDeviceFixture::SetUp();
+        num_devices_ = devices_internal.size();
+        devices_ = devices_internal;
+        reserved_devices_ = reserved_devices_internal;
 
         if (::testing::Test::IsSkipped()) {
             tt::tt_metal::detail::SetFabricConfig(FabricConfig::DISABLED);
