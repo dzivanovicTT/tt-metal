@@ -31,6 +31,31 @@ public:
 
     Tile tile() const { return tensor_layout_.get_tile(); }
 
+    TensorSpec sharded_across_dims(
+        tt::stl::Span<const int32_t> dims,
+        CoreRangeSet grid,
+        ShardOrientation orientation = ShardOrientation::ROW_MAJOR) const;
+    TensorSpec sharded_across_dims_except(
+        tt::stl::Span<const int32_t> dims,
+        CoreRangeSet grid,
+        ShardOrientation orientation = ShardOrientation::ROW_MAJOR) const;
+    TensorSpec height_sharded(CoreRangeSet grid, ShardOrientation orientation = ShardOrientation::ROW_MAJOR) const;
+    TensorSpec width_sharded(CoreRangeSet grid, ShardOrientation orientation = ShardOrientation::ROW_MAJOR) const;
+    TensorSpec block_sharded(CoreRange grid, ShardOrientation orientation = ShardOrientation::ROW_MAJOR) const;
+
+    enum class ShardShapeAlignment {
+        None,
+        Required,
+        Recommended,
+    };
+    TensorSpec sharded(
+        Shape shard_shape,
+        CoreRangeSet grid,
+        ShardShapeAlignment shard_alignment,
+        ShardOrientation orientation = ShardOrientation::ROW_MAJOR,
+        ShardDistributionStrategy shard_distribution_strategy = ShardDistributionStrategy::ROUND_ROBIN_1D) const;
+    TensorSpec sharded(NdShardSpec nd_shard_spec, ShardShapeAlignment shard_alignment) const;
+
     Strides compute_strides() const { return tensor_layout_.compute_strides(logical_shape_); }
     BufferShardingArgs compute_buffer_sharding_args() const {
         return tensor_layout_.compute_buffer_sharding_args(logical_shape_);
