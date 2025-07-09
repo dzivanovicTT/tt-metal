@@ -76,8 +76,30 @@ FabricEriscDatamoverConfig::FabricEriscDatamoverConfig(Topology topology) {
     uint32_t num_sender_channels = get_sender_channel_count(topology);
     uint32_t num_downstream_edms = get_downstream_edm_count(topology);
     // Global
-    this->handshake_addr = tt::tt_metal::hal::get_erisc_l1_unreserved_base() /* + 1024*/;
-    this->edm_channel_ack_addr = handshake_addr + eth_channel_sync_size;
+    size_t next_l1_addr = tt::tt_metal::hal::get_erisc_l1_unreserved_base();
+    this->handshake_addr = next_l1_addr;
+    next_l1_addr += eth_channel_sync_size;
+
+    log_info(tt::LogFabric, "sender_txq_id: {}, receiver_txq_id: {}", this->sender_txq_id, this->receiver_txq_id);
+    if (this->sender_txq_id != this->receiver_txq_id) {
+        for (size_t i = 0; i < num_sender_channels; i++) {
+            this->to_sender_channel_remote_ack_counter_addrs[i] = next_l1_addr;
+            next_l1_addr += field_size;
+        }
+        for (size_t i = 0; i < num_sender_channels; i++) {
+            this->to_sender_channel_remote_completion_counter_addrs[i] = next_l1_addr;
+        }
+        for (size_t i = 0; i < num_receiver_channels; i++) {
+            this->receiver_channel_remote_ack_counter_addrs[i] = next_l1_addr;
+            next_l1_addr += field_size;
+        }
+        for (size_t i = 0; i < num_receiver_channels; i++) {
+            this->receiver_channel_remote_completion_counter_addrs[i] = next_l1_addr;
+            next_l1_addr += field_size;
+        }
+    }
+
+    this->edm_channel_ack_addr = next_l1_addr;
     this->termination_signal_address =
         edm_channel_ack_addr +
         (4 * eth_channel_sync_size);  // pad extra bytes to match old EDM so handshake logic will still work
@@ -1054,6 +1076,23 @@ std::vector<uint32_t> FabricEriscDatamoverBuilder::get_compile_time_args(uint32_
     // Special marker to help with identifying misalignment bugs
     ct_args.push_back(0x10c0ffee);
 
+    bool multi_txq_enabled = config.sender_txq_id != config.receiver_txq_id;
+    if (multi_txq_enabled) {
+        for (size_t i = 0; i < num_sender_channels; i++) {
+            ct_args.push_back(config.to_sender_channel_remote_ack_counter_addrs[i]);
+        }
+        for (size_t i = 0; i < num_sender_channels; i++) {
+            ct_args.push_back(config.to_sender_channel_remote_completion_counter_addrs[i]);
+        }
+        for (size_t i = 0; i < num_receiver_channels; i++) {
+            ct_args.push_back(config.receiver_channel_remote_ack_counter_addrs[i]);
+        }
+        for (size_t i = 0; i < num_receiver_channels; i++) {
+            ct_args.push_back(config.receiver_channel_remote_completion_counter_addrs[i]);
+        }
+    }
+
+    ct_args.push_back(0x20c0ffee);
     return ct_args;
 }
 
