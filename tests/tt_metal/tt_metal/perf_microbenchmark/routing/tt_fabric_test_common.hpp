@@ -170,6 +170,16 @@ public:
 
     std::vector<FabricNodeId> get_all_node_ids() const override { return available_node_ids_; }
 
+    std::vector<tt::tt_metal::IDevice*> get_all_devices() const {
+        std::vector<tt::tt_metal::IDevice*> devices;
+        if (mesh_device_) {
+            for (const auto& coord : available_device_coordinates_) {
+                devices.push_back(mesh_device_->get_device(coord));
+            }
+        }
+        return devices;
+    }
+
     uint32_t get_l1_unreserved_base(const FabricNodeId& node_id) const override {
         const auto& device_coord = get_device_coord(node_id);
         auto* device = mesh_device_->get_device(device_coord);
@@ -585,6 +595,22 @@ public:
         FabricNodeId dst_node_backward = FabricNodeId{src_node.mesh_id, backward_chip_id};
 
         return std::make_pair(dst_node_forward, dst_node_backward);
+    }
+
+    uint32_t get_linear_topology_num_sync_devices() const override {
+        uint32_t num_devices = mesh_shape_[NS_DIM] + mesh_shape_[EW_DIM] - 1;
+        return num_devices;
+    }
+
+    uint32_t get_wrap_around_mesh_ring_topology_num_sync_devices() const override {
+        // sync using full ring mcast, ie, mcast on both forward/backward path.
+        uint32_t num_devices = 2 * (mesh_shape_[NS_DIM] - 1 + mesh_shape_[EW_DIM] - 1);
+        return num_devices;
+    }
+
+    uint32_t get_mesh_topology_num_sync_devices() const override {
+        uint32_t num_devices = mesh_shape_[NS_DIM] * mesh_shape_[EW_DIM];
+        return num_devices;
     }
 
     std::unordered_map<RoutingDirection, uint32_t> get_full_or_half_ring_mcast_hops(
