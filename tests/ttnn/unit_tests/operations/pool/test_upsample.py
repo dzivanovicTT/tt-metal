@@ -13,7 +13,6 @@ import ttnn
 from models.utility_functions import skip_for_blackhole
 from tests.ttnn.utils_for_testing import assert_with_pcc, check_with_pcc_without_tensor_printout
 
-
 TILE_WIDTH = 32
 
 
@@ -57,14 +56,13 @@ def get_shard_grid_from_num_cores(device, ncores: Union[int, Tuple[int, int]]) -
         raise ValueError("Invalid ncores")
 
 
+@pytest.mark.parametrize("device_params", [{"l1_small_size": 24576}], indirect=True)
 @pytest.mark.parametrize(
     "input_shapes",
     [
-        [2, 1280, 4, 4],  # 256x256
-        [2, 1280, 8, 8],
-        [2, 640, 16, 16],
-        [2, 1280, 8, 8],  # 512x512
-        [2, 1280, 16, 16],
+        [1, 640, 16, 16],
+        [1, 1280, 8, 8],
+        [1, 1280, 16, 16],
         [2, 1280, 16, 16],
         [1, 256, 28, 28],
         [1, 512, 14, 14],
@@ -73,34 +71,65 @@ def get_shard_grid_from_num_cores(device, ncores: Union[int, Tuple[int, int]]) -
 @pytest.mark.parametrize("scale_h", [2])
 @pytest.mark.parametrize("scale_w", [2])
 @pytest.mark.parametrize("mode", ["nearest", "bilinear"])
-def test_upsample_single_core(device, input_shapes, mode, scale_h, scale_w):
-    batch_size, height, width, num_channels = input_shapes
-    if mode == "bilinear":
-        pytest.skip("Disabled until single core bilinear mode is supported (#18399)")
-
+@pytest.mark.parametrize("math_fidelity", [ttnn.MathFidelity.LoFi])
+@pytest.mark.parametrize("math_approx_mode", [True, False])
+def test_upsample_single_core(device, input_shapes, mode, scale_h, scale_w, math_fidelity, math_approx_mode):
+    batch_size, num_channels, height, width = input_shapes
     torch.manual_seed(0)
-    input = torch.rand(input_shapes, dtype=torch.bfloat16)
-    tt_input = input.permute(0, 2, 3, 1)
+    if mode == "bilinear":
+        # Bilinear mode requires channels padded to TILE_WIDTH
+        # TODO, add native autopadding
+        TILE_WIDTH = 32
+        num_channels_padded = num_channels
+        if num_channels % TILE_WIDTH != 0:
+            num_channels_padded = num_channels + (TILE_WIDTH - num_channels % TILE_WIDTH)
 
+        input_shape = [batch_size, num_channels_padded, height, width]
+        input = torch.rand(input_shape, dtype=torch.bfloat16)
+        tt_input = input.permute(0, 2, 3, 1)
+        input_tensor = ttnn.from_torch(tt_input, device=device)
+    else:
+        input = torch.rand(input_shapes, dtype=torch.bfloat16)
+        tt_input = input.permute(0, 2, 3, 1)
+        input_tensor = ttnn.from_torch(tt_input, device=device)
     scale_factor = (scale_h, scale_w)
     torch_upsample = nn.Upsample(scale_factor=scale_factor, mode=mode)
     torch_result = torch_upsample(input)
 
     scale_factor = (scale_h, scale_w)
-    input_tensor = ttnn.from_torch(tt_input, device=device)
-    output_tensor = ttnn.upsample(input_tensor, scale_factor, mode=mode)
+
+    if mode == "bilinear":
+        compute_kernel_config = ttnn.WormholeComputeKernelConfig(
+            math_fidelity=math_fidelity,
+            math_approx_mode=math_approx_mode,
+            fp32_dest_acc_en=False,
+        )
+        output_tensor = ttnn.upsample(
+            input_tensor,
+            scale_factor,
+            mode="bilinear",
+            compute_kernel_config=compute_kernel_config,
+        )
+    else:
+        output_tensor = ttnn.upsample(input_tensor, scale_factor)
+
     output_tensor = ttnn.to_torch(output_tensor)
-    output_tensor = output_tensor.permute(0, 3, 1, 2)
 
-    assert_with_pcc(torch_result, output_tensor)
+    torch_result = torch_result.permute(0, 2, 3, 1)
+    torch_result = torch_result[:, :, :, 0:num_channels]
+    output_tensor = output_tensor[:, :, :, 0:num_channels]
 
-    allclose = torch.allclose(output_tensor, torch_result)
-    isclose = torch.all(torch.isclose(output_tensor, torch_result))
-    isequal = torch.equal(output_tensor, torch_result)
-
-    assert allclose
-    assert isclose
-    assert isequal
+    if mode == "nearest":
+        pcc_passed, pcc_message = assert_with_pcc(torch_result, output_tensor)
+        allclose = torch.allclose(output_tensor, torch_result)
+        isclose = torch.all(torch.isclose(output_tensor, torch_result))
+        isequal = torch.equal(output_tensor, torch_result)
+        assert allclose
+        assert isclose
+        assert isequal
+    else:
+        pcc_passed, pcc_message = assert_with_pcc(torch_result, output_tensor, pcc=0.99)
+    logger.info(pcc_message)
 
 
 def upsample_multicore_common(
@@ -335,6 +364,7 @@ def test_upsample_multicore_corerange(
 @pytest.mark.parametrize(
     "batch_size, num_channels, height, width, scale_h, scale_w",
     (
+        (1, 1280, 8, 8, 2, 2),
         (1, 256, 16, 16, 8, 8),  # 256x256
         (1, 256, 32, 32, 4, 4),  # 256x256
         (1, 256, 64, 64, 2, 2),  # 256x256

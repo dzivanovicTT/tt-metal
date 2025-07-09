@@ -95,6 +95,7 @@ operation::ProgramWithCallbacks UpSample::create_program(
             if (mode_ == "nearest") {
                 return upsample_single_core(input_tensor_0, output_tensor_0, scale_factor_h_, scale_factor_w_);
             } else {
+                // With autosharding added this case should never be entered
                 TT_THROW("Unsupported mode");
             }
     };
