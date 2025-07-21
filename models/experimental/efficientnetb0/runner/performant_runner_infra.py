@@ -63,7 +63,7 @@ class EfficientNetb0PerformanceRunnerInfra:
         torch_input_tensor = self.torch_input_tensor if torch_input_tensor is None else torch_input_tensor
 
         n, c, h, w = torch_input_tensor.shape
-        ## Converting from image based channels (3) to min channels (16)
+        # Converting from image based channels (3) to min channels (16)
         if c == 3:
             c = 16
         input_mem_config = ttnn.create_sharded_memory_config(
@@ -72,7 +72,22 @@ class EfficientNetb0PerformanceRunnerInfra:
             ttnn.ShardStrategy.HEIGHT,
             use_height_and_width_as_shard_shape=True,
         )
+        # print("in runner infra torch_input_tensor: ", torch_input_tensor.shape)
+        # num_cores = core_grid.x * core_grid.y
+        # shard_h = (n * w * h + num_cores - 1) // num_cores
+        # grid_size = core_grid
+        # grid_coord = ttnn.CoreCoord(grid_size.x - 1, grid_size.y - 1)
+        # shard_grid = ttnn.CoreRangeSet({ttnn.CoreRange(ttnn.CoreCoord(0, 0), grid_coord)})
+        # shard_spec = ttnn.ShardSpec(shard_grid, (shard_h, 16), ttnn.ShardOrientation.ROW_MAJOR)
+        # input_mem_config_1 = ttnn.MemoryConfig(
+        #     ttnn.types.TensorMemoryLayout.HEIGHT_SHARDED, ttnn.types.BufferType.L1, shard_spec
+        # )
         tt_inputs_host = ttnn.from_torch(torch_input_tensor, dtype=ttnn.bfloat16, layout=ttnn.ROW_MAJOR_LAYOUT)
+        # print("tt_inputs_host: ", tt_inputs_host.memory_config())
+        # tt_inputs_host = ttnn.reshape(tt_inputs_host, (1, 1, (n * h * w), c))
+        # tt_inputs_host = ttnn.pad(
+        #     tt_inputs_host, [1, 1, n * h * w, 16], [0, 0, 0, 0], 0
+        # )
 
         return tt_inputs_host, input_mem_config
 
@@ -103,7 +118,7 @@ class EfficientNetb0PerformanceRunnerInfra:
         torch_output_tensor = self.torch_output_tensor if torch_output_tensor is None else torch_output_tensor
         output_tensor = ttnn.to_torch(ttnn_output_tensor)
 
-        self.pcc_passed, self.pcc_message = assert_with_pcc(self.torch_output_tensor, output_tensor, pcc=0.11)
+        self.pcc_passed, self.pcc_message = assert_with_pcc(self.torch_output_tensor, output_tensor, pcc=0.95)
 
         logger.info(
             f"EfficientNetb0 - batch_size={self.batch_size}, act_dtype={self.act_dtype}, weight_dtype={self.weight_dtype}, PCC={self.pcc_message}"

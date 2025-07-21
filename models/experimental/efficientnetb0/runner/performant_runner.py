@@ -36,7 +36,9 @@ class EfficientNetb0PerformantRunner:
             sharded_mem_config_DRAM,
             self.input_mem_config,
         ) = self.runner_infra.setup_dram_sharded_input(device)
+        # print("self.tt_inputs_host: ", self.tt_inputs_host.memory_config())
         self.tt_image_res = self.tt_inputs_host.to(device, sharded_mem_config_DRAM)
+        # print("self.tt_image_res: ", self.tt_image_res.memory_config())
 
     def _capture_efficientnetb0_trace_2cqs(self):
         # Initialize the op event so we can write
@@ -90,7 +92,11 @@ class EfficientNetb0PerformantRunner:
             self.input_tensor = ttnn.reshard(self.tt_image_res, self.input_mem_config, self.input_tensor)
         self.op_event = ttnn.record_event(self.device, 0)
         ttnn.execute_trace(self.device, self.tid, cq_id=0, blocking=False)
-        return self.runner_infra.output_tensor
+        ttnn.synchronize_device(self.device)
+
+        ttnn_output_tensor = self.runner_infra.output_tensor
+        return ttnn_output_tensor
+        # return self.runner_infra.output_tensor
 
     def _validate(self, input_tensor, result_output_tensor):
         torch_output_tensor = self.runner_infra.torch_output_tensor
