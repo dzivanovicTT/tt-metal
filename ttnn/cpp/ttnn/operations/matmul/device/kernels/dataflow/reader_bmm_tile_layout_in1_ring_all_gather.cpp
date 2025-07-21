@@ -81,16 +81,22 @@ void kernel_main() {
                 noc_semaphore_set_multicast(pv_semaphore, rs_semaphore_address, num_rs_semaphores);
             } else {
                 // Increment the privilage core semaphore by 1
-                noc_semaphore_inc(get_noc_addr(pv_semaphore), 1);
+                noc_semaphore_inc(get_noc_addr(pv_core_x, pv_core_y, pv_semaphore), 1);
             }
         }
         return;
     }
     const uint32_t in1_tensor_addr = get_arg_val<uint32_t>(rt_args_idx++);
     const uint32_t ring_idx = get_arg_val<uint32_t>(rt_args_idx++);
-    const uint32_t dram_bank_id = get_arg_val<uint32_t>(rt_args_idx++);
-    const uint32_t vc = get_arg_val<uint32_t>(rt_args_idx++);
-    const uint32_t dram_read_offset = get_arg_val<uint32_t>(rt_args_idx++);
+    uint32_t dram_bank_id = 0;
+    uint32_t vc = 0;
+    uint32_t dram_read_offset = 0;
+
+    if constexpr (in1_is_dram_interleaved || in1_is_dram_sharded) {
+        dram_bank_id = get_arg_val<uint32_t>(rt_args_idx++);
+        vc = get_arg_val<uint32_t>(rt_args_idx++);
+        dram_read_offset = get_arg_val<uint32_t>(rt_args_idx++);
+    }
 
     constexpr uint32_t cb_id_in1 = get_compile_time_arg_val(11);
     constexpr uint32_t sync_cb = get_compile_time_arg_val(12);
@@ -206,7 +212,8 @@ void kernel_main() {
                     noc_semaphore_set_multicast(pv_semaphore, rs_semaphore_address, num_rs_semaphores);
                 } else {
                     // Increment the privilage core semaphore by 1
-                    noc_semaphore_inc(get_noc_addr(pv_semaphore), 1);
+                    uint64_t sem_addr = get_noc_addr(pv_core_x, pv_core_y, pv_semaphore);
+                    noc_semaphore_inc(sem_addr, 1);
                 }
             }
         }
