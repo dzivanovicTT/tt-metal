@@ -62,7 +62,7 @@ public:
     Tensor& operator=(Tensor&& other) noexcept;
     ~Tensor();
 
-    // Constructs a tensor with `Storage` and `TensorSpec`.
+    // Constructs a tensor with `Storage`, `TensorSpec`, and `TensorTopology`.
     [[nodiscard]] Tensor(
         Storage storage,
         TensorSpec tensor_spec,

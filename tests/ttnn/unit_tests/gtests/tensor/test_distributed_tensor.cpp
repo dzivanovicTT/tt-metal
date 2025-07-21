@@ -47,9 +47,9 @@ TEST_F(TensorDistributionTest, DistributeToDevice) {
     EXPECT_TRUE(distribute_tensor(input_tensor, *mapper).storage_type() == StorageType::HOST);
     EXPECT_TRUE(distribute_tensor(input_tensor, *mapper, *mesh_device_).storage_type() != StorageType::HOST);
 
-    // Tensor topology is a single host
-    const auto tensor_topology = input_tensor.tensor_topology();
-    EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(1));
+    // Tensor topology is a single device
+    const auto& tensor_topology = input_tensor.tensor_topology();
+    EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(mesh_device_->num_devices()));
 }
 
 TEST_F(TensorDistributionTest, SingleDeviceTensorReplication) {
@@ -60,7 +60,7 @@ TEST_F(TensorDistributionTest, SingleDeviceTensorReplication) {
     Tensor replicated_tensor = distribute_tensor(input_tensor, *mapper, *mesh_device_);
 
     // Tensor topology for tensor replicated across entire mesh should be 1D shape with number of devices
-    const auto tensor_topology = replicated_tensor.tensor_topology();
+    const auto& tensor_topology = replicated_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(mesh_device_->num_devices()));
 
     std::vector<Tensor> device_tensors = get_device_tensors(replicated_tensor);
@@ -101,7 +101,7 @@ TEST_F(TensorDistributionT3000Test, Shard1DFewerShardsThanDevices) {
 
     // Tensor topology for tensor sharded across 1 dimension should be 1D shape with number of actual shards (ie.
     // num_devices - 1)
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(mesh_device_->num_devices() - 1));
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), mesh_device_->num_devices() - 1);
@@ -132,7 +132,7 @@ TEST_F(TensorDistributionT3000Test, Shard1DNegativeDim) {
 
     // Tensor topology for tensor sharded across 1 dimension should be 1D shape with number of actual shards (ie.
     // num_devices)
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(mesh_device_->num_devices()));
 
     std::vector<Tensor> device_tensors = get_device_tensors(sharded_tensor);
@@ -156,7 +156,7 @@ TEST_F(TensorDistributionT3000Test, Shard1D) {
 
     // Tensor topology for tensor sharded across 1 dimension should be 1D shape with number of actual shards (ie.
     // num_devices)
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, MeshShape(mesh_device_->num_devices()));
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), mesh_device_->num_devices());
@@ -193,7 +193,7 @@ TEST_F(TensorDistributionT3000Test, PartialConcat) {
     Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper);
 
     // Tensor topology for tensor sharded/replicated across 2D should be mesh device shape.
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_device_->shape());
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), kNumRows);
@@ -249,7 +249,7 @@ TEST_P(TensorDistributionT3000Test2D, FullyReplicated) {
     Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper);
 
     // Tensor topology for tensor replicated across 2D (with override) should be same as mesh shape override
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), 1);
@@ -291,7 +291,7 @@ TEST_P(TensorDistributionT3000Test2D, ReplicateDim) {
     Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper);
 
     // Tensor topology for tensor sharded/replicated across 2D (with override) should be same as mesh shape override
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), num_rows);
@@ -332,7 +332,7 @@ TEST_P(TensorDistributionT3000Test2D, ShardDims) {
     Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper);
 
     // Tensor topology for tensor sharded across 2D (with override) should be same as mesh shape override
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), num_rows * num_cols);
@@ -454,7 +454,7 @@ TEST_F(TensorDistributionT3000Test, NdMapperShard3D) {
     Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper);
 
     // Tensor topology for tensor sharded across 3D (with override) should be same as mesh shape override
-    const auto tensor_topology = sharded_tensor.tensor_topology();
+    const auto& tensor_topology = sharded_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     EXPECT_EQ(count_unique_buffers(sharded_tensor), 2 * 2);

@@ -36,7 +36,7 @@ TEST_F(TensorTopologyTest, SingleDevice) {
     Tensor replicated_tensor = distribute_tensor(input_tensor, *mapper, *mesh_device_);
 
     // Tensor topology for tensor replicated across 2D (with override) should be same as mesh shape override
-    const auto tensor_topology = replicated_tensor.tensor_topology();
+    const auto& tensor_topology = replicated_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     auto coord = MeshCoordinate(0);
@@ -75,7 +75,7 @@ TEST_F(TensorTopologyT3000Test, Replicate2D) {
     Tensor replicated_tensor = distribute_tensor(input_tensor, *mapper, *mesh_device_);
 
     // Tensor topology for tensor replicated across 2D (with override) should be same as mesh shape override
-    const auto tensor_topology = replicated_tensor.tensor_topology();
+    const auto& tensor_topology = replicated_tensor.tensor_topology();
     EXPECT_EQ(tensor_topology.mesh_shape, mesh_shape_override);
 
     auto check_neighbors_2d = [&tensor_topology](const MeshCoordinate& coord) {
