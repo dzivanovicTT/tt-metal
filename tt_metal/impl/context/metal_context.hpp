@@ -25,7 +25,6 @@
 #include <vector>
 
 namespace tt::tt_fabric {
-class GlobalControlPlane;
 class ControlPlane;
 }  // namespace tt::tt_fabric
 
@@ -101,6 +100,13 @@ private:
     void reset_cores(chip_id_t device_id);
     void assert_cores(chip_id_t device_id);
 
+    // Returns the ERISC Launch Flag address
+    uint32_t get_active_erisc_launch_flag_addr();
+    // Returns true if metal firmware or a kernel is running on the virtual ethernet core
+    bool erisc_app_still_running(chip_id_t device_id, CoreCoord virtual_core);
+    // Send a message to exit the erisc app
+    void erisc_send_exit_signal(chip_id_t device_id, CoreCoord virtual_core, bool is_idle_eth);
+
     // Functions used to init/run firmware on devices
     CoreCoord virtual_noc0_coordinate(chip_id_t device_id, uint8_t noc_index, CoreCoord coord);
     void generate_device_bank_to_noc_tables(chip_id_t device_id);
@@ -143,7 +149,7 @@ private:
     std::unique_ptr<DPrintServer> dprint_server_;
     std::unique_ptr<WatcherServer> watcher_server_;
     std::array<std::unique_ptr<DispatchMemMap>, static_cast<size_t>(CoreType::COUNT)> dispatch_mem_map_;
-    std::unique_ptr<tt::tt_fabric::GlobalControlPlane> global_control_plane_;
+    std::unique_ptr<tt::tt_fabric::ControlPlane> control_plane_;
     tt_fabric::FabricConfig fabric_config_ = tt_fabric::FabricConfig::DISABLED;
     std::shared_ptr<distributed::multihost::DistributedContext> distributed_context_;
 

@@ -1683,7 +1683,8 @@ void ControlPlane::initialize_intermesh_eth_links() {
 // contains all the cross host links
 bool ControlPlane::is_intermesh_enabled() const {
     // Check if the architecture and system support intermesh routing
-    if (not tt_metal::MetalContext::instance().hal().intermesh_eth_links_enabled()) {
+    if (not tt_metal::MetalContext::instance().hal().get_device_feature_enabled(
+            tt::tt_metal::DeviceFeature::ETH_LINKS_INTERMESH_ROUTING)) {
         return false;
     }
 
@@ -2112,21 +2113,5 @@ bool ControlPlane::is_local_mesh(MeshId mesh_id) const {
 }
 
 ControlPlane::~ControlPlane() = default;
-
-GlobalControlPlane::GlobalControlPlane(const std::string& mesh_graph_desc_file) {
-    mesh_graph_desc_file_ = mesh_graph_desc_file;
-    // Initialize host mappings
-    control_plane_ = std::make_unique<ControlPlane>(mesh_graph_desc_file);
-}
-
-GlobalControlPlane::GlobalControlPlane(
-    const std::string& mesh_graph_desc_file,
-    const std::map<FabricNodeId, chip_id_t>& logical_mesh_chip_id_to_physical_chip_id_mapping) {
-    mesh_graph_desc_file_ = mesh_graph_desc_file;
-    control_plane_ =
-        std::make_unique<ControlPlane>(mesh_graph_desc_file, logical_mesh_chip_id_to_physical_chip_id_mapping);
-}
-
-GlobalControlPlane::~GlobalControlPlane() = default;
 
 }  // namespace tt::tt_fabric

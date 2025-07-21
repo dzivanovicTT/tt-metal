@@ -377,7 +377,7 @@ def test_demo_text(
         pytest.skip("Skipping test since there is no 6U machines dedicated for APC")
     if apc_test and not pcc_check:
         raise ValueError("APC test requires PCC check to be enabled")
-    if pcc_check:
+    if apc_test:
         demo_targets = load_demo_targets("models/demos/llama3_subdevices/demo/text_demo_targets.json", galaxy_type)
 
     # Override parameters from command line if they are provided
@@ -631,19 +631,19 @@ def test_demo_text(
             torch_output_logits = torch_output[0]
             logits = tt_out_logits_all_users[0, 0, :vocab_size]
             does_pass, pcc_message = comp_pcc(
-                logits, torch_output_logits, demo_targets["prefill_pcc"] if apc_test else 0.91
+                logits, torch_output_logits, 0.91 if not apc_test else demo_targets["prefill_pcc"]
             )
             logger.info(f"PCC: {pcc_message}")
             logger.info(
                 f"Teacher forced token at prefill {'PASSED' if does_pass else 'FAILED'} PCC check with torch reference model"
             )
+        if apc_test:
             assert_message = (
                 f"Prefill PCC check failed: {pcc_message}, while expected {demo_targets['prefill_pcc']}.\n"
                 f"If it is expected to be different in Llama model, please update the text_demo_targets.json file.\n"
                 f"Instructions: https://github.com/tenstorrent/tt-metal/blob/main/models/demos/llama3_subdevices/README.md#updating-apc-test-target-values"
             )
-            if apc_test:
-                assert pcc_message == demo_targets["prefill_pcc"], assert_message
+            assert pcc_message == demo_targets["prefill_pcc"], assert_message
 
         # Save prefill token
         prefilled_token = toks.view(-1, 1)
@@ -756,19 +756,19 @@ def test_demo_text(
                     else:
                         torch_output_logits = torch_output[iteration + 1]
                     does_pass, pcc_message = comp_pcc(
-                        tt_out_logits_saved, torch_output_logits, demo_targets["decode_pcc"] if apc_test else 0.91
+                        tt_out_logits_saved, torch_output_logits, 0.91 if not apc_test else demo_targets["decode_pcc"]
                     )
                     logger.info(f"PCC: {pcc_message}")
                     logger.info(
                         f"Teacher forced token at decode iteration {iteration} {'PASSED' if does_pass else 'FAILED'} PCC check with torch reference model"
                     )
+                if apc_test:
                     assert_message = (
                         f"Decode PCC check failed: {pcc_message}, while expected {demo_targets['decode_pcc']}.\n"
                         f"If any ops in Llama model might be impacted, please update decode_pcc in the text_demo_targets.json file.\n"
                         f"Instructions: https://github.com/tenstorrent/tt-metal/blob/main/models/demos/llama3_subdevices/README.md#updating-apc-test-target-values"
                     )
-                    if apc_test:
-                        assert pcc_message == demo_targets["decode_pcc"], assert_message
+                    assert pcc_message == demo_targets["decode_pcc"], assert_message
 
                 if teacher_forcing:
                     _, tt_top5_tokens = torch.topk(tt_out_logits_saved, k=5, dim=-1)
@@ -817,17 +817,18 @@ def test_demo_text(
                 logger.info(
                     f"Decode Iteration {iteration}: Time: {1000*decode_iteration_time:.4f}ms, tok/s/user: {tokens_per_second_per_user:.2f}, Throughput: {batch_size*tokens_per_second_per_user:.2f} tok/s"
                 )
-                if apc_test and demo_targets["token_pos"] == iteration:
+                if apc_test and (demo_targets["token_pos"] - len(input_tokens_prefill_pt)) == iteration:
+                    # Check if the throughput is within the expected range
+                    print(f"len of input tokens prefill: {len(input_tokens_prefill_pt)}")
                     lower_bound = demo_targets["throughput"] - demo_targets["absolute_margin"]
                     upper_bound = demo_targets["throughput"] + demo_targets["absolute_margin"]
                     # TODO: Enable once experimentaly established avg and absolute margin
                     assert_message = (
-                        f"Throughput for APC test is not within the expected range. Current throughput: {tokens_per_second_per_user:.1f} tok/s/user, Update text_demo_targets.json file with the expected throughput.\n"
+                        f"Current throughput: {tokens_per_second_per_user:.1f} tok/s/user for APC test is not within the expected range: ({lower_bound}, {upper_bound}).\n"
+                        f"Update text_demo_targets.json file with the expected throughput.\n"
                         f"Instructions: https://github.com/tenstorrent/tt-metal/blob/main/models/demos/llama3_subdevices/README.md#updating-apc-test-target-values"
                     )
-                    # assert (
-                    #     lower_bound <= tokens_per_second_per_user <= upper_bound
-                    # ), assert_message
+                    assert lower_bound <= tokens_per_second_per_user <= upper_bound, assert_message
 
             current_pos += 1
             iteration += 1
