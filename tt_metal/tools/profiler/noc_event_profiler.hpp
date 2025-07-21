@@ -6,6 +6,7 @@
 
 #if defined(PROFILE_NOC_EVENTS) && (defined(COMPILE_FOR_NCRISC) || defined(COMPILE_FOR_BRISC))
 
+
 #include <utility>
 #include <tuple>
 #include <algorithm>
