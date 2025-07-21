@@ -17,6 +17,7 @@
 #include "compute_kernel_api/tile_move_copy.h"
 #include "compute_kernel_api/matmul.h"
 #include "compute_kernel_api/reduce.h"
+#include "debug/dprint.h"
 
 template <uint32_t num_tiles>
 void max_block_inplace(uint32_t in0, uint32_t in1) {
@@ -327,6 +328,8 @@ void sub_exp_block(uint32_t in0_cb, uint32_t in1_cb, uint32_t out_cb, uint32_t n
         acquire_dst();
 
         sub_tiles(in0_cb, in1_cb, i, i, 0);
+        DPRINT << "Check values for input" << ENDL();
+        DPRINT << TSLICE(0, 0, SliceRange::h0_w0_32()) << ENDL();
 
         exp_tile<EXP_APPROX_MODE, false, true, true>(0, static_cast<int>(VectorMode::C), scale_bf16);
 

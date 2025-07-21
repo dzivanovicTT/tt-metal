@@ -60,8 +60,8 @@ void MAIN {
     constexpr uint32_t qk_chunk_tiles = Sq_chunk_t * Sk_chunk_t;
     constexpr uint32_t out_chunk_tiles = Sq_chunk_t * vDHt;
 
-    constexpr uint32_t cb_q_in = tt::CBIndex::c_0;
-    constexpr uint32_t cb_k_in = tt::CBIndex::c_1;
+    constexpr uint32_t cb_q_in = tt::CBIndex::c_0;  // inputs - bf16
+    constexpr uint32_t cb_k_in = tt::CBIndex::c_1;  // inputs - bf8b
     constexpr uint32_t cb_v_in = tt::CBIndex::c_2;
     constexpr uint32_t cb_mask_in = tt::CBIndex::c_3;
     constexpr uint32_t cb_identity_scale_in = tt::CBIndex::c_5;
@@ -79,6 +79,7 @@ void MAIN {
     constexpr uint32_t cb_out = tt::CBIndex::c_16;
 
     mm_init(cb_q_in, cb_k_in, cb_out);
+    DPRINT << "Here" << ENDL();
 
     for (uint32_t nb = local_batch_start; nb < local_batch_end; ++nb) {
         for (uint32_t nq = local_nh_start; nq < local_nh_end; ++nq) {
