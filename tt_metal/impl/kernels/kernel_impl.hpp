@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <enchantum/enchantum.hpp>
 
 #include <umd/device/tt_core_coordinates.h>
 #include "api/tt-metalium/kernel.hpp"
@@ -72,7 +73,7 @@ public:
     DataMovementKernel(const KernelSource& kernel_src, const CoreRangeSet& cr_set, const DataMovementConfig& config) :
         KernelImpl(kernel_src, cr_set, config.compile_args, config.defines), config_(config) {
         this->dispatch_class_ =
-            magic_enum::enum_integer(HalProcessorClassType::DM) + magic_enum::enum_integer(config.processor);
+            enchantum::to_underlying(HalProcessorClassType::DM) + enchantum::to_underlying(config.processor);
     }
 
     ~DataMovementKernel() override {}
@@ -109,7 +110,7 @@ public:
     EthernetKernel(const KernelSource& kernel_src, const CoreRangeSet& cr_set, const EthernetConfig& config) :
         KernelImpl(kernel_src, cr_set, config.compile_args, config.defines), config_(config) {
         this->dispatch_class_ =
-            magic_enum::enum_integer(HalProcessorClassType::DM) + magic_enum::enum_integer(config.processor);
+            enchantum::to_underlying(HalProcessorClassType::DM) + enchantum::to_underlying(config.processor);
     }
 
     ~EthernetKernel() override {}
@@ -144,7 +145,7 @@ class ComputeKernel : public KernelImpl {
 public:
     ComputeKernel(const KernelSource& kernel_src, const CoreRangeSet& cr_set, const ComputeConfig& config) :
         KernelImpl(kernel_src, cr_set, config.compile_args, config.defines), config_(config) {
-        this->dispatch_class_ = magic_enum::enum_integer(HalProcessorClassType::COMPUTE);
+        this->dispatch_class_ = enchantum::to_underlying(HalProcessorClassType::COMPUTE);
     }
 
     ~ComputeKernel() override {}
