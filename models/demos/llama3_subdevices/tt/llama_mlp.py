@@ -138,17 +138,14 @@ class TtLlamaMLP(LightweightModule):
             use_noc1_only=False,
         )
         ttnn.deallocate(x)
-        try:
-            w3_out_reduced = self.tt_ccl.line_reduce_scatter(
-                w3_out,
-                cluster_axis=1,
-                num_links=self.model_config["GALAXY_NUM_LINKS"],
-                memory_config=self.model_config["REDUCE_SCATTER_OUT_MEMCFG"],
-                use_noc1_only=False,
-            )
-        except Exception as e:
-            print(e)
-            self.tt_ccl.close()
+        w3_out_reduced = self.tt_ccl.line_reduce_scatter(
+            w3_out,
+            cluster_axis=1,
+            num_links=self.model_config["GALAXY_NUM_LINKS"],
+            memory_config=self.model_config["REDUCE_SCATTER_OUT_MEMCFG"],
+            use_noc1_only=False,
+        )
+        ttnn.deallocate(w3_out)
 
         ff1ff3 = ttnn.mul(
             w1_out_reduced,
