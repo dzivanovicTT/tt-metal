@@ -74,6 +74,327 @@ ttnn::Shape squeeze_or_unsqueeze_shape_to_ND(const ttnn::Shape& shape, const uin
     }
 }
 
+enum DatumIndex { WormholeIndex = 0, BlackholeIndex = 1 };
+
+float get_transaction_noc_bw(
+    uint32_t transaction_size, const std::map<uint32_t, std::array<float, 2>>& dict, int index) {
+    uint32_t lower_pow2 = std::pow(2, std::floor(std::log2(transaction_size)));
+
+    uint32_t upper_pow2 = std::pow(2, std::ceil(std::log2(transaction_size)));
+
+    float lower_bw = dict.lower_bound(lower_pow2)->second[index];
+    float upper_bw = dict.lower_bound(upper_pow2)->second[index];
+
+    if (transaction_size - lower_pow2 < upper_pow2 - transaction_size) {
+        return lower_bw;
+    } else {
+        return upper_bw;
+    }
+}
+
+uint32_t get_effective_l1_cores(
+    uint32_t transaction_size,
+    int index,
+    bool is_write,
+    std::map<uint32_t, std::array<float, 2>> l1_read_bw,
+    std::map<uint32_t, std::array<float, 2>> l1_write_bw) {
+    const uint32_t max_l1_cores = (index == WormholeIndex) ? (8 + 10) : (9 + 12);
+    int num_cores = (index == WormholeIndex) ? 64 : 108;
+    float max_bw = index == WormholeIndex ? 32.0f : 50.0f;
+    auto aggregate_bw = max_bw * max_l1_cores;
+    float achieved_l1_bw = get_transaction_noc_bw(transaction_size, is_write ? l1_write_bw : l1_read_bw, index);
+    uint32_t effective_cores = std::ceil((float)aggregate_bw / (float)achieved_l1_bw);
+    if (effective_cores > num_cores) {
+        effective_cores = num_cores;
+    }
+    return effective_cores;
+}
+
+uint32_t get_effective_dram_cores(
+    uint32_t transaction_size, int index, std::map<uint32_t, std::array<float, 2>> dram_bw, bool single_noc) {
+    int num_cores = (index == WormholeIndex) ? 64 : 108;
+    auto aggregate_bw = single_noc == 1 ? 170 : 256;
+    float achieved_dram_bw = get_transaction_noc_bw(transaction_size, dram_bw, index);
+    uint32_t effective_cores = std::ceil((float)aggregate_bw / (float)achieved_dram_bw);
+    if (effective_cores > num_cores) {
+        effective_cores = num_cores;  // Limit to available cores
+    }
+    return effective_cores;
+}
+
+uint32_t get_cycles_for_transaction_size(
+    uint32_t transaction_size,
+    bool is_dram,
+    bool is_local,
+    uint32_t num_transactions,
+    uint32_t num_cores,
+    int index,
+    bool is_read,
+    std::map<uint32_t, std::array<float, 2>> l1_local_bw,
+    std::map<uint32_t, std::array<float, 2>> l1_read_bw,
+    std::map<uint32_t, std::array<float, 2>> l1_write_bw,
+    std::map<uint32_t, std::array<float, 2>> dram_bw) {
+    auto transaction_type = is_local ? l1_local_bw : (is_read ? l1_read_bw : l1_write_bw);
+    if (is_dram) {
+        transaction_type = dram_bw;
+    }
+    uint32_t latency_cyles = 1;
+    if (transaction_type == l1_local_bw) {
+        latency_cyles = index == WormholeIndex ? 56 : 88;
+    } else if (transaction_type == l1_read_bw) {
+        latency_cyles = index == WormholeIndex ? 259 : 403;
+    } else if (transaction_type == l1_write_bw) {
+        latency_cyles = index == WormholeIndex ? 256 : 404;
+    } else if (transaction_type == dram_bw) {
+        latency_cyles = index == WormholeIndex ? 358 : 529;
+    }
+
+    transaction_size = std::max(transaction_size, 16u);
+    auto transaction_bw = get_transaction_noc_bw(transaction_size, transaction_type, index);
+    float device_frequency_hz = index == WormholeIndex ? 1e9 : 1.2e9;
+    uint32_t cycles = 1;
+    if (is_dram) {
+        cycles = std::ceil(
+            (float)(num_transactions * transaction_size * device_frequency_hz) / (float)(transaction_bw * 1e9));
+    } else {
+        cycles = std::ceil(
+            (float)(num_transactions * transaction_size * device_frequency_hz) / (float)(transaction_bw * 1e9));
+    }
+    return cycles + latency_cyles;
+}
+
+int common_tm_bw_model(const Tensor& input_tensor, const Tensor& output_tensor, bool output_only, int compute_cycles) {
+    // the bw maps assigns a measured bandwidth per transaction size for each device architecture
+    std::map<uint32_t, std::array<float, 2>> dram_bw = {
+        {16, {0.436, 0.387}},
+        {32, {0.868, 0.772}},
+        {64, {1.736, 1.545}},
+        {128, {3.489, 3.088}},
+        {256, {6.975, 6.176}},
+        {512, {13.889, 12.361}},
+        {1024, {27.891, 24.71}},
+        {2048, {28.411, 49.164}},
+        {4096, {28.227, 50.238}},
+        {8192, {28.537, 50.393}},
+        {16384, {27.831, 50.636}},
+        {32768, {27.758, 50.695}},
+        {65536, {28.694, 50.626}}};
+
+    std::map<uint32_t, std::array<float, 2>> l1_read_bw = {
+        {16, {0.868, 0.671}},
+        {32, {1.724, 1.336}},
+        {64, {3.477, 2.673}},
+        {128, {6.885, 5.354}},
+        {256, {13.794, 10.691}},
+        {512, {27.143, 21.382}},
+        {1024, {28.976, 42.771}},
+        {2048, {29.742, 47.977}},
+        {4096, {29.544, 49.34}},
+        {8192, {28.728, 49.961}},
+        {16384, {28.7, 50.287}},
+        {32768, {28.618, 50.335}},
+        {65536, {28.7, 50.403}}};
+
+    std::map<uint32_t, std::array<float, 2>> l1_write_bw = {
+        {16, {0.681, 0.511}},
+        {32, {1.254, 1.018}},
+        {64, {2.709, 2.036}},
+        {128, {5.417, 4.072}},
+        {256, {10.823, 8.143}},
+        {512, {21.668, 16.284}},
+        {1024, {27.837, 32.593}},
+        {2048, {27.811, 48.644}},
+        {4096, {27.811, 49.828}},
+        {8192, {27.808, 50.219}},
+        {16384, {27.808, 50.578}},
+        {32768, {27.811, 50.412}},
+        {65536, {28.808, 50.383}}};
+
+    std::map<uint32_t, std::array<float, 2>> l1_local_bw = {
+        {16, {0.868, 0.671}},
+        {32, {1.724, 1.337}},
+        {64, {3.477, 2.675}},
+        {128, {6.899, 5.354}},
+        {256, {13.791, 10.708}},
+        {512, {27.594, 21.413}},
+        {1024, {27.696, 42.792}},
+        {2048, {27.911, 46.455}},
+        {4096, {27.811, 48.5}},
+        {8192, {27.808, 49.639}},
+        {16384, {27.814, 50.171}},
+        {32768, {27.805, 50.123}},
+        {65536, {27.84, 50.21}}};
+
+    const auto& input_shape = input_tensor.padded_shape();
+    auto element_size_bytes = input_tensor.element_size();
+    bool input_is_sharded = input_tensor.memory_config().is_sharded();
+    bool input_is_dram = input_tensor.buffer()->buffer_type() == tt::tt_metal::BufferType::DRAM;
+    bool input_is_tiled = input_tensor.layout() == Layout::TILE;
+    uint32_t input_size_bytes = input_shape.volume() * element_size_bytes;
+
+    auto arch = input_tensor.device()->arch();
+    if (arch != tt::ARCH::WORMHOLE_B0 && arch != tt::ARCH::BLACKHOLE) {
+        TT_THROW("Unsupported architecture for common_bw_model: {}", arch);
+    }
+    int num_cores = (arch == tt::ARCH::WORMHOLE_B0) ? 64 : 108;
+    int total_num_cores = num_cores;
+    int index = (arch == tt::ARCH::WORMHOLE_B0) ? 0 : 1;
+
+    tt::DataFormat cb_data_format = tt::tt_metal::datatype_to_dataformat_converter(input_tensor.dtype());
+    uint32_t tile_width = input_tensor.tensor_spec().tile().get_width();
+    uint32_t tile_height = input_tensor.tensor_spec().tile().get_height();
+    uint32_t single_tile_size = tile_width * tile_height * element_size_bytes;
+    uint32_t input_transaction_size = input_is_tiled ? single_tile_size : input_shape[-1] * element_size_bytes;
+
+    if (input_is_sharded) {
+        const auto& input_shard_shape = input_tensor.memory_config().shard_spec().value().shape;
+        input_transaction_size = input_is_tiled ? single_tile_size : input_shard_shape[1] * element_size_bytes;
+        // can increase transaction size for height-sharded tensors
+        if (!input_is_tiled && !input_is_dram &&
+            input_tensor.memory_config().memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED) {
+            uint32_t row_size = input_shard_shape[1] * element_size_bytes;
+            uint32_t multi_row_size = input_shard_shape[0] * row_size;
+            const uint32_t max_transaction_size = 65536u;
+            input_transaction_size = std::min(multi_row_size, max_transaction_size);
+        }
+    }
+
+    uint32_t num_read_transactions = std::ceil((float)input_size_bytes / (float)input_transaction_size);
+
+    bool output_is_dram = output_tensor.buffer()->buffer_type() == tt::tt_metal::BufferType::DRAM;
+    bool output_is_tiled = output_tensor.layout() == Layout::TILE;
+    bool output_is_sharded = output_tensor.memory_config().is_sharded();
+
+    const auto& output_shape = output_tensor.padded_shape();
+    uint32_t output_size_bytes = output_shape.volume() * element_size_bytes;
+
+    uint32_t output_transaction_size = output_is_tiled ? single_tile_size : output_shape[-1] * element_size_bytes;
+
+    if (output_is_sharded) {
+        const auto& output_shard_shape = output_tensor.memory_config().shard_spec().value().shape;
+        output_transaction_size = output_is_tiled ? single_tile_size : output_shard_shape[1] * element_size_bytes;
+        if (!output_is_tiled && !output_is_dram &&
+            output_tensor.memory_config().memory_layout() == TensorMemoryLayout::HEIGHT_SHARDED) {
+            uint32_t out_row_size = output_shard_shape[1] * element_size_bytes;
+            uint32_t out_multi_row_size = output_shard_shape[0] * out_row_size;
+            const uint32_t max_transaction_size = 65536u;
+            output_transaction_size = std::min(out_multi_row_size, max_transaction_size);
+        }
+    }
+    uint32_t num_write_transactions = std::ceil((float)output_size_bytes / (float)output_transaction_size);
+    auto updated_input_transactions = num_read_transactions;
+    auto updated_output_transactions = num_write_transactions;
+    // limit number of cores to max aggregate bw to avoid congestion
+    float read_util = 1.0f;
+    float write_util = 1.0f;
+    if (input_is_dram && output_is_dram) {
+        uint32_t input_effective_cores = get_effective_dram_cores(input_transaction_size, index, dram_bw, false);
+        uint32_t output_effective_cores = get_effective_dram_cores(output_transaction_size, index, dram_bw, false);
+        auto actual_read_cores = std::min(input_effective_cores, num_read_transactions);
+        auto actual_write_cores = std::min(output_effective_cores, num_write_transactions);
+        updated_input_transactions = std::ceil((float)num_read_transactions / (float)actual_read_cores);
+        updated_output_transactions = std::ceil((float)num_write_transactions / (float)actual_write_cores);
+        num_cores = actual_read_cores;
+        if (updated_input_transactions < updated_output_transactions) {
+            num_cores = actual_write_cores;
+        }
+        read_util = (float)num_cores / (float)input_effective_cores;
+        write_util = (float)num_cores / (float)output_effective_cores;
+
+    } else if (input_is_dram) {
+        num_cores = get_effective_dram_cores(input_transaction_size, index, dram_bw, true);
+        updated_input_transactions = std::ceil((float)num_read_transactions / (float)num_cores);
+    } else if (output_is_dram) {
+        num_cores = get_effective_dram_cores(output_transaction_size, index, dram_bw, true);
+        updated_output_transactions = std::ceil((float)num_write_transactions / (float)num_cores);
+    }
+    // local noc transactions for l1 sharded tensors
+    bool is_local = input_is_sharded && !input_is_dram && output_is_sharded && !output_is_dram &&
+                    (output_tensor.memory_config().shard_spec().value().grid ==
+                     input_tensor.memory_config().shard_spec().value().grid);
+
+    if (!input_is_dram && !output_is_dram) {
+        uint32_t input_effective_cores =
+            get_effective_l1_cores(input_transaction_size, index, false, l1_read_bw, l1_write_bw);
+        uint32_t output_effective_cores =
+            get_effective_l1_cores(output_transaction_size, index, true, l1_read_bw, l1_write_bw);
+        auto actual_read_cores = std::min(input_effective_cores, num_read_transactions);
+        auto actual_write_cores = std::min(output_effective_cores, num_write_transactions);
+        auto updated_input_transactions = std::ceil((float)num_read_transactions / (float)actual_read_cores);
+        auto updated_output_transactions = std::ceil((float)num_write_transactions / (float)actual_write_cores);
+        num_cores = actual_read_cores;
+        if (updated_input_transactions < updated_output_transactions) {
+            num_cores = actual_write_cores;
+        }
+    } else if (!input_is_dram) {
+        auto num_cores_ = get_effective_l1_cores(input_transaction_size, index, false, l1_read_bw, l1_write_bw);
+        if (updated_output_transactions < (num_read_transactions / num_cores_)) {
+            num_cores = num_cores_;
+        }
+    } else if (!output_is_dram) {
+        auto num_cores_ = get_effective_l1_cores(output_transaction_size, index, true, l1_read_bw, l1_write_bw);
+        if (updated_input_transactions < (num_write_transactions / num_cores_)) {
+            num_cores = num_cores_;
+        }
+    }
+
+    num_cores = is_local ? input_tensor.memory_config().shard_spec().value().grid.num_cores() : num_cores;
+
+    // parallelize work over cores
+    // assume distribution of work is balanced between cores
+    num_read_transactions = std::ceil((float)num_read_transactions / (float)num_cores);
+    num_write_transactions = std::ceil((float)num_write_transactions / (float)num_cores);
+
+    auto total_read_cycles = get_cycles_for_transaction_size(
+        input_transaction_size,
+        input_is_dram,
+        is_local,
+        num_read_transactions,
+        num_cores,
+        index,
+        true,
+        l1_local_bw,
+        l1_read_bw,
+        l1_write_bw,
+        dram_bw);
+
+    auto total_write_cycles = get_cycles_for_transaction_size(
+        output_transaction_size,
+        output_is_dram,
+        is_local,
+        num_write_transactions,
+        num_cores,
+        index,
+        false,
+        l1_local_bw,
+        l1_read_bw,
+        l1_write_bw,
+        dram_bw);
+
+    int ideal_dev_clock_cycles = 1;
+    if (input_is_dram && output_is_dram) {
+        float overlap_factor = 1.0f;
+        if (read_util < 0.3f && write_util < 0.3f) {
+            overlap_factor = 0.6f;
+        } else if (read_util < 0.3f || write_util < 0.3f) {
+            overlap_factor = 0.8f;
+        } else if (read_util > 0.8f && write_util > 0.8f) {
+            overlap_factor = 1.0f;
+        } else {
+            overlap_factor = 0.9f;
+        }
+        ideal_dev_clock_cycles =
+            output_only ? total_write_cycles
+                        : std::ceil((float)(total_read_cycles + total_write_cycles) * (float)overlap_factor);
+    } else {
+        ideal_dev_clock_cycles = output_only ? total_write_cycles : std::max(total_read_cycles, total_write_cycles);
+    }
+    int total_compute_cycles = 0;
+    if (compute_cycles > 0) {
+        total_compute_cycles = std::ceil((float)compute_cycles / (float)total_num_cores);
+    }
+    return std::max(ideal_dev_clock_cycles, total_compute_cycles);
+}
 
 uint32_t get_estimated_size_of_cbs(
     const Tensor& input_tensor_a,
