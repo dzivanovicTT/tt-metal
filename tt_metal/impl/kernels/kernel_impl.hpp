@@ -5,6 +5,7 @@
 #pragma once
 
 #include <string>
+#include <enchantum/enchantum.hpp>
 
 #include <umd/device/tt_core_coordinates.h>
 #include "api/tt-metalium/kernel.hpp"

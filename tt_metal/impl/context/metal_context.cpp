@@ -2,6 +2,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
+#include <enchantum/enchantum.hpp>
+
 #include "metal_context.hpp"
 #include <fmt/ranges.h>
 #include <umd/device/types/cluster_descriptor_types.h>
