@@ -35,7 +35,7 @@ int count_unique_buffers(const Tensor& tensor) {
 }
 
 using TensorDistributionTest = GenericMeshDeviceFixture;
-using TensorDistributionT3000Test = T3000MeshDeviceFixture;
+using TensorDistribution2x4Test = MeshDevice2x4Fixture;
 
 TEST_F(TensorDistributionTest, DistributeToDevice) {
     Tensor input_tensor = Tensor::from_vector(
@@ -62,7 +62,7 @@ TEST_F(TensorDistributionTest, SingleDeviceTensorReplication) {
     }
 }
 
-TEST_F(TensorDistributionT3000Test, Shard1DInvalidDim) {
+TEST_F(TensorDistribution2x4Test, Shard1DInvalidDim) {
     const int num_devices = mesh_device_->num_devices();
     Tensor input_tensor = Tensor::from_vector(
         std::vector<float>(num_devices, 0), get_tensor_spec(ttnn::Shape{1, 1, 1, num_devices}, DataType::FLOAT32));
@@ -78,7 +78,7 @@ TEST_F(TensorDistributionT3000Test, Shard1DInvalidDim) {
     });
 }
 
-TEST_F(TensorDistributionT3000Test, Shard1DFewerShardsThanDevices) {
+TEST_F(TensorDistribution2x4Test, Shard1DFewerShardsThanDevices) {
     const int num_devices = mesh_device_->num_devices();
     std::vector<float> test_data;
     for (int i = 0; i < num_devices - 1; i++) {
@@ -107,7 +107,7 @@ TEST_F(TensorDistributionT3000Test, Shard1DFewerShardsThanDevices) {
     EXPECT_TRUE(ttnn::allclose<float>(concatenated_tensor, expected_tensor));
 }
 
-TEST_F(TensorDistributionT3000Test, Shard1DNegativeDim) {
+TEST_F(TensorDistribution2x4Test, Shard1DNegativeDim) {
     const int num_devices = mesh_device_->num_devices();
     std::vector<float> test_data(num_devices, 0);
     std::iota(test_data.begin(), test_data.end(), 0);
@@ -124,7 +124,7 @@ TEST_F(TensorDistributionT3000Test, Shard1DNegativeDim) {
     }
 }
 
-TEST_F(TensorDistributionT3000Test, Shard1D) {
+TEST_F(TensorDistribution2x4Test, Shard1D) {
     const int num_devices = mesh_device_->num_devices();
     std::vector<float> test_data;
     for (int i = 0; i < num_devices; i++) {
@@ -152,7 +152,7 @@ TEST_F(TensorDistributionT3000Test, Shard1D) {
     EXPECT_TRUE(ttnn::allclose<float>(concatenated_tensor, expected_tensor));
 }
 
-TEST_F(TensorDistributionT3000Test, PartialConcat) {
+TEST_F(TensorDistribution2x4Test, PartialConcat) {
     constexpr int kNumRows = 2;
     constexpr int kNumCols = 4;
     std::vector<float> test_data;
@@ -198,10 +198,10 @@ TEST_F(TensorDistributionT3000Test, PartialConcat) {
         ElementsAre(0, 1, 2, 10, 11, 12));
 }
 
-class TensorDistributionT3000Test2D : public TensorDistributionT3000Test,
-                                      public ::testing::WithParamInterface<MeshShape> {};
+class TensorDistribution2x4Test2D : public TensorDistribution2x4Test,
+                                    public ::testing::WithParamInterface<MeshShape> {};
 
-TEST_P(TensorDistributionT3000Test2D, FullyReplicated) {
+TEST_P(TensorDistribution2x4Test2D, FullyReplicated) {
     const auto num_rows = GetParam()[0];
     const auto num_cols = GetParam()[1];
     const auto num_devices = num_rows * num_cols;
@@ -230,7 +230,7 @@ TEST_P(TensorDistributionT3000Test2D, FullyReplicated) {
     }
 }
 
-TEST_P(TensorDistributionT3000Test2D, ReplicateDim) {
+TEST_P(TensorDistribution2x4Test2D, ReplicateDim) {
     const auto num_rows = GetParam()[0];
     const auto num_cols = GetParam()[1];
     const auto num_devices = num_rows * num_cols;
@@ -273,7 +273,7 @@ TEST_P(TensorDistributionT3000Test2D, ReplicateDim) {
     }
 }
 
-TEST_P(TensorDistributionT3000Test2D, ShardDims) {
+TEST_P(TensorDistribution2x4Test2D, ShardDims) {
     const auto num_rows = GetParam()[0];
     const auto num_cols = GetParam()[1];
     const int num_devices = num_rows * num_cols;
@@ -315,11 +315,11 @@ TEST_P(TensorDistributionT3000Test2D, ShardDims) {
 }
 
 INSTANTIATE_TEST_SUITE_P(
-    TensorDistributionT3000Test2D,
-    TensorDistributionT3000Test2D,
+    TensorDistribution2x4Test2D,
+    TensorDistribution2x4Test2D,
     ::testing::Values(MeshShape(1, 1), MeshShape(2, 2), MeshShape(2, 4), MeshShape(1, 3)));
 
-TEST_F(TensorDistributionT3000Test, NdMapperInvalidShape) {
+TEST_F(TensorDistribution2x4Test, NdMapperInvalidShape) {
     EXPECT_ANY_THROW(create_mesh_mapper(
         *mesh_device_,
         MeshMapperConfig{
@@ -328,7 +328,7 @@ TEST_F(TensorDistributionT3000Test, NdMapperInvalidShape) {
         }));
 }
 
-TEST_F(TensorDistributionT3000Test, NdMapperUnevenSharding) {
+TEST_F(TensorDistribution2x4Test, NdMapperUnevenSharding) {
     constexpr int kNumRows = 2;
     constexpr int kNumCols = 4;
 
@@ -349,7 +349,7 @@ TEST_F(TensorDistributionT3000Test, NdMapperUnevenSharding) {
     EXPECT_ANY_THROW({ Tensor sharded_tensor = distribute_tensor(input_tensor, *mapper, *mesh_device_); });
 }
 
-TEST_F(TensorDistributionT3000Test, NdMapperInvalidPlacements) {
+TEST_F(TensorDistribution2x4Test, NdMapperInvalidPlacements) {
     // Too few placements.
     EXPECT_ANY_THROW(create_mesh_mapper(
         *mesh_device_,
@@ -365,7 +365,7 @@ TEST_F(TensorDistributionT3000Test, NdMapperInvalidPlacements) {
         }));
 }
 
-TEST_F(TensorDistributionT3000Test, NdComposerInvalidShape) {
+TEST_F(TensorDistribution2x4Test, NdComposerInvalidShape) {
     EXPECT_ANY_THROW(create_mesh_composer(
         *mesh_device_,
         MeshComposerConfig{
@@ -374,7 +374,7 @@ TEST_F(TensorDistributionT3000Test, NdComposerInvalidShape) {
         }));
 }
 
-TEST_F(TensorDistributionT3000Test, NdComposerInvalidDims) {
+TEST_F(TensorDistribution2x4Test, NdComposerInvalidDims) {
     EXPECT_ANY_THROW(create_mesh_composer(
         *mesh_device_,
         MeshComposerConfig{
@@ -382,7 +382,7 @@ TEST_F(TensorDistributionT3000Test, NdComposerInvalidDims) {
         }));
 }
 
-TEST_F(TensorDistributionT3000Test, NdMapperShard3D) {
+TEST_F(TensorDistribution2x4Test, NdMapperShard3D) {
     constexpr size_t kNumRows = 2;
     constexpr size_t kNumCols = 4;
     constexpr size_t kInnerDim = 7;
