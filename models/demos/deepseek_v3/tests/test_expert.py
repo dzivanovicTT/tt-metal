@@ -15,7 +15,7 @@ import ttnn
 from models.demos.deepseek_v3.reference.modeling_deepseek import DeepseekV3MLP as ReferenceExpert
 
 # Import from local reference files instead of HuggingFace
-from models.demos.deepseek_v3.tt.expert import Expert as TTExpert
+from models.demos.deepseek_v3.tt.mlp.expert import Expert as TTExpert
 from models.demos.deepseek_v3.utils.run_config import create_run_config
 from models.utility_functions import comp_pcc
 

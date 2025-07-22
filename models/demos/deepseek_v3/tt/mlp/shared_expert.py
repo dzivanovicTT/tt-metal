@@ -4,11 +4,11 @@
 
 from transformers.configuration_utils import PretrainedConfig
 
-from models.demos.deepseek_v3.tt.mlp_1d import MLP1D
+from models.demos.deepseek_v3.tt.mlp.mlp_1d_dequant import MLP1DDequant
 
 
-class Expert(MLP1D):  # The only difference with the regular Dequantized MLP is the intermediate layer size
-    """Expert layer for Mixture-of-Experts (MoE) models."""
+class SharedExpert(MLP1DDequant):  # The only difference with the regular Dequantized MLP is the intermediate layer size
+    """Shared Expert layer for Mixture-of-Experts (MoE) models."""
 
     @classmethod
     def _get_model_dims_from_cfg(cls, hf_config: PretrainedConfig) -> tuple[int, int]:

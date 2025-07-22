@@ -20,7 +20,6 @@ from models.demos.deepseek_v3.utils.config_dataclass import (
 )
 from models.demos.deepseek_v3.utils.config_helpers import (
     COMPUTE_KERNEL_CONFIG_LOFI,
-    COMPUTE_KERNEL_CONFIG_SDPA,
     MAX_BATCH_SIZE,
     SEQ_LEN_CHUNK_SIZE,
     dram_sharded_weight_config,
@@ -137,7 +136,6 @@ class MLP1D(AbstractModule):
             mesh_mapper=ttnn.shard_tensor_to_mesh_mapper(mesh_device, mesh_sharded_dim),
         )
 
-    @final
     @classmethod
     def is_device_supported(cls, mesh_device: ttnn.Device) -> bool:
         """
@@ -162,7 +160,7 @@ class MLP1D(AbstractModule):
         Returns:
             ModelPrefillConfig containing operator configurations for prefill mode
         """
-        matmul_core_grid_size = ttnn.CoreCoord(  # Matmul expects the core grid size in (y, x) format
+        matmul_core_grid_size = ttnn.CoreCoord(
             mesh_device.core_grid.x,
             mesh_device.core_grid.y,
         )  # NOTE: we might modify this later during optimization stage
@@ -191,7 +189,7 @@ class MLP1D(AbstractModule):
             "w3": linear_op_config,
             "mul": MulConfig(
                 memory_config=ttnn.DRAM_MEMORY_CONFIG,
-                input_tensor_a_activations=[ttnn.UnaryOpType.SILU],
+                input_tensor_a_activations=[],  # [ttnn.UnaryOpType.SILU], TODO: uncomment once SiLU works properly
             ),
             "reduce_scatter": ReduceScatterConfig(
                 dim=-1,  # We are scattering across the feature dimension (last one)
@@ -276,7 +274,7 @@ class MLP1D(AbstractModule):
                     inner_num_cores,
                     output_num_cores,
                 ),
-                compute_kernel_config=COMPUTE_KERNEL_CONFIG_SDPA,
+                compute_kernel_config=COMPUTE_KERNEL_CONFIG_LOFI,
             ),
             "w3": LinearConfig(
                 input_tensor_b=FromWeightConfig(MeshDeviceStub(mesh_device.shape)),
@@ -288,7 +286,7 @@ class MLP1D(AbstractModule):
             ),
             "mul": MulConfig(
                 memory_config=ttnn.L1_WIDTH_SHARDED_MEMORY_CONFIG,
-                input_tensor_a_activations=[ttnn.UnaryOpType.SILU],
+                input_tensor_a_activations=[],  # [ttnn.UnaryOpType.SILU], TODO: uncomment once SiLU works properly
             ),
             "reduce_scatter": ReduceScatterConfig(
                 dim=-1,  # We are scattering across the feature dimension (last one)
@@ -313,6 +311,22 @@ class MLP1D(AbstractModule):
         dim = hf_config.hidden_size
         hidden_dim = hf_config.intermediate_size
         return dim, hidden_dim
+
+    @classmethod
+    def _golden_silu(cls, x: ttnn.Tensor) -> ttnn.Tensor:
+        """Golden implementation of the SiLU activation function. TODO: This is only a temporary fix for the bug reported in issue #24352."""
+        x1 = ttnn.neg(x)
+        x2 = ttnn.exp(x1)
+        x3 = ttnn.add(x2, 1)
+        x4 = ttnn.ones_like(x)
+        x5 = ttnn.div(x4, x3)
+        x6 = ttnn.mul(x, x5)
+        ttnn.deallocate(x1)
+        ttnn.deallocate(x2)
+        ttnn.deallocate(x3)
+        ttnn.deallocate(x4)
+        ttnn.deallocate(x5)
+        return x6
 
     @final
     @classmethod
@@ -367,6 +381,8 @@ class MLP1D(AbstractModule):
 
     @classmethod
     def forward_prefill(cls, x: ttnn.Tensor, cfg: RunPrefillConfig) -> ttnn.Tensor:
+        assert x.memory_config() == cfg["input_memory_config"]
+
         _, _, seq_len, _ = x.shape
 
         if seq_len > cfg["max_rows"]:  # For large sequence lengths, process the input in chunks
@@ -382,11 +398,13 @@ class MLP1D(AbstractModule):
         )
         ttnn.deallocate(x)
 
-        # add reduce-scatter here to gather intermediates
+        # Apply SiLU activation
+        w1_activated = cls._golden_silu(w1_out)
+        ttnn.deallocate(w1_out)
 
         # Apply activation and multiply
-        activated = ttnn.mul(w1_out, w3_out, **cfg["mul"])
-        ttnn.deallocate(w1_out)
+        activated = ttnn.mul(w1_activated, w3_out, **cfg["mul"])
+        ttnn.deallocate(w1_activated)
         ttnn.deallocate(w3_out)
 
         # Down projection with dynamic program configs, no need to reshard as we are using dram activations
@@ -416,16 +434,22 @@ class MLP1D(AbstractModule):
         w1_out = ttnn.linear(x, **cfg["w1"])
         w3_out = ttnn.linear(x, **cfg["w3"])
 
+        # Apply SiLU activation
+        w1_activated = cls._golden_silu(w1_out)
+        ttnn.deallocate(w1_out)
+
         # Apply activation and multiply
-        activated = ttnn.mul(w1_out, w3_out, **cfg["mul"])
+        activated = ttnn.mul(w1_activated, w3_out, **cfg["mul"])
+        ttnn.deallocate(w1_activated)
+        ttnn.deallocate(w3_out)
 
         # Down projection
         w2_out = ttnn.linear(activated, **cfg["w2"])
-        # ttnn.deallocate(activated)
+        ttnn.deallocate(activated)
 
         # Add reduce-scatter
         output = ttnn.reduce_scatter(w2_out, **cfg["reduce_scatter"])
-        # ttnn.deallocate(w2_out)
+        ttnn.deallocate(w2_out)
 
         assert output.memory_config() == cfg["output_memory_config"]
         return output
