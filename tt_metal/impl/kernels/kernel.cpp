@@ -35,6 +35,49 @@ namespace tt {
 
 namespace tt_metal {
 
+namespace fs = std::filesystem;
+
+// Kernel path searching:
+//
+// If the path doesn't exist as a absolute/relative path, then it must be relative to
+// TT_METAL_HOME/TT_METAL_KERNEL_PATH.
+//
+static fs::path find_fallback_path_from_config(const fs::path& file_path) {
+    fs::path file_path_relative_to_dir;
+
+    const auto& rtoptions = tt_metal::MetalContext::instance().rtoptions();
+    if (rtoptions.is_root_dir_specified()) {
+        file_path_relative_to_dir = rtoptions.get_root_dir() / file_path;
+    }
+
+    if (!fs::exists(file_path_relative_to_dir) && rtoptions.is_kernel_dir_specified()) {
+        file_path_relative_to_dir = rtoptions.get_kernel_dir() / file_path;
+    }
+
+    if (!fs::exists(file_path_relative_to_dir)) {
+        file_path_relative_to_dir = rtoptions.get_system_kernel_dir() / file_path;
+    }
+
+    return file_path_relative_to_dir;
+}
+
+static fs::path find_path(const std::string& search_path) {
+    if (fs::exists(search_path)) {
+        return search_path;
+    } else if (auto fall_back_path = find_fallback_path_from_config(search_path); fs::exists(fall_back_path)) {
+        return fall_back_path;
+    } else {
+        TT_THROW("Kernel file {} doesn't exist!", search_path);
+    }
+}
+
+KernelSource::KernelSource(const std::string& source, const SourceType& source_type) :
+    source_(source), source_type_(source_type) {
+    if (source_type == FILE_PATH) {
+        path_ = find_path(source);
+    }
+};
+
 HalProgrammableCoreType get_programmable_core_type_from_riscv(RISCV riscv_processor, bool is_idle_eth) {
     switch (riscv_processor) {
         case RISCV::BRISC:
