@@ -25,11 +25,13 @@ random.seed(0)
 # Each suite has a key name (in this case "suite_1" and "suite_2") which will associate the test vectors to this specific suite of inputs.
 # Developers can create their own generator functions and pass them to the parameters as inputs.
 parameters = {
-    "fdv": {
-        "input_shape": [[1, 1, 32, 32], [1, 1, 320, 384], [1, 3, 320, 384]],
+    "nightly": {
+        "input_shape": gen_shapes([1, 1, 1, 1], [6, 12, 256, 256], [1, 1, 1, 1], 8)
+        + gen_shapes([1, 1, 1], [12, 256, 256], [1, 1, 1], 8)
+        + gen_shapes([1, 1], [256, 256], [1, 1], 8),
         "input_a_dtype": [ttnn.bfloat16],
         "input_b_dtype": [ttnn.bfloat16],
-        "input_layout": [ttnn.TILE_LAYOUT, ttnn.ROW_MAJOR_LAYOUT],
+        "input_layout": [ttnn.TILE_LAYOUT],
         "input_a_memory_config": [ttnn.DRAM_MEMORY_CONFIG, ttnn.L1_MEMORY_CONFIG],
         "input_b_memory_config": [ttnn.DRAM_MEMORY_CONFIG, ttnn.L1_MEMORY_CONFIG],
         "output_memory_config": [ttnn.DRAM_MEMORY_CONFIG, ttnn.L1_MEMORY_CONFIG],
@@ -51,7 +53,13 @@ def mesh_device_fixture():
 # Returns False, None if the vector is valid, and True, str with a reason for invalidation if it is invalid.
 def invalidate_vector(test_vector) -> Tuple[bool, Optional[str]]:
     if test_vector["input_layout"] == ttnn.ROW_MAJOR_LAYOUT:
-        return True, "Unary operation requires tensor to be in Tile layout when working with non-sharded input tensor"
+        return True, "Input to eltwise binary must be tilized"
+    if test_vector["input_a_dtype"] == ttnn.bfloat8_b or test_vector["input_b_dtype"] == ttnn.bfloat8_b:
+        return True, "bfloat8_b is not supported"
+    if test_vector["input_layout"] == "ROW_MAJOR_LAYOUT" and (
+        test_vector["input_a_dtype"] == ttnn.bfloat8_b or test_vector["input_b_dtype"] == ttnn.bfloat8_b
+    ):
+        return True, "bfloat8_b is only supported on tiled layout"
     return False, None
 
 
@@ -70,6 +78,9 @@ def run(
     *,
     device,
 ) -> list:
+    data_seed = random.randint(0, 20000000)
+    torch.manual_seed(data_seed)
+
     if input_layout == ttnn.ROW_MAJOR_LAYOUT:
         input_shape = sanitize_shape_rm(input_shape)
 
@@ -78,8 +89,10 @@ def run(
     )(input_shape)
 
     torch_input_tensor_b = gen_func_with_cast_tt(
-        partial(torch_random, low=-100, high=100, dtype=torch.float32), input_a_dtype
+        partial(torch_random, low=0.1, high=100, dtype=torch.float32), input_b_dtype
     )(input_shape)
+    signs_b = torch.randint(0, 2, input_shape) * 2 - 1
+    torch_input_tensor_b *= signs_b
 
     golden_function = ttnn.get_golden_function(ttnn.floor_div)
     torch_output_tensor = golden_function(torch_input_tensor_a, torch_input_tensor_b)
@@ -106,4 +119,4 @@ def run(
 
     output_tensor = ttnn.to_torch(output_tensor)
 
-    return [check_with_pcc(torch_output_tensor, output_tensor, 0.99), e2e_perf]
+    return [check_with_pcc(torch_output_tensor, output_tensor, 0.999), e2e_perf]
